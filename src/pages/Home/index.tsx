@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import './index.less'
-import { CHARACTERS, getSelected } from '@/pages/Shop'
+import { CHARACTERS } from '@/features/shop/catalog'
+import { getSelected } from '@/features/shop/storage'
 import { addStars, getStarBalance } from '@/utils/starCurrency'
 import {
   BOTTOM_HORIZONTAL_SPREAD,

@@ -17,7 +17,3 @@ export function saveStarBalance(balance: number): number {
 export function addStars(amount = 1): number {
   return saveStarBalance(getStarBalance() + amount)
 }
-
-export function resetStarBalance(): number {
-  return saveStarBalance(INITIAL_STAR_BALANCE)
-}
