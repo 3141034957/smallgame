@@ -4,8 +4,10 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { createLeaderboardStore } from './database.mjs'
 import {
+  createLegacyPlayerId,
   MAX_SCORE,
   normalizeCharacterId,
+  normalizePlayerId,
   normalizeScoreInput,
 } from './leaderboard.mjs'
 
@@ -88,7 +90,17 @@ const server = createServer((req, res) => {
           return
         }
 
+        const playerId = requestBody.playerId === undefined
+          ? createLegacyPlayerId(input.name)
+          : normalizePlayerId(requestBody.playerId)
+        if (!playerId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'invalid playerId' }))
+          return
+        }
+
         leaderboardStore.submitScore(
+          playerId,
           input.name,
           input.score,
           normalizeCharacterId(requestBody.characterId),

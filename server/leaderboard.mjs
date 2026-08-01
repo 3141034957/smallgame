@@ -17,6 +17,16 @@ export function normalizeCharacterId(value) {
     : DEFAULT_CHARACTER_ID
 }
 
+export function normalizePlayerId(value) {
+  if (typeof value !== 'string') return null
+  const playerId = value.trim()
+  return /^[a-zA-Z0-9_-]{8,96}$/.test(playerId) ? playerId : null
+}
+
+export function createLegacyPlayerId(name) {
+  return `legacy:${name}`
+}
+
 export function normalizeScoreInput(value) {
   const name = typeof value?.name === 'string'
     ? value.name.trim().replace(/\s+/g, ' ').slice(0, 12)

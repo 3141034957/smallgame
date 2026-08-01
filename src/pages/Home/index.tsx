@@ -49,9 +49,57 @@ import type {
 
 const API_BASE = '/api'
 const NICKNAME_STORAGE_KEY = 'clockwork-player-nickname-v1'
+const PLAYER_ID_STORAGE_KEY = 'clockwork-player-id-v1'
 const MAX_REVIVES_PER_RUN = 10
 
+function createCompatiblePlayerId() {
+  try {
+    if (typeof globalThis.crypto?.randomUUID === 'function') {
+      return globalThis.crypto.randomUUID()
+    }
+  } catch {
+    // Some browsers expose randomUUID but block it on non-HTTPS origins.
+  }
+
+  const bytes = new Uint8Array(16)
+  if (typeof globalThis.crypto?.getRandomValues === 'function') {
+    globalThis.crypto.getRandomValues(bytes)
+  } else {
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256)
+    }
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0'))
+  return [
+    hex.slice(0, 4).join(''),
+    hex.slice(4, 6).join(''),
+    hex.slice(6, 8).join(''),
+    hex.slice(8, 10).join(''),
+    hex.slice(10).join(''),
+  ].join('-')
+}
+
+function getOrCreatePlayerId() {
+  try {
+    const storedPlayerId = localStorage.getItem(PLAYER_ID_STORAGE_KEY)
+    if (storedPlayerId) return storedPlayerId
+  } catch {
+    // Continue with an in-memory ID when site storage is unavailable.
+  }
+
+  const playerId = createCompatiblePlayerId()
+  try {
+    localStorage.setItem(PLAYER_ID_STORAGE_KEY, playerId)
+  } catch {
+    // The current game session can still work without persistent storage.
+  }
+  return playerId
+}
+
 async function submitScore(
+  playerId: string,
   name: string,
   score: number,
   characterId: string,
@@ -61,7 +109,7 @@ async function submitScore(
     const response = await fetch(`${API_BASE}/score`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, score, characterId }),
+      body: JSON.stringify({ playerId, name, score, characterId }),
       signal,
     })
     return response.ok
@@ -139,6 +187,7 @@ function Home() {
   } = useGameAudio()
 
   const [status, setStatus] = useState<GameStatus>('ready')
+  const [playerId] = useState(getOrCreatePlayerId)
   const [score, setScore] = useState(0)
   const [stars, setStars] = useState(getStarBalance)
   const [streak, setStreak] = useState(0)
@@ -202,6 +251,7 @@ function Home() {
     void (async () => {
       try {
         const success = await submitScore(
+          playerId,
           name,
           nextScore,
           characterId,

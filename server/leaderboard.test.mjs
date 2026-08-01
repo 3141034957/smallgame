@@ -3,6 +3,7 @@ import {
   DEFAULT_CHARACTER_ID,
   MAX_SCORE,
   normalizeCharacterId,
+  normalizePlayerId,
   normalizeScoreInput,
   rankLeaderboardEntries,
 } from './leaderboard.mjs'
@@ -31,6 +32,14 @@ describe('leaderboard rules', () => {
     expect(normalizeCharacterId('neon')).toBe('neon')
     expect(normalizeCharacterId(undefined)).toBe(DEFAULT_CHARACTER_ID)
     expect(normalizeCharacterId('unknown-character')).toBe(DEFAULT_CHARACTER_ID)
+  })
+
+  it('accepts persistent anonymous player IDs', () => {
+    expect(normalizePlayerId('2cf83fa1-5209-48c6-91d0-71f510c9a758')).toBe(
+      '2cf83fa1-5209-48c6-91d0-71f510c9a758',
+    )
+    expect(normalizePlayerId('short')).toBeNull()
+    expect(normalizePlayerId('invalid player id')).toBeNull()
   })
 
   it('ranks scores with deterministic tie breaking without mutating input', () => {
