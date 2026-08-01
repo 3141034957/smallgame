@@ -8,6 +8,7 @@
     "dev:server": "node server/index.mjs",
     "build": "tsc -b && vite build && node scripts/prepare-sites-build.mjs",
     "db:generate": "drizzle-kit generate",
+    "db:seed:print": "node scripts/generate-leaderboard-seed.mjs",
     "test": "vitest run",
     "start": "node server/index.mjs",
     "lint": "oxlint",
