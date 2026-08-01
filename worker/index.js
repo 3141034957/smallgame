@@ -1,4 +1,9 @@
-const MAX_SCORE = 500_000
+import {
+  MAX_SCORE,
+  normalizeScoreInput,
+  rankLeaderboardEntries,
+} from './leaderboard.js'
+
 const MAX_REQUEST_BODY_BYTES = 16 * 1024
 
 const JSON_HEADERS = {
@@ -8,16 +13,6 @@ const JSON_HEADERS = {
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: JSON_HEADERS })
-}
-
-function normalizeScoreInput(value) {
-  const name = typeof value?.name === 'string'
-    ? value.name.trim().replace(/\s+/g, ' ').slice(0, 12)
-    : ''
-  const score = value?.score
-
-  if (!name || !Number.isFinite(score) || score < 0) return null
-  return { name, score: Math.floor(score) }
 }
 
 async function submitScore(request, db) {
@@ -72,18 +67,14 @@ async function submitScore(request, db) {
 
 async function getLeaderboard(db) {
   const { results = [] } = await db.prepare(`
-    SELECT name, score
+    SELECT name, score, updated_at AS updatedAt
     FROM leaderboard
     ORDER BY score DESC, updated_at ASC, name ASC
     LIMIT 100
   `).all()
 
   return json({
-    data: results.map((entry, index) => ({
-      rank: index + 1,
-      name: entry.name,
-      score: entry.score,
-    })),
+    data: rankLeaderboardEntries(results),
   })
 }
 
