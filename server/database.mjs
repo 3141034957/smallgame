@@ -77,6 +77,90 @@ function normalizeLegacyStats(value) {
   }
 }
 
+function hasCurrentScoreLimit(db, tableName, scoreColumn) {
+  const schema = db.prepare(
+    'SELECT sql FROM sqlite_master WHERE type = ? AND name = ?',
+  ).get('table', tableName)?.sql ?? ''
+
+  return schema.includes(`${scoreColumn} <= ${MAX_SCORE}`)
+}
+
+function migrateScoreLimit(db) {
+  const leaderboardIsCurrent = hasCurrentScoreLimit(
+    db,
+    'leaderboard',
+    'score',
+  )
+  const submissionsAreCurrent = hasCurrentScoreLimit(
+    db,
+    'score_submissions',
+    'submitted_score',
+  )
+  if (leaderboardIsCurrent && submissionsAreCurrent) return
+
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    db.exec(`
+      ALTER TABLE leaderboard RENAME TO leaderboard_score_limit_backup;
+      ALTER TABLE score_submissions
+        RENAME TO score_submissions_score_limit_backup;
+
+      CREATE TABLE leaderboard (
+        name TEXT PRIMARY KEY NOT NULL,
+        score INTEGER NOT NULL CHECK (score >= 0 AND score <= ${MAX_SCORE}),
+        character_id TEXT NOT NULL DEFAULT '${DEFAULT_CHARACTER_ID}',
+        updated_at INTEGER NOT NULL CHECK (updated_at >= 0)
+      ) STRICT;
+
+      INSERT INTO leaderboard (name, score, character_id, updated_at)
+      SELECT name, score, character_id, updated_at
+      FROM leaderboard_score_limit_backup;
+
+      CREATE TABLE score_submissions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nickname TEXT NOT NULL,
+        submitted_score INTEGER NOT NULL CHECK (
+          submitted_score >= 0 AND submitted_score <= ${MAX_SCORE}
+        ),
+        character_id TEXT NOT NULL DEFAULT '${DEFAULT_CHARACTER_ID}',
+        became_best INTEGER NOT NULL CHECK (became_best IN (0, 1)),
+        submitted_at INTEGER NOT NULL CHECK (submitted_at >= 0)
+      ) STRICT;
+
+      INSERT INTO score_submissions (
+        id,
+        nickname,
+        submitted_score,
+        character_id,
+        became_best,
+        submitted_at
+      )
+      SELECT
+        id,
+        nickname,
+        submitted_score,
+        character_id,
+        became_best,
+        submitted_at
+      FROM score_submissions_score_limit_backup;
+
+      DROP TABLE leaderboard_score_limit_backup;
+      DROP TABLE score_submissions_score_limit_backup;
+
+      CREATE INDEX idx_leaderboard_score
+        ON leaderboard (score DESC, updated_at ASC, name ASC);
+      CREATE INDEX idx_score_submissions_time
+        ON score_submissions (submitted_at DESC, id DESC);
+      CREATE INDEX idx_score_submissions_nickname
+        ON score_submissions (nickname, submitted_at DESC);
+    `)
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
+}
+
 function initializeSchema(db) {
   db.exec(`
     PRAGMA journal_mode = WAL;
@@ -144,6 +228,8 @@ function initializeSchema(db) {
       ADD COLUMN character_id TEXT NOT NULL DEFAULT '${DEFAULT_CHARACTER_ID}';
     `)
   }
+
+  migrateScoreLimit(db)
 }
 
 function importLegacyJson(db, leaderboardPath, statsPath) {
@@ -247,14 +333,19 @@ export function createLeaderboardStore({
     VALUES ('score_report_count', 1)
     ON CONFLICT(key) DO UPDATE SET value = value + 1
   `)
-  const upsertBest = db.prepare(`
+  const upsertLeaderboard = db.prepare(`
     INSERT INTO leaderboard (name, score, character_id, updated_at)
     VALUES (?, ?, ?, ?)
     ON CONFLICT(name) DO UPDATE SET
-      score = excluded.score,
+      score = CASE
+        WHEN excluded.score > leaderboard.score THEN excluded.score
+        ELSE leaderboard.score
+      END,
       character_id = excluded.character_id,
-      updated_at = excluded.updated_at
-    WHERE excluded.score > leaderboard.score
+      updated_at = CASE
+        WHEN excluded.score > leaderboard.score THEN excluded.updated_at
+        ELSE leaderboard.updated_at
+      END
   `)
   const selectLeaderboard = db.prepare(`
     SELECT name, score, character_id AS characterId, updated_at AS updatedAt
@@ -299,7 +390,7 @@ export function createLeaderboardStore({
         )
         incrementReporter.run(name)
         incrementTotal.run()
-        upsertBest.run(name, score, normalizedCharacterId, submittedAt)
+        upsertLeaderboard.run(name, score, normalizedCharacterId, submittedAt)
         db.exec('COMMIT')
         return {
           submissionId: Number(result.lastInsertRowid),

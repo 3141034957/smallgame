@@ -1,4 +1,4 @@
-export const MAX_SCORE = 500_000
+export const MAX_SCORE = 2_000_000
 export const DEFAULT_CHARACTER_ID = 'burger-dog'
 
 const CHARACTER_IDS = new Set([

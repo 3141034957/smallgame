@@ -9,6 +9,7 @@ import {
 
 describe('leaderboard rules', () => {
   it('normalizes valid score submissions', () => {
+    expect(MAX_SCORE).toBe(2_000_000)
     expect(normalizeScoreInput({ name: '  云  朵猫  ', score: 42.9 })).toEqual({
       name: '云 朵猫',
       score: 42,
