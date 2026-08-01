@@ -1,9 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type {
-  CSSProperties,
-  FormEvent,
-  PointerEvent as ReactPointerEvent,
-} from 'react'
+import type { CSSProperties, FormEvent } from 'react'
 import './index.less'
 import { CHARACTERS, getSelected } from '@/pages/Shop'
 import { addStars, getStarBalance } from '@/utils/starCurrency'
@@ -14,7 +10,6 @@ import {
   FREEZE_DURATION,
   HOP_DURATION,
   NOTE_EFFECTS,
-  NOTE_FREQUENCIES,
   PAINT_EFFECT_DURATION,
   PLATFORM_AREA_SCALE,
   TEMPO_EFFECT_DURATION,
@@ -28,13 +23,15 @@ import {
   slotScale,
   slotY,
 } from '@/features/game/engine'
+import { useGameAudio } from '@/features/game/hooks/useGameAudio'
+import { useGameInput } from '@/features/game/hooks/useGameInput'
+import { useGameLoop } from '@/features/game/hooks/useGameLoop'
 import type {
   FrameState,
   GameStatus,
   LandingImpact,
   NoteFeedback,
   NoteKind,
-  Platform,
   TempoEffect,
 } from '@/features/game/engine'
 
@@ -148,10 +145,6 @@ function Home() {
   const paintEffectTimeRef = useRef(0)
   const freezeTimeRef = useRef(0)
   const scoreMultiplierRef = useRef(1)
-  const audioContextRef = useRef<AudioContext | null>(null)
-  const activeAudioNodesRef = useRef(new Map<OscillatorNode, GainNode>())
-  const backgroundMusicRef = useRef<HTMLAudioElement>(null)
-  const bgmRef = useRef<HTMLAudioElement | null>(null)
   const playerRef = useRef<HTMLDivElement>(null)
   const playerShadowRef = useRef<HTMLDivElement>(null)
   const feverBarRef = useRef<HTMLElement>(null)
@@ -168,6 +161,16 @@ function Home() {
     falling: 0,
     fever: 0,
   })
+  const {
+    backgroundMusicRef,
+    ensureAudioContext,
+    pauseGameAudio,
+    playNoteSound,
+    resumeGameAudio,
+    startGameAudio,
+    stopGameAudio,
+    syncBackgroundMusic,
+  } = useGameAudio()
 
   const [status, setStatus] = useState<GameStatus>('ready')
   const [score, setScore] = useState(0)
@@ -205,17 +208,7 @@ function Home() {
   const changeStatus = (next: GameStatus) => {
     statusRef.current = next
     setStatus(next)
-    const backgroundMusic = backgroundMusicRef.current
-    if (!backgroundMusic) return
-
-    if (next === 'playing') {
-      backgroundMusic.volume = 0.42
-      void backgroundMusic.play().catch(() => {
-        // 某些浏览器会在缺少用户手势时拒绝播放，下一次点击会再次尝试。
-      })
-    } else {
-      backgroundMusic.pause()
-    }
+    syncBackgroundMusic(next)
   }
 
   const refreshLeaderboard = () => {
@@ -274,51 +267,6 @@ function Home() {
     }
     animation.addEventListener('finish', release, { once: true })
     animation.addEventListener('cancel', release, { once: true })
-  }
-
-  const ensureAudioContext = () => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContext()
-    }
-    if (audioContextRef.current.state === 'suspended') {
-      void audioContextRef.current.resume()
-    }
-    return audioContextRef.current
-  }
-
-  const playNoteSound = (platform: Platform, perfect: boolean, fever: boolean) => {
-    const context = ensureAudioContext()
-    const now = context.currentTime
-    const frequency = NOTE_FREQUENCIES[platform.id % NOTE_FREQUENCIES.length]
-
-    const addVoice = (
-      voiceFrequency: number,
-      duration: number,
-      volume: number,
-      type: OscillatorType,
-    ) => {
-      const oscillator = context.createOscillator()
-      const gain = context.createGain()
-      oscillator.type = type
-      oscillator.frequency.setValueAtTime(voiceFrequency, now)
-      gain.gain.setValueAtTime(0.0001, now)
-      gain.gain.exponentialRampToValueAtTime(volume, now + 0.018)
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration)
-      oscillator.connect(gain)
-      gain.connect(context.destination)
-      activeAudioNodesRef.current.set(oscillator, gain)
-      oscillator.onended = () => {
-        activeAudioNodesRef.current.delete(oscillator)
-        oscillator.disconnect()
-        gain.disconnect()
-      }
-      oscillator.start(now)
-      oscillator.stop(now + duration + 0.03)
-    }
-
-    addVoice(frequency, perfect ? 0.42 : 0.28, perfect ? 0.18 : 0.11, 'sine')
-    if (perfect) addVoice(frequency * 1.5, 0.34, 0.075, 'triangle')
-    if (fever) addVoice(frequency / 2, 0.2, 0.09, 'square')
   }
 
   const getActiveHopDuration = () => {
@@ -433,16 +381,7 @@ function Home() {
   }
 
   const startGame = () => {
-    ensureAudioContext()
-    if (!bgmRef.current) {
-      bgmRef.current = new Audio('/audio/pigen-pop.mp3')
-      bgmRef.current.loop = true
-    }
-    bgmRef.current.currentTime = 0
-    bgmRef.current.play().catch(() => {})
-    if (backgroundMusicRef.current) {
-      backgroundMusicRef.current.currentTime = 2
-    }
+    startGameAudio()
     platformsRef.current = createPlatforms()
     platformOffsetRef.current = 0
     hopElapsedRef.current = 0
@@ -477,8 +416,7 @@ function Home() {
   }
 
   const completeReturnToHome = () => {
-    bgmRef.current?.pause()
-    if (bgmRef.current) bgmRef.current.currentTime = 0
+    stopGameAudio()
     moveDirectionRef.current = 0
     fallProgressRef.current = 0
     setShowingAd(false)
@@ -550,7 +488,7 @@ function Home() {
 
   const beginReviveCountdown = () => {
     ensureAudioContext()
-    bgmRef.current?.pause()
+    pauseGameAudio()
     fallProgressRef.current = 0
     hopElapsedRef.current = 0
     feverTimeRef.current = 0
@@ -590,6 +528,15 @@ function Home() {
     beginReviveCountdown()
   }
 
+  const beginReviveCountdownRef = useRef(beginReviveCountdown)
+  beginReviveCountdownRef.current = beginReviveCountdown
+  const resumeAfterCountdownRef = useRef(() => {})
+  resumeAfterCountdownRef.current = () => {
+    resumeGameAudio()
+    changeStatus('playing')
+    focusGameWithoutScrolling()
+  }
+
   useEffect(() => {
     if (!showingAd || adCountdown <= 0) return
     if (adCountdown <= 7 && !adCanSkip) setAdCanSkip(true)
@@ -598,7 +545,7 @@ function Home() {
       setAdCountdown(next)
       if (next <= 0) {
         setShowingAd(false)
-        beginReviveCountdown()
+        beginReviveCountdownRef.current()
       }
     }, 1000)
     return () => clearTimeout(timer)
@@ -614,9 +561,7 @@ function Home() {
       }
 
       setReviveCountdown(null)
-      bgmRef.current?.play().catch(() => {})
-      changeStatus('playing')
-      focusGameWithoutScrolling()
+      resumeAfterCountdownRef.current()
     }, 1000)
 
     return () => window.clearTimeout(timer)
@@ -632,9 +577,7 @@ function Home() {
       }
 
       setResumeCountdown(null)
-      bgmRef.current?.play().catch(() => {})
-      changeStatus('playing')
-      focusGameWithoutScrolling()
+      resumeAfterCountdownRef.current()
     }, 1000)
 
     return () => window.clearTimeout(timer)
@@ -657,14 +600,7 @@ function Home() {
     return () => resizeObserver.disconnect()
   }, [])
 
-  useEffect(() => {
-    let animationFrame = 0
-    let lastTime = performance.now()
-
-    const tick = (time: number) => {
-      const delta = Math.min(34, time - lastTime)
-      lastTime = time
-
+  const advanceGame = (delta: number) => {
       if (statusRef.current === 'playing') {
         if (feverTimeRef.current > 0) {
           feverTimeRef.current = Math.max(0, feverTimeRef.current - delta)
@@ -694,11 +630,8 @@ function Home() {
           }
         }
 
-        // When frozen, skip all movement
-        if (freezeTimeRef.current > 0) {
-          animationFrame = requestAnimationFrame(tick)
-          return
-        }
+        // When frozen, skip all movement.
+        if (freezeTimeRef.current > 0) return
 
         const hopDuration = getActiveHopDuration()
         hopElapsedRef.current += delta
@@ -817,22 +750,17 @@ function Home() {
         paintFrame(nextFrame)
       }
 
-      animationFrame = requestAnimationFrame(tick)
-    }
+  }
 
-    animationFrame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(animationFrame)
-  }, [])
+  useGameLoop(advanceGame)
 
   useEffect(() => {
     refreshLeaderboard()
   }, [])
 
   useEffect(() => {
-    const backgroundMusic = backgroundMusicRef.current
     const requestControllers = requestControllersRef.current
     const activeAnimations = activeAnimationsRef.current
-    const activeAudioNodes = activeAudioNodesRef.current
     const platformElements = platformElementsRef.current
 
     return () => {
@@ -847,95 +775,18 @@ function Home() {
       activeAnimations.forEach((animation) => animation.cancel())
       activeAnimations.clear()
 
-      activeAudioNodes.forEach((gain, oscillator) => {
-        oscillator.onended = null
-        try {
-          oscillator.stop()
-        } catch {
-          // Oscillator may already have stopped.
-        }
-        oscillator.disconnect()
-        gain.disconnect()
-      })
-      activeAudioNodes.clear()
-
-      backgroundMusic?.pause()
-      if (backgroundMusic) {
-        backgroundMusic.currentTime = 0
-        backgroundMusic.removeAttribute('src')
-        backgroundMusic.load()
-      }
-
-      if (bgmRef.current) {
-        bgmRef.current.pause()
-        bgmRef.current.removeAttribute('src')
-        bgmRef.current.load()
-        bgmRef.current = null
-      }
-
       platformElements.clear()
-      const audioContext = audioContextRef.current
-      audioContextRef.current = null
-      if (audioContext && audioContext.state !== 'closed') {
-        void audioContext.close().catch(() => {
-          // The browser may already be tearing down the audio device.
-        })
-      }
     }
   }, [])
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'ArrowLeft' || event.key.toLowerCase() === 'a') {
-        event.preventDefault()
-        moveDirectionRef.current = -1
-      }
-      if (event.key === 'ArrowRight' || event.key.toLowerCase() === 'd') {
-        event.preventDefault()
-        moveDirectionRef.current = 1
-      }
-      if ((event.key === ' ' || event.key === 'Enter') && statusRef.current === 'ready') {
-        event.preventDefault()
-        startGame()
-      }
-    }
-    const onKeyUp = (event: KeyboardEvent) => {
-      if (
-        event.key === 'ArrowLeft' ||
-        event.key === 'ArrowRight' ||
-        event.key.toLowerCase() === 'a' ||
-        event.key.toLowerCase() === 'd'
-      ) {
-        moveDirectionRef.current = 0
-      }
-    }
-
-    window.addEventListener('keydown', onKeyDown)
-    window.addEventListener('keyup', onKeyUp)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('keyup', onKeyUp)
-    }
-  }, [])
-
-  const updatePointerTarget = (
-    event: ReactPointerEvent<HTMLDivElement>,
-    refreshBounds = false,
-  ) => {
-    if (statusRef.current !== 'playing' || !gameRef.current) return
-    if (refreshBounds) {
-      const bounds = gameRef.current.getBoundingClientRect()
-      gameBoundsRef.current = { left: bounds.left, width: bounds.width }
-    }
-    const bounds = gameBoundsRef.current
-    const normalized = ((event.clientX - bounds.left) / bounds.width) * 2 - 1
-    targetXRef.current = clamp(normalized * 1.12, -1, 1)
-  }
-
-  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    event.currentTarget.setPointerCapture(event.pointerId)
-    updatePointerTarget(event, true)
-  }
+  const { handlePointerDown, updatePointerTarget } = useGameInput({
+    gameRef,
+    gameBoundsRef,
+    moveDirectionRef,
+    statusRef,
+    targetXRef,
+    onStart: startGame,
+  })
 
   const localPlatformIndex = platformIndex - platformOffsetRef.current
   const visiblePlatforms = platformsRef.current.slice(
@@ -977,10 +828,10 @@ function Home() {
             onClick={(event) => {
               event.stopPropagation()
               if (statusRef.current === 'playing') {
-                bgmRef.current?.pause()
+                pauseGameAudio()
                 changeStatus('paused')
               } else if (statusRef.current === 'paused') {
-                bgmRef.current?.play().catch(() => {})
+                resumeGameAudio()
                 changeStatus('playing')
               }
             }}
