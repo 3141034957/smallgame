@@ -53,13 +53,14 @@ const NICKNAME_STORAGE_KEY = 'clockwork-player-nickname-v1'
 async function submitScore(
   name: string,
   score: number,
+  characterId: string,
   signal?: AbortSignal,
 ): Promise<boolean> {
   try {
     const response = await fetch(`${API_BASE}/score`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, score }),
+      body: JSON.stringify({ name, score, characterId }),
       signal,
     })
     return response.ok
@@ -70,9 +71,12 @@ async function submitScore(
 
 async function fetchLeaderboard(
   signal?: AbortSignal,
-): Promise<Array<{ rank: number; name: string; score: number }>> {
+): Promise<LeaderboardEntry[]> {
   try {
-    const res = await fetch(`${API_BASE}/leaderboard`, { signal })
+    const res = await fetch(`${API_BASE}/leaderboard`, {
+      cache: 'no-store',
+      signal,
+    })
     if (!res.ok) return []
     const json = await res.json()
     return json.data || []
@@ -184,13 +188,22 @@ function Home() {
       })
   }
 
-  const submitScoreAndRefresh = (name: string, nextScore: number) => {
+  const submitScoreAndRefresh = (
+    name: string,
+    nextScore: number,
+    characterId: string,
+  ) => {
     const controller = new AbortController()
     requestControllersRef.current.add(controller)
 
     void (async () => {
       try {
-        const success = await submitScore(name, nextScore, controller.signal)
+        const success = await submitScore(
+          name,
+          nextScore,
+          characterId,
+          controller.signal,
+        )
         if (!success || controller.signal.aborted) return
         const data = await fetchLeaderboard(controller.signal)
         if (!controller.signal.aborted) setLeaderboardData(data)
@@ -440,7 +453,7 @@ function Home() {
     const pendingScore = pendingScoreRef.current
     if (pendingScore !== null) {
       pendingScoreRef.current = null
-      submitScoreAndRefresh(nextNickname, pendingScore)
+      submitScoreAndRefresh(nextNickname, pendingScore, selectedCharacter.id)
     }
 
     completeReturnToHome()
@@ -685,7 +698,11 @@ function Home() {
             const storedNickname = localStorage.getItem(NICKNAME_STORAGE_KEY)?.trim()
             if (storedNickname) {
               pendingScoreRef.current = null
-              submitScoreAndRefresh(storedNickname, scoreRef.current)
+              submitScoreAndRefresh(
+                storedNickname,
+                scoreRef.current,
+                selectedCharacter.id,
+              )
             } else {
               pendingScoreRef.current = scoreRef.current
             }

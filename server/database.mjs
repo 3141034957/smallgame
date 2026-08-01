@@ -2,7 +2,9 @@ import { DatabaseSync } from 'node:sqlite'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import {
+  DEFAULT_CHARACTER_ID,
   MAX_SCORE,
+  normalizeCharacterId,
   normalizeScoreInput,
   rankLeaderboardEntries,
 } from './leaderboard.mjs'
@@ -30,7 +32,11 @@ function normalizeLegacyLeaderboard(records) {
       input.score > current.score ||
       (input.score === current.score && updatedAt < current.updatedAt)
     ) {
-      bestByName.set(input.name, { ...input, updatedAt })
+      bestByName.set(input.name, {
+        ...input,
+        characterId: normalizeCharacterId(entry.characterId),
+        updatedAt,
+      })
     }
   }
 
@@ -81,6 +87,7 @@ function initializeSchema(db) {
     CREATE TABLE IF NOT EXISTS leaderboard (
       name TEXT PRIMARY KEY NOT NULL,
       score INTEGER NOT NULL CHECK (score >= 0 AND score <= ${MAX_SCORE}),
+      character_id TEXT NOT NULL DEFAULT '${DEFAULT_CHARACTER_ID}',
       updated_at INTEGER NOT NULL CHECK (updated_at >= 0)
     ) STRICT;
 
@@ -93,6 +100,7 @@ function initializeSchema(db) {
       submitted_score INTEGER NOT NULL CHECK (
         submitted_score >= 0 AND submitted_score <= ${MAX_SCORE}
       ),
+      character_id TEXT NOT NULL DEFAULT '${DEFAULT_CHARACTER_ID}',
       became_best INTEGER NOT NULL CHECK (became_best IN (0, 1)),
       submitted_at INTEGER NOT NULL CHECK (submitted_at >= 0)
     ) STRICT;
@@ -118,6 +126,24 @@ function initializeSchema(db) {
       value TEXT NOT NULL
     ) STRICT;
   `)
+
+  const leaderboardColumns = db.prepare('PRAGMA table_info(leaderboard)').all()
+  if (!leaderboardColumns.some((column) => column.name === 'character_id')) {
+    db.exec(`
+      ALTER TABLE leaderboard
+      ADD COLUMN character_id TEXT NOT NULL DEFAULT '${DEFAULT_CHARACTER_ID}';
+    `)
+  }
+
+  const submissionColumns = db.prepare(
+    'PRAGMA table_info(score_submissions)',
+  ).all()
+  if (!submissionColumns.some((column) => column.name === 'character_id')) {
+    db.exec(`
+      ALTER TABLE score_submissions
+      ADD COLUMN character_id TEXT NOT NULL DEFAULT '${DEFAULT_CHARACTER_ID}';
+    `)
+  }
 }
 
 function importLegacyJson(db, leaderboardPath, statsPath) {
@@ -131,10 +157,11 @@ function importLegacyJson(db, leaderboardPath, statsPath) {
   const leaderboard = normalizeLegacyLeaderboard(readJson(leaderboardPath, []))
   const stats = normalizeLegacyStats(readJson(statsPath, {}))
   const insertLeaderboard = db.prepare(`
-    INSERT INTO leaderboard (name, score, updated_at)
-    VALUES (?, ?, ?)
+    INSERT INTO leaderboard (name, score, character_id, updated_at)
+    VALUES (?, ?, ?, ?)
     ON CONFLICT(name) DO UPDATE SET
       score = excluded.score,
+      character_id = excluded.character_id,
       updated_at = excluded.updated_at
     WHERE excluded.score > leaderboard.score
       OR (
@@ -166,7 +193,12 @@ function importLegacyJson(db, leaderboardPath, statsPath) {
   db.exec('BEGIN IMMEDIATE')
   try {
     for (const entry of leaderboard) {
-      insertLeaderboard.run(entry.name, entry.score, entry.updatedAt)
+      insertLeaderboard.run(
+        entry.name,
+        entry.score,
+        entry.characterId,
+        entry.updatedAt,
+      )
     }
     for (const reporter of stats.reporters) {
       insertReporter.run(reporter.nickname, reporter.reportCount)
@@ -199,9 +231,10 @@ export function createLeaderboardStore({
     INSERT INTO score_submissions (
       nickname,
       submitted_score,
+      character_id,
       became_best,
       submitted_at
-    ) VALUES (?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?)
   `)
   const incrementReporter = db.prepare(`
     INSERT INTO score_reporters (nickname, report_count)
@@ -215,15 +248,16 @@ export function createLeaderboardStore({
     ON CONFLICT(key) DO UPDATE SET value = value + 1
   `)
   const upsertBest = db.prepare(`
-    INSERT INTO leaderboard (name, score, updated_at)
-    VALUES (?, ?, ?)
+    INSERT INTO leaderboard (name, score, character_id, updated_at)
+    VALUES (?, ?, ?, ?)
     ON CONFLICT(name) DO UPDATE SET
       score = excluded.score,
+      character_id = excluded.character_id,
       updated_at = excluded.updated_at
     WHERE excluded.score > leaderboard.score
   `)
   const selectLeaderboard = db.prepare(`
-    SELECT name, score, updated_at AS updatedAt
+    SELECT name, score, character_id AS characterId, updated_at AS updatedAt
     FROM leaderboard
     ORDER BY score DESC, updated_at ASC, name ASC
     LIMIT 100
@@ -245,7 +279,13 @@ export function createLeaderboardStore({
   return {
     migration,
 
-    submitScore(name, score, submittedAt = Date.now()) {
+    submitScore(
+      name,
+      score,
+      characterId = DEFAULT_CHARACTER_ID,
+      submittedAt = Date.now(),
+    ) {
+      const normalizedCharacterId = normalizeCharacterId(characterId)
       db.exec('BEGIN IMMEDIATE')
       try {
         const current = findBest.get(name)
@@ -253,12 +293,13 @@ export function createLeaderboardStore({
         const result = insertSubmission.run(
           name,
           score,
+          normalizedCharacterId,
           becameBest ? 1 : 0,
           submittedAt,
         )
         incrementReporter.run(name)
         incrementTotal.run()
-        upsertBest.run(name, score, submittedAt)
+        upsertBest.run(name, score, normalizedCharacterId, submittedAt)
         db.exec('COMMIT')
         return {
           submissionId: Number(result.lastInsertRowid),
@@ -289,6 +330,7 @@ export function createLeaderboardStore({
           id,
           nickname,
           submitted_score AS score,
+          character_id AS characterId,
           became_best AS becameBest,
           submitted_at AS submittedAt
         FROM score_submissions

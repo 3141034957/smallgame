@@ -1,4 +1,17 @@
-export type LeaderboardEntry = { rank: number; name: string; score: number }
+import { CHARACTERS } from '@/features/shop/catalog'
+
+export type LeaderboardEntry = {
+  rank: number
+  characterId: string
+  name: string
+  score: number
+}
+
+const DEFAULT_LEADERBOARD_CHARACTER =
+  CHARACTERS.find((character) => character.id === 'burger-dog') ?? CHARACTERS[0]
+const LEADERBOARD_CHARACTERS = new Map(
+  CHARACTERS.map((character) => [character.id, character]),
+)
 
 type ReadyOverlayProps = {
   entries: LeaderboardEntry[]
@@ -21,21 +34,33 @@ export function ReadyOverlay({ entries, onStart, onOpenShop }: ReadyOverlayProps
             <span className="leaderboard-subtitle">TOP 100</span>
           </div>
           <div className="leaderboard-columns" aria-hidden="true">
-            <span>名次</span><span>玩家</span><span>分数</span>
+            <span>角色</span><span>名次</span><span>玩家</span><span>分数</span>
           </div>
           <div className="leaderboard-list" onPointerDown={(event) => event.stopPropagation()}>
-            {entries.map((entry) => (
-              <div
-                className={`leaderboard-row${entry.rank <= 3 ? ` leaderboard-row--top${entry.rank}` : ''}`}
-                key={entry.rank}
-              >
-                <span className="leaderboard-rank">
-                  {entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : entry.rank}
-                </span>
-                <span className="leaderboard-name">{entry.name}</span>
-                <span className="leaderboard-score">{entry.score.toLocaleString()}</span>
-              </div>
-            ))}
+            {entries.map((entry) => {
+              const character =
+                LEADERBOARD_CHARACTERS.get(entry.characterId) ??
+                DEFAULT_LEADERBOARD_CHARACTER
+
+              return (
+                <div
+                  className={`leaderboard-row${entry.rank <= 3 ? ` leaderboard-row--top${entry.rank}` : ''}`}
+                  key={entry.name}
+                >
+                  <span className="leaderboard-character">
+                    <img
+                      src={character.image}
+                      alt={`${entry.name}使用的角色：${character.name}`}
+                    />
+                  </span>
+                  <span className="leaderboard-rank">
+                    {entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : entry.rank}
+                  </span>
+                  <span className="leaderboard-name">{entry.name}</span>
+                  <span className="leaderboard-score">{entry.score.toLocaleString()}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
         <div className="overlay-ready-action">

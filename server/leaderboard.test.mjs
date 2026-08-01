@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DEFAULT_CHARACTER_ID,
   MAX_SCORE,
+  normalizeCharacterId,
   normalizeScoreInput,
   rankLeaderboardEntries,
 } from './leaderboard.mjs'
@@ -24,16 +26,22 @@ describe('leaderboard rules', () => {
     expect(normalizeScoreInput(null)).toBeNull()
   })
 
+  it('keeps supported characters and defaults old data to burger dog', () => {
+    expect(normalizeCharacterId('neon')).toBe('neon')
+    expect(normalizeCharacterId(undefined)).toBe(DEFAULT_CHARACTER_ID)
+    expect(normalizeCharacterId('unknown-character')).toBe(DEFAULT_CHARACTER_ID)
+  })
+
   it('ranks scores with deterministic tie breaking without mutating input', () => {
     const entries = [
-      { name: '晚提交', score: 200, updatedAt: 20 },
+      { name: '晚提交', score: 200, characterId: 'neon', updatedAt: 20 },
       { name: '低分', score: 100, updatedAt: 1 },
       { name: '早提交', score: 200, updatedAt: 10 },
     ]
     expect(rankLeaderboardEntries(entries)).toEqual([
-      { rank: 1, name: '早提交', score: 200 },
-      { rank: 2, name: '晚提交', score: 200 },
-      { rank: 3, name: '低分', score: 100 },
+      { rank: 1, characterId: 'burger-dog', name: '早提交', score: 200 },
+      { rank: 2, characterId: 'neon', name: '晚提交', score: 200 },
+      { rank: 3, characterId: 'burger-dog', name: '低分', score: 100 },
     ])
     expect(entries[0].name).toBe('晚提交')
   })

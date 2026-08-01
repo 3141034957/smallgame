@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url'
 import { createLeaderboardStore } from './database.mjs'
 import {
   MAX_SCORE,
+  normalizeCharacterId,
   normalizeScoreInput,
 } from './leaderboard.mjs'
 
@@ -71,7 +72,8 @@ const server = createServer((req, res) => {
     req.on('end', () => {
       if (requestRejected) return
       try {
-        const input = normalizeScoreInput(JSON.parse(body))
+        const requestBody = JSON.parse(body)
+        const input = normalizeScoreInput(requestBody)
         if (!input) {
           res.writeHead(400, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({
@@ -86,7 +88,11 @@ const server = createServer((req, res) => {
           return
         }
 
-        leaderboardStore.submitScore(input.name, input.score)
+        leaderboardStore.submitScore(
+          input.name,
+          input.score,
+          normalizeCharacterId(requestBody.characterId),
+        )
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ success: true }))
       } catch (error) {
@@ -107,7 +113,10 @@ const server = createServer((req, res) => {
   if (method === 'GET' && pathname === '/api/leaderboard') {
     try {
       const top100 = leaderboardStore.getLeaderboard()
-      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+      })
       res.end(JSON.stringify({ data: top100 }))
     } catch (error) {
       console.error('Failed to load leaderboard:', error)

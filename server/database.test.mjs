@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -50,7 +51,7 @@ describe('SQLite leaderboard store', () => {
       scoreReportCount: 4,
     })
     expect(first.getLeaderboard()).toEqual([
-      { rank: 1, name: '小 猫', score: 120 },
+      { rank: 1, characterId: 'burger-dog', name: '小 猫', score: 120 },
     ])
     expect(first.getStats()).toEqual({
       scoreReportCount: 4,
@@ -71,13 +72,13 @@ describe('SQLite leaderboard store', () => {
     })
     const store = createLeaderboardStore(paths)
 
-    expect(store.submitScore('猫猫', 90, 20).becameBest).toBe(false)
-    expect(store.submitScore('猫猫', 120, 30).becameBest).toBe(true)
-    expect(store.submitScore('狗狗', 50, 40).becameBest).toBe(true)
+    expect(store.submitScore('猫猫', 90, 'neon', 20).becameBest).toBe(false)
+    expect(store.submitScore('猫猫', 120, 'golden', 30).becameBest).toBe(true)
+    expect(store.submitScore('狗狗', 50, 'shadow', 40).becameBest).toBe(true)
 
     expect(store.getLeaderboard()).toEqual([
-      { rank: 1, name: '猫猫', score: 120 },
-      { rank: 2, name: '狗狗', score: 50 },
+      { rank: 1, characterId: 'golden', name: '猫猫', score: 120 },
+      { rank: 2, characterId: 'shadow', name: '狗狗', score: 50 },
     ])
     expect(store.getStats()).toMatchObject({
       scoreReportCount: 3,
@@ -88,10 +89,44 @@ describe('SQLite leaderboard store', () => {
       ],
     })
     expect(store.getRecentSubmissions()).toEqual([
-      expect.objectContaining({ nickname: '狗狗', score: 50, becameBest: true }),
-      expect.objectContaining({ nickname: '猫猫', score: 120, becameBest: true }),
-      expect.objectContaining({ nickname: '猫猫', score: 90, becameBest: false }),
+      expect.objectContaining({ nickname: '狗狗', score: 50, characterId: 'shadow', becameBest: true }),
+      expect.objectContaining({ nickname: '猫猫', score: 120, characterId: 'golden', becameBest: true }),
+      expect.objectContaining({ nickname: '猫猫', score: 90, characterId: 'neon', becameBest: false }),
     ])
+    store.close()
+  })
+
+  it('adds character columns to an existing database without changing old rows', () => {
+    const paths = createFixture()
+    const legacyDatabase = new DatabaseSync(paths.databasePath)
+    legacyDatabase.exec(`
+      CREATE TABLE leaderboard (
+        name TEXT PRIMARY KEY NOT NULL,
+        score INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      ) STRICT;
+      INSERT INTO leaderboard (name, score, updated_at)
+      VALUES ('旧玩家', 321, 10);
+
+      CREATE TABLE score_submissions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nickname TEXT NOT NULL,
+        submitted_score INTEGER NOT NULL,
+        became_best INTEGER NOT NULL,
+        submitted_at INTEGER NOT NULL
+      ) STRICT;
+    `)
+    legacyDatabase.close()
+
+    const store = createLeaderboardStore(paths)
+    expect(store.getLeaderboard()).toEqual([
+      { rank: 1, characterId: 'burger-dog', name: '旧玩家', score: 321 },
+    ])
+    expect(store.submitScore('新玩家', 123, 'penguin', 20).becameBest).toBe(true)
+    expect(store.getLeaderboard()[1]).toMatchObject({
+      characterId: 'penguin',
+      name: '新玩家',
+    })
     store.close()
   })
 })
