@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties, FormEvent } from 'react'
+import type { FormEvent } from 'react'
 import './index.less'
 import { CHARACTERS, getSelected } from '@/pages/Shop'
 import { addStars, getStarBalance } from '@/utils/starCurrency'
@@ -17,7 +17,6 @@ import {
   clamp,
   createPlatforms,
   ensurePlatformsThrough,
-  formatScore,
   progressionSpeed,
   slotHorizontalSpread,
   slotScale,
@@ -26,6 +25,18 @@ import {
 import { useGameAudio } from '@/features/game/hooks/useGameAudio'
 import { useGameInput } from '@/features/game/hooks/useGameInput'
 import { useGameLoop } from '@/features/game/hooks/useGameLoop'
+import { MechanicalDecor } from '@/features/game/components/MechanicalDecor'
+import { GameHud } from '@/features/game/components/GameHud'
+import { GameScene } from '@/features/game/components/GameScene'
+import { GameFeedback } from '@/features/game/components/GameFeedback'
+import { ReadyOverlay } from '@/features/game/components/ReadyOverlay'
+import type { LeaderboardEntry } from '@/features/game/components/ReadyOverlay'
+import {
+  AdDialog,
+  CountdownOverlay,
+  NicknameDialog,
+  ResultDialog,
+} from '@/features/game/components/GameDialogs'
 import type {
   FrameState,
   GameStatus,
@@ -67,58 +78,6 @@ async function fetchLeaderboard(
   } catch {
     return []
   }
-}
-
-const GEAR_SPOKES = Array.from({ length: 10 }, (_, index) => index)
-const CHAIN_LINKS = Array.from({ length: 8 }, (_, index) => index)
-
-function MechanicalGear({ variant }: { variant: 'upper' | 'lower' | 'rear' }) {
-  return (
-    <div className={`mechanical-gear mechanical-gear--${variant}`}>
-      {GEAR_SPOKES.map((spoke) => (
-        <i
-          className="gear-spoke"
-          style={{ '--spoke-angle': `${spoke * 36}deg` } as CSSProperties}
-          key={spoke}
-        />
-      ))}
-      <span className="gear-hub">
-        <b />
-      </span>
-    </div>
-  )
-}
-
-function MechanicalDecor() {
-  return (
-    <div className="mechanical-decor" aria-hidden="true">
-      <div className="cavern-facet cavern-facet--one" />
-      <div className="cavern-facet cavern-facet--two" />
-      <div className="cavern-facet cavern-facet--three" />
-      <div className="conduit conduit--left" />
-      <div className="conduit conduit--right" />
-
-      <div className="chain chain--left">
-        {CHAIN_LINKS.map((link) => <i key={link} />)}
-      </div>
-      <div className="chain chain--right">
-        {CHAIN_LINKS.map((link) => <i key={link} />)}
-      </div>
-
-      <MechanicalGear variant="rear" />
-      <MechanicalGear variant="upper" />
-      <MechanicalGear variant="lower" />
-
-      <div className="rotor-arm rotor-arm--one" />
-      <div className="rotor-arm rotor-arm--two" />
-      <div className="rotor-joint rotor-joint--one" />
-      <div className="rotor-joint rotor-joint--two" />
-
-      <div className="hanging-bell hanging-bell--one"><i /></div>
-      <div className="hanging-bell hanging-bell--two"><i /></div>
-      <div className="hanging-bell hanging-bell--three"><i /></div>
-    </div>
-  )
 }
 
 function Home() {
@@ -197,7 +156,7 @@ function Home() {
   const [adCountdown, setAdCountdown] = useState(0)
   const [reviveCountdown, setReviveCountdown] = useState<number | null>(null)
   const [resumeCountdown, setResumeCountdown] = useState<number | null>(null)
-  const [leaderboardData, setLeaderboardData] = useState<Array<{ rank: number; name: string; score: number }>>([])
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([])
   const [adCanSkip, setAdCanSkip] = useState(false)
   const [nickname, setNickname] = useState(
     () => localStorage.getItem(NICKNAME_STORAGE_KEY)?.trim() ?? '',
@@ -819,384 +778,101 @@ function Home() {
           <div className="runway-edge runway-edge--right" />
         </div>
 
-        <header className="hud">
-          <button
-            className="round-button pause-button"
-            type="button"
-            aria-label={status === 'paused' ? '继续游戏' : '暂停游戏'}
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation()
-              if (statusRef.current === 'playing') {
-                pauseGameAudio()
-                changeStatus('paused')
-              } else if (statusRef.current === 'paused') {
-                resumeGameAudio()
-                changeStatus('playing')
-              }
-            }}
-            disabled={status !== 'playing' && status !== 'paused'}
-          >
-            {status === 'paused' ? <span className="play-icon">▶</span> : <><i /><i /></>}
-          </button>
+        <GameHud
+          status={status}
+          platformIndex={platformIndex}
+          stars={stars}
+          score={score}
+          paceMultiplier={paceMultiplier}
+          isFever={isFever}
+          isDoubleScore={isDoubleScore}
+          feverBarRef={feverBarRef}
+          onTogglePause={() => {
+            if (statusRef.current === 'playing') {
+              pauseGameAudio()
+              changeStatus('paused')
+            } else if (statusRef.current === 'paused') {
+              resumeGameAudio()
+              changeStatus('playing')
+            }
+          }}
+        />
 
-          <div className="endless-status" aria-label={`无限模式，第 ${platformIndex} 层`}>
-            <span>∞</span>
-            <strong>{platformIndex}</strong>
-            <small>层</small>
-          </div>
+        <GameFeedback
+          status={status}
+          feedback={feedback}
+          streak={streak}
+          noteFeedback={noteFeedback}
+          paintEffectId={paintEffectId}
+          impact={impact}
+        />
 
-          <div className="best-pill" aria-label={`拥有 ${stars} 颗星星`}>
-            <span className="mini-cat star-wallet-icon">★</span>
-            <span>星星</span>
-            <strong>{stars}</strong>
-          </div>
-        </header>
-
-        <div className="score">
-          <span>SCORE</span>
-          <strong>{formatScore(score)}</strong>
-          <small>速度 ×{paceMultiplier.toFixed(2)}</small>
-        </div>
-
-        {isFever && (
-          <div className="chorus-banner">
-            <span>副歌模式</span>
-            <strong>×2</strong>
-            <i><b ref={feverBarRef} /></i>
-          </div>
-        )}
-
-        {isDoubleScore && !isFever && (
-          <div className="double-score-banner">
-            <span>♯ 狂热旋律</span>
-            <strong>×2</strong>
-          </div>
-        )}
-
-        {feedback.label && status === 'playing' && (
-          <div className="feedback" key={`feedback-${feedback.id}`}>
-            <strong>{feedback.label}</strong>
-            {streak > 1 && <span>×{streak}</span>}
-          </div>
-        )}
-
-        {noteFeedback && status === 'playing' && (
-          <div
-            className={`note-effect-toast note-effect-toast--${noteFeedback.kind}`}
-            key={`note-effect-${noteFeedback.id}`}
-          >
-            <strong>{noteFeedback.symbol}</strong>
-            <span>{noteFeedback.label}</span>
-          </div>
-        )}
-
-        {paintEffectId > 0 && status === 'playing' && (
-          <div className="paint-splatter" key={`paint-${paintEffectId}`} aria-hidden="true">
-            {Array.from({ length: 6 }, (_, index) => (
-              <i
-                className={`paint-splatter__blob paint-splatter__blob--${index + 1}`}
-                key={index}
-              />
-            ))}
-          </div>
-        )}
-
-        {impact.id > 0 && status === 'playing' && (
-          <div
-            className={`landing-impact${impact.perfect ? ' landing-impact--perfect' : ''}`}
-            style={{ left: `${impact.x}%` }}
-            key={`impact-${impact.id}`}
-          >
-            {[0, 1, 2, 3, 4, 5, 6, 7].map((particle) => (
-              <i
-                style={{ '--particle-angle': `${particle * 45}deg` } as CSSProperties}
-                key={particle}
-              />
-            ))}
-            {impact.reward > 1 && <strong>×{impact.reward}</strong>}
-          </div>
-        )}
-
-        <div className="platform-layer" aria-hidden="true">
-          {visiblePlatforms.map((platform, index) => {
-            const currentFrame = frameRef.current
-            const { width: gameWidth, height: gameHeight } = gameSizeRef.current
-            const distance = index - currentFrame.phase
-            const y = slotY(distance)
-            const scale = slotScale(distance)
-            const x = platform.x * gameWidth * slotHorizontalSpread(scale)
-            const width = (108 + platform.width * 38) * PLATFORM_AREA_SCALE
-            const opacity = distance < 0 ? Math.max(0, 1 + distance * 14) : 1
-            const platformStyle = {
-              '--platform-x': `${x}px`,
-              '--platform-y': `${y * gameHeight / 100}px`,
-              '--platform-width': `${width}px`,
-              '--platform-scale': scale,
-              '--platform-depth': 100 - index,
-              '--platform-opacity': opacity,
-              '--treat-scale': (0.55 + scale * 0.45) / scale,
-              '--platform-note-size': `${width / 2}px`,
-            } as CSSProperties
-
-            return (
-              <div
-                className={[
-                  'platform-wrap',
-                  platform.id === bounceId ? 'is-bounced' : '',
-                  platform.reward > 1 ? 'platform-wrap--risk' : '',
-                ].filter(Boolean).join(' ')}
-                style={platformStyle}
-                key={platform.id}
-                ref={(element) => {
-                  if (element) platformElementsRef.current.set(platform.id, element)
-                  else platformElementsRef.current.delete(platform.id)
-                }}
-              >
-                <div className="platform">
-                  {platform.reward > 1 && <span className="risk-badge">×1.5</span>}
-                  <span className="platform-light" />
-                  {platform.note && (
-                    <span className={`platform-note platform-note--${platform.note}`}>
-                      {NOTE_EFFECTS[platform.note].symbol}
-                    </span>
-                  )}
-                  {platform.treat === 'star' && <span className="treat treat--star">★</span>}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        <div
-          ref={playerRef}
-          className={`player player--character-${selectedCharacter.id}`}
-          aria-hidden="true"
-          style={{
-            '--char-glow': selectedCharacter.colors.glow,
-          } as CSSProperties}
-        >
-          <div ref={playerShadowRef} className="player-shadow" />
-          <div
-            className={[
-              'player-sprite',
-              impact.id > 0 ? 'player-sprite--landed' : '',
-              impact.perfect ? 'player-sprite--perfect' : '',
-            ].filter(Boolean).join(' ')}
-            key={`player-impact-${impact.id}`}
-          >
-            <img
-              className="player-character-image"
-              src={selectedCharacter.image}
-              alt=""
-              draggable={false}
-            />
-          </div>
-          <span className="spark spark--one">✦</span>
-          <span className="spark spark--two">★</span>
-        </div>
+        <GameScene
+          visiblePlatforms={visiblePlatforms}
+          frame={frameRef.current}
+          gameSize={gameSizeRef.current}
+          bounceId={bounceId}
+          impact={impact}
+          character={{
+            id: selectedCharacter.id,
+            image: selectedCharacter.image,
+            glow: selectedCharacter.colors.glow,
+          }}
+          platformElementsRef={platformElementsRef}
+          playerRef={playerRef}
+          playerShadowRef={playerShadowRef}
+        />
 
         <div className="controls" aria-hidden="true">
           <span>拖动屏幕控制落点</span>
         </div>
 
         {status === 'ready' && (
-          <div className="game-overlay game-overlay--ready" onPointerDown={(event) => event.stopPropagation()}>
-            <div className="ready-panel">
-              <div className="overlay-ready-title">
-                <span className="eyebrow">THE CLOCKWORK CAVERN</span>
-                <h1>冲吧！小伙子</h1>
-              </div>
-              <p className="ready-description">穿过古老机械核心，踏上每一座能量平台</p>
-              <div className="leaderboard">
-                <div className="leaderboard-header">
-                  <span className="leaderboard-title">🏆 排行榜</span>
-                  <span className="leaderboard-subtitle">TOP 100</span>
-                </div>
-                <div className="leaderboard-columns" aria-hidden="true">
-                  <span>名次</span>
-                  <span>玩家</span>
-                  <span>分数</span>
-                </div>
-                <div
-                  className="leaderboard-list"
-                  onPointerDown={(event) => event.stopPropagation()}
-                >
-                  {leaderboardData.map((entry: { rank: number; name: string; score: number }) => (
-                    <div
-                      className={
-                        'leaderboard-row' +
-                        (entry.rank <= 3 ? ` leaderboard-row--top${entry.rank}` : '')
-                      }
-                      key={entry.rank}
-                    >
-                      <span className="leaderboard-rank">
-                        {entry.rank <= 3
-                          ? ['🥇', '🥈', '🥉'][entry.rank - 1]
-                          : entry.rank}
-                      </span>
-                      <span className="leaderboard-name">{entry.name}</span>
-                      <span className="leaderboard-score">{entry.score.toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="overlay-ready-action">
-                <button className="primary-button" type="button" onClick={startGame}>
-                  开始跳跃
-                </button>
-                <div className="overlay-ready-row">
-                  <button className="shop-entry-button" type="button" onClick={() => window.location.hash = '#/shop'}>
-                    ⚙ 角色工坊
-                  </button>
-                  <small>拖动屏幕控制落点</small>
-                </div>
-              </div>
-            </div>
-          </div>
+          <ReadyOverlay
+            entries={leaderboardData}
+            onStart={startGame}
+            onOpenShop={() => { window.location.hash = '#/shop' }}
+          />
         )}
 
         {(status === 'over' || status === 'paused') && (
-          <div className={`game-overlay game-overlay--${status}`} onPointerDown={(event) => event.stopPropagation()}>
-            <div className="overlay-card">
-              {status === 'paused' && (
-                <>
-                  <span className="pause-paw">🐾</span>
-                  <h2>休息一下</h2>
-                  <p>小小巡检员正在平台上等你</p>
-                  <button
-                    className="primary-button"
-                    type="button"
-                    onClick={() => {
-                      setResumeCountdown(1)
-                      focusGameWithoutScrolling()
-                    }}
-                  >
-                    继续游戏
-                  </button>
-                </>
-              )}
-
-              {status === 'over' && (
-                <>
-                  <button
-                    className={`death-share-button death-share-button--${shareStatus}`}
-                    type="button"
-                    onClick={() => void copyCurrentLink()}
-                    aria-label="复制当前网页链接"
-                  >
-                    {shareStatus === 'copied'
-                      ? '已复制'
-                      : shareStatus === 'failed'
-                        ? '复制失败'
-                        : '↗ 分享'}
-                  </button>
-                  <span className="eyebrow">GOOD TRY!</span>
-                  <h2>差一点点</h2>
-                  <div className="result-score">
-                    <span>本次得分</span>
-                    <strong>{formatScore(score)}</strong>
-                  </div>
-                  <div className="result-best">最佳记录 {formatScore(best)}</div>
-                  <p className="revive-notice">🎉 庆祝玩家数量超过300，可直接跳过广告复活</p>
-                  <button className="primary-button primary-button--revive" type="button" onClick={requestAdPlay}>
-                    看广告免费复活
-                  </button>
-                  <button className="text-button" type="button" onClick={returnToHome}>
-                    返回主页
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
+          <ResultDialog
+            mode={status}
+            score={score}
+            best={best}
+            shareStatus={shareStatus}
+            onResume={() => {
+              setResumeCountdown(1)
+              focusGameWithoutScrolling()
+            }}
+            onShare={() => { void copyCurrentLink() }}
+            onRevive={requestAdPlay}
+            onReturnHome={returnToHome}
+          />
         )}
 
         {showNicknamePrompt && (
-          <div className="nickname-overlay" onPointerDown={(event) => event.stopPropagation()}>
-            <form className="nickname-dialog" onSubmit={saveNicknameAndReturnHome}>
-              <span className="eyebrow">PLAYER PROFILE</span>
-              <h2>留下你的昵称</h2>
-              <p>昵称只需填写一次，下次会直接返回主页</p>
-              <input
-                className="nickname-input"
-                type="text"
-                value={nicknameDraft}
-                onChange={(event) => setNicknameDraft(event.target.value)}
-                maxLength={12}
-                placeholder="输入 1–12 个字符"
-                autoComplete="nickname"
-                autoFocus
-                aria-label="玩家昵称"
-              />
-              <button
-                className="primary-button"
-                type="submit"
-                disabled={!nicknameDraft.trim()}
-              >
-                保存并返回主页
-              </button>
-              <button
-                className="text-button"
-                type="button"
-                onClick={() => {
-                  setShowNicknamePrompt(false)
-                  focusGameWithoutScrolling()
-                }}
-              >
-                暂不返回
-              </button>
-            </form>
-          </div>
+          <NicknameDialog
+            value={nicknameDraft}
+            onChange={setNicknameDraft}
+            onSubmit={saveNicknameAndReturnHome}
+            onCancel={() => {
+              setShowNicknamePrompt(false)
+              focusGameWithoutScrolling()
+            }}
+          />
         )}
 
         {showingAd && (
-          <div className="ad-overlay" onPointerDown={(e) => e.stopPropagation()}>
-            <div className="ad-overlay-card">
-              <span className="ad-label">📺 广告</span>
-              <div className="ad-sim-placeholder">
-                <span className="ad-sim-icon">🎬</span>
-                <p>观看广告获取免费复活机会</p>
-                <small>广告还有 {adCountdown} 秒</small>
-              </div>
-              <div className="ad-countdown-bar">
-                <i style={{ width: `${(adCountdown / 10) * 100}%` }} />
-              </div>
-              {adCanSkip && (
-                <button className="ad-skip-button" type="button" onClick={skipAd}>
-                  跳过广告
-                </button>
-              )}
-              {!adCanSkip && (
-                <span className="ad-skip-hint">剩余 {adCountdown - 7}s 后可跳过</span>
-              )}
-            </div>
-          </div>
+          <AdDialog countdown={adCountdown} canSkip={adCanSkip} onSkip={skipAd} />
         )}
 
         {resumeCountdown !== null && (
-          <div
-            className="resume-countdown-overlay"
-            role="status"
-            aria-live="assertive"
-            onPointerDown={(event) => event.stopPropagation()}
-          >
-            <span>准备继续</span>
-            <strong key={resumeCountdown}>{resumeCountdown}</strong>
-            <small>倒计时结束后继续游戏</small>
-          </div>
+          <CountdownOverlay mode="resume" value={resumeCountdown} />
         )}
 
         {status === 'reviving' && reviveCountdown !== null && (
-          <div
-            className="revive-countdown-overlay"
-            role="status"
-            aria-live="assertive"
-            onPointerDown={(event) => event.stopPropagation()}
-          >
-            <span>复活准备</span>
-            <strong key={reviveCountdown}>{reviveCountdown}</strong>
-            <small>倒计时结束后继续跳跃</small>
-          </div>
+          <CountdownOverlay mode="revive" value={reviveCountdown} />
         )}
       </div>
     </main>
