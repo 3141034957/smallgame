@@ -6,6 +6,8 @@ type ResultDialogProps = {
   score: number
   best: number
   shareStatus: 'idle' | 'copied' | 'failed'
+  reviveCount: number
+  maxRevives: number
   onResume: () => void
   onShare: () => void
   onRevive: () => void
@@ -17,11 +19,15 @@ export function ResultDialog({
   score,
   best,
   shareStatus,
+  reviveCount,
+  maxRevives,
   onResume,
   onShare,
   onRevive,
   onReturnHome,
 }: ResultDialogProps) {
+  const remainingRevives = Math.max(0, maxRevives - reviveCount)
+
   return (
     <div className={`game-overlay game-overlay--${mode}`} onPointerDown={(event) => event.stopPropagation()}>
       <div className="overlay-card">
@@ -46,9 +52,18 @@ export function ResultDialog({
             <h2>差一点点</h2>
             <div className="result-score"><span>本次得分</span><strong>{formatScore(score)}</strong></div>
             <div className="result-best">最佳记录 {formatScore(best)}</div>
-            <p className="revive-notice">🎉 庆祝玩家数量超过300，可直接跳过广告复活</p>
-            <button className="primary-button primary-button--revive" type="button" onClick={onRevive}>
-              看广告免费复活
+            <p className="revive-notice">
+              {remainingRevives > 0
+                ? `🎉 本局还可复活 ${remainingRevives} 次`
+                : `本局 ${maxRevives} 次复活机会已用完`}
+            </p>
+            <button
+              className="primary-button primary-button--revive"
+              type="button"
+              onClick={onRevive}
+              disabled={remainingRevives === 0}
+            >
+              {remainingRevives > 0 ? '看广告免费复活' : '复活次数已达上限'}
             </button>
             <button className="text-button" type="button" onClick={onReturnHome}>返回主页</button>
           </>

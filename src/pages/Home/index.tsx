@@ -49,6 +49,7 @@ import type {
 
 const API_BASE = '/api'
 const NICKNAME_STORAGE_KEY = 'clockwork-player-nickname-v1'
+const MAX_REVIVES_PER_RUN = 10
 
 async function submitScore(
   name: string,
@@ -101,6 +102,7 @@ function Home() {
   const moveDirectionRef = useRef(0)
   const scoreRef = useRef(0)
   const pendingScoreRef = useRef<number | null>(null)
+  const reviveCountRef = useRef(0)
   const streakRef = useRef(0)
   const bounceIdRef = useRef(-1)
   const feverTimeRef = useRef(0)
@@ -160,6 +162,7 @@ function Home() {
   const [showingAd, setShowingAd] = useState(false)
   const [adCountdown, setAdCountdown] = useState(0)
   const [reviveCountdown, setReviveCountdown] = useState<number | null>(null)
+  const [reviveCount, setReviveCount] = useState(0)
   const [resumeCountdown, setResumeCountdown] = useState<number | null>(null)
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([])
   const [adCanSkip, setAdCanSkip] = useState(false)
@@ -378,6 +381,8 @@ function Home() {
     setNoteFeedback(null)
     setShareStatus('idle')
     setReviveCountdown(null)
+    reviveCountRef.current = 0
+    setReviveCount(0)
     setImpact({ id: 0, x: 50, perfect: false, reward: 1 })
     bounceIdRef.current = -1
     const initialFrame = { phase: 0, platformIndex: 0, playerX: 0, falling: 0, fever: 0 }
@@ -490,6 +495,11 @@ function Home() {
   }
 
   const requestAdPlay = () => {
+    if (reviveCountRef.current >= MAX_REVIVES_PER_RUN) return
+
+    const nextReviveCount = reviveCountRef.current + 1
+    reviveCountRef.current = nextReviveCount
+    setReviveCount(nextReviveCount)
     setAdCountdown(10)
     setAdCanSkip(true)
     setShowingAd(true)
@@ -859,6 +869,8 @@ function Home() {
             score={score}
             best={best}
             shareStatus={shareStatus}
+            reviveCount={reviveCount}
+            maxRevives={MAX_REVIVES_PER_RUN}
             onResume={() => {
               setResumeCountdown(1)
               focusGameWithoutScrolling()
