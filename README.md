@@ -1,32 +1,77 @@
-# React + TypeScript + Vite
+# Mochi Cat 小游戏
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + Vite 前端和 Node.js 排行榜服务。项目面向内网服务器部署，可通过 Cloudflare Tunnel 将同一个服务地址映射到公网域名。
 
-Currently, two official plugins are available:
+## 环境要求
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js 22.13+，推荐使用最新的 Node.js 22 LTS
+- npm
 
-## React Compiler
+如果使用 nvm：
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+nvm install
+nvm use
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## 本地开发
+
+分别启动排行榜服务和前端开发服务器：
+
+```bash
+npm ci
+npm run dev:server
+```
+
+在另一个终端运行：
+
+```bash
+npm run dev
+```
+
+开发页面地址为 `http://localhost:5173`，排行榜接口由 Vite 转发到 `http://localhost:3001`。
+
+## 内网服务器部署
+
+```bash
+npm ci
+npm run build
+npm start
+```
+
+游戏和排行榜接口统一由 `http://localhost:3001` 提供。Cloudflare Tunnel 的源站服务地址也应配置为这个地址。
+
+第一次启动时，服务会自动创建 SQLite 数据库，并把原来的排行榜和统计 JSON 数据导入数据库。生产环境建议使用 systemd、Supervisor 或其他进程管理工具保持 `npm start` 常驻，并在升级前备份 `server/data`。
+
+## 数据文件
+
+- `server/data/game.db`：SQLite 数据库，保存排行榜、提交历史和统计数据
+- `server/data/leaderboard.json`：旧排行榜的首次迁移来源和备份
+- `server/data/stats.json`：旧统计数据的首次迁移来源和备份
+
+当前服务使用本机 SQLite 存储，不依赖 Sites、Cloudflare Worker 或 D1 数据库。数据库启用了事务和 WAL；仍建议只运行一个 Node.js 服务实例。
+
+查看数据库概况、排行榜和最近提交记录：
+
+```bash
+npm run db:inspect
+```
+
+如果服务器安装了 `sqlite3` 命令，也可以直接查询：
+
+```bash
+sqlite3 server/data/game.db
+```
+
+```sql
+SELECT * FROM leaderboard ORDER BY score DESC LIMIT 100;
+SELECT * FROM score_submissions ORDER BY submitted_at DESC LIMIT 50;
+```
+
+## 检查
+
+```bash
+npm test
+npm run lint
+npm run build
+```

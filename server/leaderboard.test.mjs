@@ -3,7 +3,7 @@ import {
   MAX_SCORE,
   normalizeScoreInput,
   rankLeaderboardEntries,
-} from './leaderboard.js'
+} from './leaderboard.mjs'
 
 describe('leaderboard rules', () => {
   it('normalizes valid score submissions', () => {
