@@ -2,24 +2,30 @@ import { useEffect, useRef } from 'react'
 import { NOTE_FREQUENCIES } from '@/features/game/engine'
 import type { GameStatus, Platform } from '@/features/game/engine'
 
-const EFFECTS_TRACK = '/audio/pigen-pop.mp3'
-
 export function useGameAudio() {
   const backgroundMusicRef = useRef<HTMLAudioElement>(null)
-  const effectsTrackRef = useRef<HTMLAudioElement | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const activeAudioNodesRef = useRef(new Map<OscillatorNode, GainNode>())
+  const isDisposedRef = useRef(false)
 
   const ensureAudioContext = () => {
-    if (!audioContextRef.current) audioContextRef.current = new AudioContext()
+    if (isDisposedRef.current) return null
+    if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+      try {
+        audioContextRef.current = new AudioContext()
+      } catch {
+        return null
+      }
+    }
     if (audioContextRef.current.state === 'suspended') {
-      void audioContextRef.current.resume()
+      void audioContextRef.current.resume().catch(() => {})
     }
     return audioContextRef.current
   }
 
   const playNoteSound = (platform: Platform, perfect: boolean, fever: boolean) => {
     const context = ensureAudioContext()
+    if (!context) return
     const now = context.currentTime
     const frequency = NOTE_FREQUENCIES[platform.id % NOTE_FREQUENCIES.length]
 
@@ -58,36 +64,30 @@ export function useGameAudio() {
     if (!backgroundMusic) return
     if (status === 'playing') {
       backgroundMusic.volume = 0.42
-      void backgroundMusic.play().catch(() => {})
-    } else {
+      if (backgroundMusic.paused) void backgroundMusic.play().catch(() => {})
+    } else if (!backgroundMusic.paused) {
       backgroundMusic.pause()
     }
   }
 
   const startGameAudio = () => {
     ensureAudioContext()
-    if (!effectsTrackRef.current) {
-      effectsTrackRef.current = new Audio(EFFECTS_TRACK)
-      effectsTrackRef.current.loop = true
-    }
-    effectsTrackRef.current.currentTime = 0
-    void effectsTrackRef.current.play().catch(() => {})
     if (backgroundMusicRef.current) backgroundMusicRef.current.currentTime = 2
   }
 
-  const pauseGameAudio = () => effectsTrackRef.current?.pause()
-  const resumeGameAudio = () => {
-    void effectsTrackRef.current?.play().catch(() => {})
-  }
   const stopGameAudio = () => {
-    effectsTrackRef.current?.pause()
-    if (effectsTrackRef.current) effectsTrackRef.current.currentTime = 0
+    const backgroundMusic = backgroundMusicRef.current
+    if (!backgroundMusic) return
+    backgroundMusic.pause()
+    backgroundMusic.currentTime = 0
   }
 
   useEffect(() => {
+    isDisposedRef.current = false
     const activeAudioNodes = activeAudioNodesRef.current
     const backgroundMusic = backgroundMusicRef.current
     return () => {
+      isDisposedRef.current = true
       activeAudioNodes.forEach((gain, oscillator) => {
         oscillator.onended = null
         try {
@@ -103,16 +103,6 @@ export function useGameAudio() {
       backgroundMusic?.pause()
       if (backgroundMusic) {
         backgroundMusic.currentTime = 0
-        backgroundMusic.removeAttribute('src')
-        backgroundMusic.load()
-      }
-
-      const effectsTrack = effectsTrackRef.current
-      effectsTrackRef.current = null
-      effectsTrack?.pause()
-      if (effectsTrack) {
-        effectsTrack.removeAttribute('src')
-        effectsTrack.load()
       }
 
       const audioContext = audioContextRef.current
@@ -126,9 +116,7 @@ export function useGameAudio() {
   return {
     backgroundMusicRef,
     ensureAudioContext,
-    pauseGameAudio,
     playNoteSound,
-    resumeGameAudio,
     startGameAudio,
     stopGameAudio,
     syncBackgroundMusic,

@@ -178,9 +178,7 @@ function Home() {
   const {
     backgroundMusicRef,
     ensureAudioContext,
-    pauseGameAudio,
     playNoteSound,
-    resumeGameAudio,
     startGameAudio,
     stopGameAudio,
     syncBackgroundMusic,
@@ -516,7 +514,6 @@ function Home() {
 
   const beginReviveCountdown = () => {
     ensureAudioContext()
-    pauseGameAudio()
     fallProgressRef.current = 0
     hopElapsedRef.current = 0
     feverTimeRef.current = 0
@@ -565,7 +562,6 @@ function Home() {
   beginReviveCountdownRef.current = beginReviveCountdown
   const resumeAfterCountdownRef = useRef(() => {})
   resumeAfterCountdownRef.current = () => {
-    resumeGameAudio()
     changeStatus('playing')
     focusGameWithoutScrolling()
   }
@@ -867,10 +863,8 @@ function Home() {
           feverBarRef={feverBarRef}
           onTogglePause={() => {
             if (statusRef.current === 'playing') {
-              pauseGameAudio()
               changeStatus('paused')
             } else if (statusRef.current === 'paused') {
-              resumeGameAudio()
               changeStatus('playing')
             }
           }}
