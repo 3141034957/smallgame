@@ -96,7 +96,14 @@ describe('SQLite leaderboard store', () => {
       store.submitScore(catPlayerId, '猫猫', 110, 'penguin', 35).becameBest,
     ).toBe(false)
     expect(
-      store.submitScore(dogPlayerId, '狗狗', 50, 'shadow', 40).becameBest,
+      store.submitScore(
+        dogPlayerId,
+        '狗狗',
+        50,
+        'shadow',
+        40,
+        '203.0.113.8',
+      ).becameBest,
     ).toBe(true)
 
     expect(store.getLeaderboard()).toEqual([
@@ -120,7 +127,10 @@ describe('SQLite leaderboard store', () => {
     ])
     expect(store.getSubmissionsInRange(20, 36)).toHaveLength(3)
     expect(store.getSubmissionsInRange(20, 36)[0]).toEqual(
-      expect.objectContaining({ nickname: '猫猫', score: 110 }),
+      expect.objectContaining({ nickname: '猫猫', score: 110, clientIp: null }),
+    )
+    expect(store.getSubmissionsInRange(40, 41)[0]).toEqual(
+      expect.objectContaining({ nickname: '狗狗', clientIp: '203.0.113.8' }),
     )
     expect(store.getReporterCountsInRange(20, 41)).toEqual([
       { nickname: '猫猫', reportCount: 3 },

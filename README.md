@@ -45,7 +45,7 @@ npm start
 
 ## 数据文件
 
-- `server/data/game.db`：SQLite 数据库，保存排行榜、提交历史和统计数据
+- `server/data/game.db`：SQLite 数据库，保存排行榜、提交历史、上报 IP 和统计数据
 - `server/data/leaderboard.json`：旧排行榜的首次迁移来源和备份
 - `server/data/stats.json`：旧统计数据的首次迁移来源和备份
 

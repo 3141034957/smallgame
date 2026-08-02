@@ -1,5 +1,6 @@
 import { createServer } from 'http'
 import { readFileSync } from 'fs'
+import { isIP } from 'net'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { createLeaderboardStore } from './database.mjs'
@@ -36,6 +37,20 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon',
   '.json': 'application/json',
   '.woff2': 'font/woff2',
+}
+
+function normalizeIp(value) {
+  if (Array.isArray(value)) value = value[0]
+  if (typeof value !== 'string') return null
+
+  let candidate = value.split(',')[0].trim()
+  if (candidate.startsWith('::ffff:')) candidate = candidate.slice(7)
+  return isIP(candidate) ? candidate : null
+}
+
+function getClientIp(req) {
+  return normalizeIp(req.headers['cf-connecting-ip']) ||
+    normalizeIp(req.socket.remoteAddress)
 }
 
 const server = createServer((req, res) => {
@@ -104,6 +119,8 @@ const server = createServer((req, res) => {
           input.name,
           input.score,
           normalizeCharacterId(requestBody.characterId),
+          Date.now(),
+          getClientIp(req),
         )
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ success: true }))

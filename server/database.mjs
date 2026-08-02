@@ -97,6 +97,9 @@ function migratePlayerSchema(db) {
   const submissionsHavePlayerId = submissionColumns.some(
     (column) => column.name === 'player_id',
   )
+  const submissionsHaveClientIp = submissionColumns.some(
+    (column) => column.name === 'client_ip',
+  )
   const leaderboardIsCurrent = hasCurrentScoreLimit(
     db,
     'leaderboard',
@@ -122,6 +125,7 @@ function migratePlayerSchema(db) {
   const submissionPlayerId = submissionsHavePlayerId
     ? 'player_id'
     : "'legacy:' || nickname"
+  const submissionClientIp = submissionsHaveClientIp ? 'client_ip' : 'NULL'
 
   db.exec('BEGIN IMMEDIATE')
   try {
@@ -162,7 +166,8 @@ function migratePlayerSchema(db) {
         ),
         character_id TEXT NOT NULL DEFAULT '${DEFAULT_CHARACTER_ID}',
         became_best INTEGER NOT NULL CHECK (became_best IN (0, 1)),
-        submitted_at INTEGER NOT NULL CHECK (submitted_at >= 0)
+        submitted_at INTEGER NOT NULL CHECK (submitted_at >= 0),
+        client_ip TEXT
       ) STRICT;
 
       INSERT INTO score_submissions (
@@ -172,7 +177,8 @@ function migratePlayerSchema(db) {
         submitted_score,
         character_id,
         became_best,
-        submitted_at
+        submitted_at,
+        client_ip
       )
       SELECT
         id,
@@ -181,7 +187,8 @@ function migratePlayerSchema(db) {
         submitted_score,
         character_id,
         became_best,
-        submitted_at
+        submitted_at,
+        ${submissionClientIp}
       FROM score_submissions_score_limit_backup;
 
       DROP TABLE leaderboard_score_limit_backup;
@@ -230,7 +237,8 @@ function initializeSchema(db) {
       ),
       character_id TEXT NOT NULL DEFAULT '${DEFAULT_CHARACTER_ID}',
       became_best INTEGER NOT NULL CHECK (became_best IN (0, 1)),
-      submitted_at INTEGER NOT NULL CHECK (submitted_at >= 0)
+      submitted_at INTEGER NOT NULL CHECK (submitted_at >= 0),
+      client_ip TEXT
     ) STRICT;
 
     CREATE INDEX IF NOT EXISTS idx_score_submissions_time
@@ -270,6 +278,12 @@ function initializeSchema(db) {
     db.exec(`
       ALTER TABLE score_submissions
       ADD COLUMN character_id TEXT NOT NULL DEFAULT '${DEFAULT_CHARACTER_ID}';
+    `)
+  }
+  if (!submissionColumns.some((column) => column.name === 'client_ip')) {
+    db.exec(`
+      ALTER TABLE score_submissions
+      ADD COLUMN client_ip TEXT;
     `)
   }
 
@@ -375,8 +389,9 @@ export function createLeaderboardStore({
       submitted_score,
       character_id,
       became_best,
-      submitted_at
-    ) VALUES (?, ?, ?, ?, ?, ?)
+      submitted_at,
+      client_ip
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
   `)
   const incrementReporter = db.prepare(`
     INSERT INTO score_reporters (nickname, report_count)
@@ -454,7 +469,8 @@ export function createLeaderboardStore({
       submitted_score AS score,
       character_id AS characterId,
       became_best AS becameBest,
-      submitted_at AS submittedAt
+      submitted_at AS submittedAt,
+      client_ip AS clientIp
     FROM score_submissions
     WHERE submitted_at >= ? AND submitted_at < ?
     ORDER BY submitted_at DESC, id DESC
@@ -483,6 +499,7 @@ export function createLeaderboardStore({
       score,
       characterId = DEFAULT_CHARACTER_ID,
       submittedAt = Date.now(),
+      clientIp = null,
     ) {
       const normalizedCharacterId = normalizeCharacterId(characterId)
       db.exec('BEGIN IMMEDIATE')
@@ -496,6 +513,7 @@ export function createLeaderboardStore({
           normalizedCharacterId,
           becameBest ? 1 : 0,
           submittedAt,
+          clientIp,
         )
         incrementReporter.run(name)
         incrementTotal.run()
@@ -539,7 +557,8 @@ export function createLeaderboardStore({
           submitted_score AS score,
           character_id AS characterId,
           became_best AS becameBest,
-          submitted_at AS submittedAt
+          submitted_at AS submittedAt,
+          client_ip AS clientIp
         FROM score_submissions
         ORDER BY submitted_at DESC, id DESC
         LIMIT ?
