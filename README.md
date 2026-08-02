@@ -51,7 +51,7 @@ npm start
 
 当前服务使用本机 SQLite 存储，不依赖 Sites、Cloudflare Worker 或 D1 数据库。数据库启用了事务和 WAL；仍建议只运行一个 Node.js 服务实例。
 
-查看数据库概况、排行榜和最近提交记录：
+查看数据库概况、排行榜、当天每个昵称的上报次数和当天全部提交记录：
 
 ```bash
 npm run db:inspect

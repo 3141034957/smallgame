@@ -118,6 +118,14 @@ describe('SQLite leaderboard store', () => {
       expect.objectContaining({ nickname: '猫猫', score: 90, characterId: 'neon', becameBest: false }),
       expect.objectContaining({ nickname: '猫猫', score: 100, characterId: 'burger-dog', becameBest: true }),
     ])
+    expect(store.getSubmissionsInRange(20, 36)).toHaveLength(3)
+    expect(store.getSubmissionsInRange(20, 36)[0]).toEqual(
+      expect.objectContaining({ nickname: '猫猫', score: 110 }),
+    )
+    expect(store.getReporterCountsInRange(20, 41)).toEqual([
+      { nickname: '猫猫', reportCount: 3 },
+      { nickname: '狗狗', reportCount: 1 },
+    ])
     store.close()
   })
 

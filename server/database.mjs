@@ -446,6 +446,33 @@ export function createLeaderboardStore({
   const selectSubmissionCount = db.prepare(
     'SELECT COUNT(*) AS count FROM score_submissions',
   )
+  const selectSubmissionsInRange = db.prepare(`
+    SELECT
+      id,
+      player_id AS playerId,
+      nickname,
+      submitted_score AS score,
+      character_id AS characterId,
+      became_best AS becameBest,
+      submitted_at AS submittedAt
+    FROM score_submissions
+    WHERE submitted_at >= ? AND submitted_at < ?
+    ORDER BY submitted_at DESC, id DESC
+  `)
+  const selectReporterCountsInRange = db.prepare(`
+    SELECT
+      nickname,
+      COUNT(*) AS reportCount
+    FROM score_submissions
+    WHERE submitted_at >= ? AND submitted_at < ?
+    GROUP BY nickname
+    ORDER BY reportCount DESC, nickname ASC
+  `)
+
+  const normalizeSubmission = (entry) => ({
+    ...entry,
+    becameBest: entry.becameBest === 1,
+  })
 
   return {
     migration,
@@ -516,10 +543,17 @@ export function createLeaderboardStore({
         FROM score_submissions
         ORDER BY submitted_at DESC, id DESC
         LIMIT ?
-      `).all(safeLimit).map((entry) => ({
-        ...entry,
-        becameBest: entry.becameBest === 1,
-      }))
+      `).all(safeLimit).map(normalizeSubmission)
+    },
+
+    getSubmissionsInRange(startTime, endTime) {
+      return selectSubmissionsInRange
+        .all(startTime, endTime)
+        .map(normalizeSubmission)
+    },
+
+    getReporterCountsInRange(startTime, endTime) {
+      return selectReporterCountsInRange.all(startTime, endTime)
     },
 
     close() {
