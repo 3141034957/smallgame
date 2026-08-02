@@ -10,20 +10,48 @@ const store = createLeaderboardStore({
   statsPath: join(dataDirectory, 'stats.json'),
 })
 
+function getDateStart(dateArgument) {
+  if (!dateArgument) {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return today
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateArgument)
+  if (!match) {
+    throw new Error(
+      `日期格式错误：${dateArgument}。请使用 YYYY-MM-DD，例如 2026-08-02。`,
+    )
+  }
+
+  const [, yearText, monthText, dayText] = match
+  const year = Number(yearText)
+  const month = Number(monthText)
+  const day = Number(dayText)
+  const date = new Date(year, month - 1, day)
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    throw new Error(`日期不存在：${dateArgument}`)
+  }
+  return date
+}
+
 try {
   const stats = store.getStats()
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
-  const tomorrowStart = new Date(todayStart)
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1)
-  const todaySubmissions = store.getSubmissionsInRange(
-    todayStart.getTime(),
-    tomorrowStart.getTime(),
+  const dateStart = getDateStart(process.argv[2])
+  const nextDateStart = new Date(dateStart)
+  nextDateStart.setDate(nextDateStart.getDate() + 1)
+  const submissions = store.getSubmissionsInRange(
+    dateStart.getTime(),
+    nextDateStart.getTime(),
   )
   const dateLabel = [
-    todayStart.getFullYear(),
-    String(todayStart.getMonth() + 1).padStart(2, '0'),
-    String(todayStart.getDate()).padStart(2, '0'),
+    dateStart.getFullYear(),
+    String(dateStart.getMonth() + 1).padStart(2, '0'),
+    String(dateStart.getDate()).padStart(2, '0'),
   ].join('-')
   console.log('数据库统计')
   console.table({
@@ -33,15 +61,15 @@ try {
   })
   console.log('排行榜 TOP 20')
   console.table(store.getLeaderboard().slice(0, 20))
-  console.log(`当天每个昵称的上报次数（${dateLabel}）`)
+  console.log(`指定日期每个昵称的上报次数（${dateLabel}）`)
   console.table(
     store.getReporterCountsInRange(
-      todayStart.getTime(),
-      tomorrowStart.getTime(),
+      dateStart.getTime(),
+      nextDateStart.getTime(),
     ),
   )
-  console.log(`当天全部分数上报，共 ${todaySubmissions.length} 条（按时间倒序）`)
-  console.table(todaySubmissions)
+  console.log(`指定日期全部分数上报，共 ${submissions.length} 条（按时间倒序）`)
+  console.table(submissions)
 } finally {
   store.close()
 }

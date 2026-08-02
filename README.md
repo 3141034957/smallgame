@@ -54,7 +54,11 @@ npm start
 查看数据库概况、排行榜、当天每个昵称的上报次数和当天全部提交记录：
 
 ```bash
+# 默认查询今天
 npm run db:inspect
+
+# 查询指定日期
+npm run db:inspect -- 2026-08-02
 ```
 
 如果服务器安装了 `sqlite3` 命令，也可以直接查询：
