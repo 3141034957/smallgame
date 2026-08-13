@@ -47,7 +47,7 @@ import type {
   TempoEffect,
 } from '@/features/game/engine'
 
-const API_BASE = '/api'
+const API_BASE = 'https://www.jumpajumpgame.online/api'
 const NICKNAME_STORAGE_KEY = 'clockwork-player-nickname-v1'
 const PLAYER_ID_STORAGE_KEY = 'clockwork-player-id-v1'
 const MAX_REVIVES_PER_RUN = 10
