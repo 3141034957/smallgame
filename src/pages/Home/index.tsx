@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
 import './index.less'
 import { CHARACTERS } from '@/features/shop/catalog'
 import { getSelected } from '@/features/shop/storage'
@@ -494,8 +493,7 @@ function Home() {
     setShareStatus(copied ? 'copied' : 'failed')
   }
 
-  const saveNicknameAndReturnHome = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const saveNicknameAndReturnHome = () => {
     const nextNickname = nicknameDraft.trim().replace(/\s+/g, ' ')
     if (!nextNickname) return
 
@@ -831,7 +829,7 @@ function Home() {
     <main className="game-shell">
       <audio
         ref={backgroundMusicRef}
-        src="/assets/clockwork-cavern-bgm.mp3"
+        src="./assets/clockwork-cavern-bgm.mp3"
         preload="auto"
         loop
       />
@@ -929,7 +927,7 @@ function Home() {
           <NicknameDialog
             value={nicknameDraft}
             onChange={setNicknameDraft}
-            onSubmit={saveNicknameAndReturnHome}
+            onSave={saveNicknameAndReturnHome}
             onCancel={() => {
               setShowNicknamePrompt(false)
               focusGameWithoutScrolling()

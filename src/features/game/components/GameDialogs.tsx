@@ -1,4 +1,3 @@
-import type { FormEventHandler } from 'react'
 import { formatScore } from '@/features/game/engine'
 
 type ResultDialogProps = {
@@ -76,14 +75,14 @@ export function ResultDialog({
 type NicknameDialogProps = {
   value: string
   onChange: (value: string) => void
-  onSubmit: FormEventHandler<HTMLFormElement>
+  onSave: () => void
   onCancel: () => void
 }
 
-export function NicknameDialog({ value, onChange, onSubmit, onCancel }: NicknameDialogProps) {
+export function NicknameDialog({ value, onChange, onSave, onCancel }: NicknameDialogProps) {
   return (
     <div className="nickname-overlay" onPointerDown={(event) => event.stopPropagation()}>
-      <form className="nickname-dialog" onSubmit={onSubmit}>
+      <div className="nickname-dialog">
         <span className="eyebrow">PLAYER PROFILE</span>
         <h2>留下你的昵称</h2>
         <p>昵称只需填写一次，下次会直接返回主页</p>
@@ -97,12 +96,18 @@ export function NicknameDialog({ value, onChange, onSubmit, onCancel }: Nickname
           autoComplete="nickname"
           autoFocus
           aria-label="玩家昵称"
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && value.trim()) {
+              event.preventDefault()
+              onSave()
+            }
+          }}
         />
-        <button className="primary-button" type="submit" disabled={!value.trim()}>
+        <button className="primary-button" type="button" onClick={onSave} disabled={!value.trim()}>
           保存并返回主页
         </button>
         <button className="text-button" type="button" onClick={onCancel}>暂不返回</button>
-      </form>
+      </div>
     </div>
   )
 }
