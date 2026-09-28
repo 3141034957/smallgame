@@ -87,7 +87,7 @@ function Shop() {
         <button
           className="shop-back"
           type="button"
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/mochi')}
           aria-label="返回主页"
         >
           <span aria-hidden="true">‹</span>

@@ -33,10 +33,20 @@
 }
 
 .pc-mobile-wrapper.is-pc .game,
+.pc-mobile-wrapper.is-pc .echo-page,
 .pc-mobile-wrapper.is-pc .shop-page {
   min-height: 100%;
 }
 
 .pc-mobile-wrapper.is-pc .game {
   border-radius: 0;
+}
+
+.pc-mobile-wrapper.is-pc:has(.echo-page) {
+  background-color: #c5c0ad;
+  background-image: repeating-linear-gradient(0deg, transparent 0 17px, rgba(54, 67, 58, .08) 17px 18px);
+}
+
+.pc-mobile-wrapper.is-pc:has(.echo-page) .mobile-body {
+  box-shadow: 9px 10px 0 #59665d, 0 0 0 1px #25312f;
 }
