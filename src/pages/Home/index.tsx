@@ -158,6 +158,7 @@ function Home() {
   const paintEffectTimeRef = useRef(0)
   const freezeTimeRef = useRef(0)
   const scoreMultiplierRef = useRef(1)
+  const doubleScoreTimeRef = useRef(0)
   const playerRef = useRef<HTMLDivElement>(null)
   const playerShadowRef = useRef<HTMLDivElement>(null)
   const feverBarRef = useRef<HTMLElement>(null)
@@ -337,6 +338,7 @@ function Home() {
 
     if (noteEffect.effect === 'double-score') {
       scoreMultiplierRef.current = 2
+      doubleScoreTimeRef.current = DOUBLE_SCORE_DURATION
       setIsDoubleScore(true)
       // Brief flash via CSS class (handled by .game--double-score-flash)
       const gameEl = gameRef.current
@@ -344,11 +346,6 @@ function Home() {
         gameEl.classList.add('game--double-score-flash')
         window.setTimeout(() => gameEl.classList.remove('game--double-score-flash'), 500)
       }
-      // Reset after duration
-      window.setTimeout(() => {
-        scoreMultiplierRef.current = 1
-        setIsDoubleScore(false)
-      }, DOUBLE_SCORE_DURATION)
     }
 
     if (noteEffect.effect === 'freeze') {
@@ -418,6 +415,11 @@ function Home() {
     feverTimeRef.current = 0
     tempoEffectRef.current = null
     paintEffectTimeRef.current = 0
+    scoreMultiplierRef.current = 1
+    doubleScoreTimeRef.current = 0
+    freezeTimeRef.current = 0
+    setIsDoubleScore(false)
+    setIsFrozen(false)
     setScore(0)
     setStreak(0)
     setFeedback({ label: '', id: 0 })
@@ -446,7 +448,7 @@ function Home() {
     fallProgressRef.current = 0
     setShowingAd(false)
     setAdCountdown(0)
-    setAdCanSkip(true)
+    setAdCanSkip(false)
     setReviveCountdown(null)
     changeStatus('ready')
     focusGameWithoutScrolling()
@@ -519,6 +521,7 @@ function Home() {
     freezeTimeRef.current = 0
     setIsFrozen(false)
     scoreMultiplierRef.current = 1
+    doubleScoreTimeRef.current = 0
     setIsDoubleScore(false)
     setFeedback({ label: '', id: 0 })
     setBounceId(-1)
@@ -546,7 +549,7 @@ function Home() {
     reviveCountRef.current = nextReviveCount
     setReviveCount(nextReviveCount)
     setAdCountdown(10)
-    setAdCanSkip(true)
+    setAdCanSkip(false)
     setShowingAd(true)
   }
 
@@ -646,9 +649,12 @@ function Home() {
           paintEffectTimeRef.current = Math.max(0, paintEffectTimeRef.current - delta)
           if (paintEffectTimeRef.current === 0) setPaintEffectId(0)
         }
-        if (scoreMultiplierRef.current > 1) {
-          // Double score is timed via a setTimeout chain set in triggerNoteEffect
-          // We just check and clear the visual state here
+        if (doubleScoreTimeRef.current > 0) {
+          doubleScoreTimeRef.current = Math.max(0, doubleScoreTimeRef.current - delta)
+          if (doubleScoreTimeRef.current === 0) {
+            scoreMultiplierRef.current = 1
+            setIsDoubleScore(false)
+          }
         }
         if (freezeTimeRef.current > 0) {
           freezeTimeRef.current = Math.max(0, freezeTimeRef.current - delta)
@@ -788,6 +794,12 @@ function Home() {
   useEffect(() => {
     refreshLeaderboard()
   }, [])
+
+  useEffect(() => {
+    if (shareStatus === 'idle') return
+    const timer = window.setTimeout(() => setShareStatus('idle'), 2500)
+    return () => window.clearTimeout(timer)
+  }, [shareStatus])
 
   useEffect(() => {
     const requestControllers = requestControllersRef.current

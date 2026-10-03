@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { emptyBoard, plantSeed } from './engine'
 import type { Board, SeedKind } from './engine'
-import { DAILY_ROUNDS, getDailyOffers, getDailyPattern, scoreDailyGarden, scoreGarden } from './daily'
+import {
+  DAILY_ROUNDS,
+  getDailyOffers,
+  getDailyPattern,
+  getNightlyPick,
+  msUntilNextDaily,
+  scoreDailyGarden,
+  scoreGarden,
+  suggestNextMove,
+} from './daily'
+import { CHAPTERS, evaluateStoryChapter, encodeBoard } from './engine'
 
 function boardWith(...slots: [number, SeedKind][]): Board {
   return slots.reduce((board, [index, kind]) => plantSeed(board, index, kind), emptyBoard())
@@ -147,5 +157,77 @@ describe('garden score', () => {
   it('rejects malformed boards instead of scoring them', () => {
     expect(() => scoreGarden([])).toThrow()
     expect(() => scoreGarden(['invalid', ...emptyBoard().slice(1)] as Board)).toThrow()
+  })
+})
+
+describe('nightly pick', () => {
+  it('answers all four letters on every night of a long stretch', () => {
+    const seen = new Set<string>()
+    for (let offset = 0; offset < 240; offset += 1) {
+      const date = new Date(Date.UTC(2026, 8, 1 + offset)).toISOString().slice(0, 10)
+      const board = getNightlyPick(date)
+      seen.add(encodeBoard(board))
+      expect(board.filter(Boolean).length).toBeGreaterThanOrEqual(6)
+      for (let chapter = 0; chapter < CHAPTERS.length; chapter += 1) {
+        expect(evaluateStoryChapter(board, chapter).complete).toBe(true)
+      }
+      expect(scoreGarden(board).score).toBeGreaterThanOrEqual(scoreGarden(getNightlyPick('2026-09-01')).score - 40)
+    }
+    expect(seen.size).toBeGreaterThan(12)
+  })
+
+  it('is stable for a date and scores well', () => {
+    const board = getNightlyPick('2026-09-24')
+    expect(getNightlyPick('2026-09-24')).toEqual(board)
+    expect(getNightlyPick('2026-09-25')).not.toEqual(board)
+    expect(scoreGarden(board).score).toBeGreaterThanOrEqual(120)
+    expect(() => getNightlyPick('2026-02-29')).toThrow(RangeError)
+  })
+})
+
+describe('countdown to the next daily puzzle', () => {
+  it('counts down to the next Beijing midnight', () => {
+    // 2026-09-24 21:00 Beijing time is 13:00 UTC.
+    const remaining = msUntilNextDaily(Date.UTC(2026, 8, 24, 13, 0))
+    expect(remaining).toBe(3 * 60 * 60 * 1000)
+    expect(msUntilNextDaily(Date.UTC(2026, 8, 24, 15, 59, 59))).toBe(1000)
+    expect(msUntilNextDaily(Date.UTC(2026, 8, 24, 16, 0))).toBe(0)
+  })
+})
+
+describe('garden hint', () => {
+  it('finds the one beat worth the most points', () => {
+    const garden = boardWith([0, 'heart'], [1, 'rain'], [4, 'heart'])
+    const hint = suggestNextMove(garden)
+    expect(hint).toEqual({ index: 5, kind: 'rain', score: 103, gain: 39 })
+    expect(hint?.score).toBe(scoreGarden(plantSeed(garden, 5, 'rain')).score)
+  })
+
+  it('may clear a planted beat when that scores higher', () => {
+    const crowded = boardWith([0, 'heart'], [4, 'rain'], [5, 'rain'], [6, 'rain'], [7, 'rain'])
+    const hint = suggestNextMove(crowded, { kinds: ['heart'] })
+    expect(hint?.index).toBe(4)
+    expect(hint?.kind).toBe('heart')
+    expect(hint?.gain).toBe(34)
+  })
+
+  it('returns nothing when the record cannot be improved in one beat', () => {
+    const full = boardWith(
+      [0, 'heart'], [1, 'rain'], [2, 'bell'], [3, 'echo'],
+      [4, 'heart'], [5, 'rain'], [6, 'bell'], [7, 'echo'],
+    )
+    expect(suggestNextMove(full)).toBeNull()
+    expect(suggestNextMove(full, { kinds: ['heart'] })).toBeNull()
+  })
+
+  it('scores with the caller’s rules, so a daily hint chases the postmark', () => {
+    const date = '2026-09-24'
+    const { featuredSlot, featuredKind } = getDailyPattern(date)
+    const hint = suggestNextMove(emptyBoard(), {
+      score: (candidate) => scoreDailyGarden(candidate, date),
+    })
+    expect(hint?.index).toBe(featuredSlot)
+    expect(hint?.kind).toBe(featuredKind)
+    expect(hint?.gain).toBe(35)
   })
 })

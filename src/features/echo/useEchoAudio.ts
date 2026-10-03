@@ -16,6 +16,8 @@ type Voice = {
 
 type VoiceSet = Set<Voice>
 
+const MASTER_VOLUME = 0.58
+
 // Pentatonic notes stay consonant even when the player changes the board.
 const BELL_NOTES = [523.25, 587.33, 659.25, 783.99, 880, 783.99, 659.25, 587.33]
 const CHORDS = [
@@ -270,6 +272,7 @@ export function useEchoAudio() {
   const previewVoicesRef = useRef<VoiceSet>(new Set())
   const rainBufferRef = useRef<AudioBuffer | null>(null)
   const playbackSerialRef = useRef(0)
+  const mutedRef = useRef(false)
 
   const ensureContext = () => {
     if (typeof window === 'undefined') return null
@@ -280,7 +283,7 @@ export function useEchoAudio() {
       try {
         const context = new AudioContextConstructor()
         const master = context.createGain()
-        master.gain.value = 0.58
+        master.gain.value = mutedRef.current ? 0 : MASTER_VOLUME
         master.connect(context.destination)
         contextRef.current = context
         masterRef.current = master
@@ -298,8 +301,16 @@ export function useEchoAudio() {
     stopVoices(previewVoicesRef.current)
   }
 
+  /** Muting keeps the silent walk through the record, so the UI never stalls. */
+  const setMuted = (muted: boolean) => {
+    mutedRef.current = muted
+    if (masterRef.current) masterRef.current.gain.value = muted ? 0 : MASTER_VOLUME
+    if (muted) stop()
+  }
+
   const previewSeed = (kind: SeedKind) => {
     stopVoices(previewVoicesRef.current)
+    if (mutedRef.current) return
     const context = ensureContext()
     const master = masterRef.current
     const rainBuffer = rainBufferRef.current
@@ -310,12 +321,22 @@ export function useEchoAudio() {
 
   const playLoop = (board: Board, repeats = 2): Playback | null => {
     stop()
+    const rounds = Number.isFinite(repeats) ? Math.max(1, Math.min(8, Math.floor(repeats))) : 2
+    if (mutedRef.current) {
+      // Nothing is scheduled, but the needle still has to travel the record.
+      const wallStart = performance.now()
+      return {
+        startTimeSec: 0,
+        durationSec: rounds * SLOT_COUNT * STEP_SECONDS,
+        isSilent: () => true,
+        nowSec: () => (performance.now() - wallStart) / 1000,
+      }
+    }
     const context = ensureContext()
     const master = masterRef.current
     const rainBuffer = rainBufferRef.current
     if (!context || !master || !rainBuffer) return null
 
-    const rounds = Number.isFinite(repeats) ? Math.max(1, Math.min(8, Math.floor(repeats))) : 2
     const openingEcho = rounds < 4 && board[SLOT_COUNT - 1] === 'bell' && board[0] === 'echo'
     const contextTimeAtStart = context.currentTime
     const wallTimeAtStart = performance.now()
@@ -388,5 +409,5 @@ export function useEchoAudio() {
     if (context && context.state !== 'closed') void context.close()
   }, [])
 
-  return { previewSeed, playLoop, stop }
+  return { previewSeed, playLoop, setMuted, stop }
 }

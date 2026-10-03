@@ -19,14 +19,15 @@ function boardWith(...slots: [number, SeedKind][]): Board {
 }
 
 describe('echo greenhouse board', () => {
-  it('defines eight steps and three progressively unlocked letters', () => {
+  it('defines eight steps and four progressively unlocked letters', () => {
     expect(SLOT_COUNT).toBe(8)
     expect(STEP_SECONDS).toBe(60 / BPM)
     expect(SEEDS.map((seed) => seed.kind)).toEqual(['heart', 'rain', 'bell', 'echo'])
-    expect(CHAPTERS).toHaveLength(3)
+    expect(CHAPTERS).toHaveLength(4)
     expect(CHAPTERS.map((chapter) => chapter.allowed)).toEqual([
       ['heart'],
       ['heart', 'rain'],
+      ['heart', 'rain', 'bell', 'echo'],
       ['heart', 'rain', 'bell', 'echo'],
     ])
   })
@@ -48,7 +49,7 @@ describe('echo greenhouse board', () => {
     expect(() => plantSeed(emptyBoard(), 8, 'heart')).toThrow(RangeError)
     expect(() => plantSeed(emptyBoard(), 1.5, 'heart')).toThrow(RangeError)
     expect(() => plantSeed([], 0, 'heart')).toThrow()
-    expect(() => evaluateChapter(emptyBoard(), 3)).toThrow(RangeError)
+    expect(() => evaluateChapter(emptyBoard(), 4)).toThrow(RangeError)
   })
 })
 
@@ -86,6 +87,23 @@ describe('letter patterns', () => {
     })
     expect(evaluateChapter(boardWith([0, 'bell'], [7, 'echo']), 2).complete).toBe(false)
     expect(evaluateChapter(boardWith([2, 'bell'], [4, 'echo']), 2).complete).toBe(false)
+  })
+
+  it('asks for the four sounds to appear clockwise as heart, rain, bell, echo', () => {
+    const ordered = boardWith(
+      [0, 'heart'], [1, 'rain'], [2, 'bell'], [3, 'echo'], [4, 'heart'], [6, 'rain'],
+    )
+    expect(evaluateChapter(ordered, 3)).toMatchObject({ complete: true, marked: [0, 1, 2, 3] })
+
+    const wrapped = boardWith([6, 'heart'], [7, 'rain'], [0, 'bell'], [1, 'echo'])
+    expect(evaluateChapter(wrapped, 3)).toMatchObject({ complete: true, marked: [6, 7, 0, 1] })
+
+    const scattered = boardWith([0, 'heart'], [4, 'heart'], [2, 'rain'], [6, 'rain'], [1, 'bell'], [7, 'echo'])
+    expect(evaluateChapter(scattered, 3).complete).toBe(false)
+
+    const swapped = boardWith([0, 'heart'], [2, 'bell'], [3, 'rain'], [4, 'echo'])
+    expect(evaluateChapter(swapped, 3).complete).toBe(false)
+    expect(evaluateChapter(emptyBoard(), 3).complete).toBe(false)
   })
 })
 
@@ -125,9 +143,24 @@ describe('cumulative story letters', () => {
     expect(evaluateChapter(finale, 1).complete).toBe(true)
   })
 
+  it('delivers the last letter only once the whole ring is in order', () => {
+    const ring = boardWith(
+      [0, 'heart'], [1, 'rain'], [2, 'bell'], [3, 'echo'], [4, 'heart'], [5, 'rain'],
+    )
+    for (let chapter = 0; chapter < 4; chapter += 1) {
+      expect(evaluateStoryChapter(ring, chapter).complete).toBe(true)
+    }
+
+    const crossed = boardWith(
+      [0, 'heart'], [1, 'bell'], [2, 'echo'], [3, 'rain'], [4, 'heart'], [5, 'bell'], [6, 'echo'], [7, 'rain'],
+    )
+    expect(evaluateStoryChapter(crossed, 2).complete).toBe(true)
+    expect(evaluateStoryChapter(crossed, 3)).toMatchObject({ complete: false, marked: [] })
+  })
+
   it('preserves invalid-input handling for the cumulative evaluator', () => {
     expect(() => evaluateStoryChapter([], 1)).toThrow()
-    expect(() => evaluateStoryChapter(emptyBoard(), 3)).toThrow(RangeError)
+    expect(() => evaluateStoryChapter(emptyBoard(), 4)).toThrow(RangeError)
   })
 })
 
