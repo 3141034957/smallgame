@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, MouseEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
@@ -17,6 +17,7 @@ import {
   DAILY_ROUNDS,
   getDailyOffers,
   getDailyPattern,
+  bestDailyScore,
   getNightlyPick,
   msUntilNextDaily,
   scoreDailyGarden,
@@ -620,9 +621,13 @@ function EchoGarden() {
   const collectSong = () => {
     const result = saveToCollection(board)
     setCollection(result.collection)
-    setNotice(result.added
-      ? `已经收进「${result.title}」，回到标题页就能再听到它。`
-      : `「${result.title}」已经在收藏册里了。`)
+    if (!result.added) {
+      setNotice(`「${result.title}」已经在收藏册里了。`)
+      return
+    }
+    setNotice(result.dropped > 0
+      ? `收进「${result.title}」。收藏册满了，最旧的一张被挤掉了。`
+      : `已经收进「${result.title}」，回到标题页就能再听到它。`)
   }
 
   const isEditing = phase === 'compose' || phase === 'remix' || phase === 'daily-compose' || phase === 'relay'
@@ -703,6 +708,7 @@ function EchoGarden() {
   const changedBeatCopy = changedBeat < 0 || !relayParentBoard ? '' : `第 ${changedBeat + 1} 拍：${relayParentBoard[changedBeat] ? seedInfo(relayParentBoard[changedBeat]).name : '留白'} → ${board[changedBeat] ? seedInfo(board[changedBeat]).name : '留白'}`
   const songCode = encodeBoard(board)
   const isCollected = collection.some((song) => song.code === songCode)
+  const dailyCeiling = useMemo(() => bestDailyScore(dailyDate), [dailyDate])
   const stageTitle = isComparingOriginal
     ? '这是改动之前的花房'
     : showingDaily
@@ -799,6 +805,7 @@ function EchoGarden() {
             const isRooted = phase === 'daily-compose' && kind !== null || phase === 'relay' && relayEditedSlot !== null && relayEditedSlot !== index
             const isFeatured = (showingDaily || guestDaily) && index === dailyPattern.featuredSlot
             const isQuiet = (showingDaily || guestDaily) && index === dailyPattern.quietSlot
+            const isChanged = changedBeat === index && (guestRelay || phase === 'relay' || phase === 'relay-result' || isComparingOriginal)
             const dormant = phase === 'listening' && listeningKind === 'song' && (
               kind === 'rain' && songAct === 0 ||
               kind === 'bell' && songAct < 2 ||
@@ -810,13 +817,13 @@ function EchoGarden() {
             } as CSSProperties
             return (
               <button
-                className={`echo-slot${kind ? ` has-${kind}` : ''}${playhead === index ? ' is-playing' : ''}${isRooted ? ' is-rooted' : ''}${isFeatured ? ' is-postmark' : ''}${isQuiet ? ' is-quiet' : ''}${markedSlots.includes(index) && phase === 'delivered' ? ' is-marked' : ''}${dormant ? ' is-dormant' : ''}`}
+                className={`echo-slot${kind ? ` has-${kind}` : ''}${playhead === index ? ' is-playing' : ''}${isRooted ? ' is-rooted' : ''}${isFeatured ? ' is-postmark' : ''}${isQuiet ? ' is-quiet' : ''}${isChanged ? ' is-changed' : ''}${markedSlots.includes(index) && phase === 'delivered' ? ' is-marked' : ''}${dormant ? ' is-dormant' : ''}`}
                 key={index}
                 type="button"
                 style={location}
                 onClick={() => touchSlot(index)}
                 disabled={!isEditing || phase === 'daily-compose' && kind !== null || phase === 'relay' && relayEditedSlot !== null && relayEditedSlot !== index}
-                aria-label={`第 ${index + 1} 拍：${kind ? seedInfo(kind).name : '空格'}${isFeatured ? `，今日邮戳目标${seedInfo(dailyPattern.featuredKind).name}` : ''}${isQuiet ? '，今日留白目标' : ''}`}
+                aria-label={`第 ${index + 1} 拍：${kind ? seedInfo(kind).name : '空格'}${isFeatured ? `，今日邮戳目标${seedInfo(dailyPattern.featuredKind).name}` : ''}${isQuiet ? '，今日留白目标' : ''}${isChanged ? '，接力改动的这一拍' : ''}`}
               >
                 <span className="echo-slot-number">{index + 1}</span>
                 <span className="echo-slot-symbol">{kind ? seedInfo(kind).icon : '+'}</span>
@@ -940,9 +947,9 @@ function EchoGarden() {
             <div className="echo-result-score"><span>本次得分</span><strong>{gardenScore.score}</strong><small>分 · 本地最佳 {dailyBest}</small></div>
             <div className="echo-bonuses" aria-label="本次花谱的组合奖励">{gardenScore.bonuses.length ? gardenScore.bonuses.map((bonus) => <span key={bonus.label}>{bonus.label} +{bonus.points}</span>) : <span>试试让种子组成新的关系</span>}</div>
             <DailyTrail records={dailyRecords} streak={dailyStreakCount} />
-            <p className="echo-garden-caption">距明天的新题还有 {countdownLabel(nextDailyMs)}</p>
+            <p className="echo-garden-caption">今天这副牌的上限约 {dailyCeiling} 分 · 距明天的新题还有 {countdownLabel(nextDailyMs)}</p>
             <button className="echo-daily-hint" type="button" onClick={openRules}>看看每一项如何计分 ↗</button>
-            <div className="echo-final-actions"><button className="echo-main-button" type="button" onClick={() => void copySong('daily')}>分享比分 · 邀请同题 <span>↗</span></button><div><button type="button" onClick={playFullSong}>听完整花谱 ▶</button><button type="button" onClick={() => startDaily(dailyDate, true)}>重种这一天</button><button type="button" onClick={goWelcome}>回到标题</button></div></div>
+            <div className="echo-final-actions"><button className="echo-main-button" type="button" onClick={() => void copySong('daily')}>分享比分 · 邀请同题 <span>↗</span></button><div><button type="button" onClick={playFullSong}>听完整花谱 ▶</button><button type="button" onClick={collectSong} disabled={isCollected}>{isCollected ? '已收进收藏册' : '收进收藏册'}</button></div><div><button type="button" onClick={() => startDaily(dailyDate, true)}>重种这一天</button><button type="button" onClick={goWelcome}>回到标题</button></div></div>
             {shareNotice && <p className="echo-share-notice" role="status">{shareNotice}</p>}
           </>
         )}

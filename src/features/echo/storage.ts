@@ -114,15 +114,16 @@ function nextSongTitle(songs: SavedSong[]): string {
   return `花房 ${highest + 1}`
 }
 
-export function saveToCollection(board: Board): { collection: SavedSong[]; title: string; added: boolean } {
+export function saveToCollection(board: Board): { collection: SavedSong[]; title: string; added: boolean; dropped: number } {
   const code = encodeBoard(board)
   const current = readCollection()
   const existing = current.find((song) => song.code === code)
-  if (existing) return { collection: current, title: existing.title, added: false }
+  if (existing) return { collection: current, title: existing.title, added: false, dropped: 0 }
 
   const song: SavedSong = { code, title: nextSongTitle(current), savedAt: Date.now() }
-  const collection = writeCollection([song, ...current])
-  return { collection, title: song.title, added: true }
+  const merged = [song, ...current]
+  const collection = writeCollection(merged)
+  return { collection, title: song.title, added: true, dropped: merged.length - collection.length }
 }
 
 export function removeFromCollection(code: string): SavedSong[] {

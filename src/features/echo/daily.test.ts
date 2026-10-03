@@ -3,6 +3,7 @@ import { emptyBoard, plantSeed } from './engine'
 import type { Board, SeedKind } from './engine'
 import {
   DAILY_ROUNDS,
+  bestDailyScore,
   getDailyOffers,
   getDailyPattern,
   getNightlyPick,
@@ -192,6 +193,27 @@ describe('countdown to the next daily puzzle', () => {
     expect(remaining).toBe(3 * 60 * 60 * 1000)
     expect(msUntilNextDaily(Date.UTC(2026, 8, 24, 15, 59, 59))).toBe(1000)
     expect(msUntilNextDaily(Date.UTC(2026, 8, 24, 16, 0))).toBe(0)
+  })
+})
+
+describe('best possible daily score', () => {
+  it('beats a player who always takes the first offer on the first empty beat', () => {
+    for (const date of ['2026-09-24', '2026-10-03', '2026-12-31']) {
+      let naive = emptyBoard()
+      for (let round = 0; round < DAILY_ROUNDS; round += 1) {
+        naive[naive.findIndex((kind) => kind === null)] = getDailyOffers(date, round)[0]
+      }
+      const best = bestDailyScore(date)
+      expect(best).toBeGreaterThanOrEqual(scoreDailyGarden(naive, date).score)
+      expect(best).toBeGreaterThan(scoreDailyGarden(naive, date).score - 60)
+      // 60 seeds + 30 + 25 + 25 + 20 + 12 + 25 + 15 bonuses.
+      expect(best).toBeLessThanOrEqual(212)
+    }
+  })
+
+  it('is stable for a date and rejects impossible dates', () => {
+    expect(bestDailyScore('2026-09-24')).toBe(bestDailyScore('2026-09-24'))
+    expect(() => bestDailyScore('2026-02-29')).toThrow(RangeError)
   })
 })
 

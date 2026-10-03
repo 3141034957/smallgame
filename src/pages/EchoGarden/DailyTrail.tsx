@@ -6,7 +6,7 @@ type DailyTrailProps = {
 }
 
 // The theoretical ceiling of a six-seed flower score, used to scale the bars.
-const BAR_CEILING = 192
+const BAR_CEILING = 212
 
 export function DailyTrail({ records, streak }: DailyTrailProps) {
   const best = records.reduce((max, record) => Math.max(max, record.score), 0)

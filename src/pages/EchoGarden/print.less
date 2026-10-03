@@ -106,6 +106,8 @@
   .echo-slot.has-echo { border-color: @print-dark; color: #3e3f37; background: #b5b99a; }
   .echo-slot.is-postmark { outline: 2px solid @print-rust; outline-offset: 3px; }
   .echo-slot.is-quiet { outline: 2px dashed @print-paper; outline-offset: 3px; }
+  .echo-slot.is-changed { z-index: 5; box-shadow: 0 0 0 3px @print-rust; }
+  .echo-slot.is-changed::after { position: absolute; bottom: -10px; left: 50%; padding: 1px 5px; border: 1px solid @print-dark; border-radius: 0; color: @print-white; background: @print-rust; font-family: @print-serif; font-size: 9px; font-weight: 800; content: "改过"; transform: translateX(-50%); }
   .echo-slot-badge { position: absolute; top: -9px; right: -7px; display: grid; width: 17px; height: 17px; place-items: center; border: 1px solid @print-dark; border-radius: 1px; color: @print-dark; background: @print-paper; font-family: @print-serif; font-size: 9px; font-weight: 800; line-height: 1; box-shadow: 1px 1px 0 @print-dark; }
   .echo-slot.is-postmark .echo-slot-badge { color: @print-white; background: @print-rust; }
   .echo-slot-number { font-family: @print-mono; font-size: 8px; }

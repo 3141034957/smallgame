@@ -140,6 +140,39 @@ export function msUntilNextDaily(now = Date.now()): number {
   return Math.ceil(beijingNow / 86_400_000) * 86_400_000 - beijingNow
 }
 
+/**
+ * How high tonight's six offers can go. Every round multiplies the board by
+ * three seeds and eight slots, so the search keeps only the most promising
+ * partial gardens — an approximation, never below what a greedy player gets.
+ */
+export function bestDailyScore(dateKey: string, beamWidth = 24): number {
+  getDailyOffers(dateKey, DAILY_ROUNDS - 1) // Validate the date before searching.
+  let beam: Board[] = [emptyBoard()]
+
+  for (let round = 0; round < DAILY_ROUNDS; round += 1) {
+    const offers = getDailyOffers(dateKey, round)
+    const seen = new Set<string>()
+    const candidates: Board[] = []
+    for (const board of beam) {
+      for (let index = 0; index < SLOT_COUNT; index += 1) {
+        if (board[index] !== null) continue
+        for (const kind of offers) {
+          const candidate = [...board]
+          candidate[index] = kind
+          const code = encodeBoard(candidate)
+          if (seen.has(code)) continue
+          seen.add(code)
+          candidates.push(candidate)
+        }
+      }
+    }
+    candidates.sort((left, right) => scoreDailyGarden(right, dateKey).score - scoreDailyGarden(left, dateKey).score)
+    beam = candidates.slice(0, beamWidth)
+  }
+
+  return beam.reduce((max, board) => Math.max(max, scoreDailyGarden(board, dateKey).score), 0)
+}
+
 export type GardenHint = {
   index: number
   kind: SeedKind | null
