@@ -118,7 +118,10 @@ export function stepFarm(previous, point, useSurge = false) {
   const modifier = FARM_MODIFIERS.find((item) => item.id === state.modifier)
   const forms = evolved(gear)
   const boomFlow = gear.orbit && gear.drum
-  const pulseDamage = 1 + Math.floor(gear.tempo / 3)
+  // A long combo pushes the whole band: louder waves, and a wider reach at
+  // the top tier. It rewards staying inside the horde instead of kiting.
+  const frenzy = state.combo >= 60 ? 2 : state.combo >= 30 ? 1 : 0
+  const pulseDamage = 1 + Math.floor(gear.tempo / 3) + frenzy
   const harvest = (crop, chain = false) => {
     if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) return
     crop.hp = 0; crop.regrow = crop.boss ? Infinity : state.tick + Math.max(28, 60 - Math.floor(state.tick / 150))
@@ -208,7 +211,7 @@ export function stepFarm(previous, point, useSurge = false) {
   if (useSurge) { state.charge = 0; state.surgeUntil = state.tick + FPS * 3; state.hurtUntil = Math.max(state.hurtUntil, state.tick + FPS); state.shots = []; state.dangers = []; pulse(38 + gear.range * 2, 8 + gear.power, 'surge') }
   const rainDue = state.echoDue
   const interval = Math.max(3, 8 - gear.tempo - (state.tick < state.surgeUntil ? 2 : 0))
-  if (state.tick - state.lastPulse >= interval) { pulse(15 + gear.range * 4, pulseDamage); state.lastPulse = state.tick; if (gear.echo) state.echoDue = state.tick + Math.max(1, 4 - gear.echo) }
+  if (state.tick - state.lastPulse >= interval) { pulse((15 + gear.range * 4) * (frenzy === 2 ? 1.3 : 1), pulseDamage); state.lastPulse = state.tick; if (gear.echo) state.echoDue = state.tick + Math.max(1, 4 - gear.echo) }
   if (state.tick === rainDue) {
     const targets = state.crops.filter((crop) => crop.hp > 0 && state.tick >= (crop.spawnAt ?? 0) && (forms.includes('echo') || distance([crop.x, crop.y], point) <= 38)).sort((a, b) => distance([a.x, a.y], point) - distance([b.x, b.y], point)).slice(0, forms.includes('echo') ? 8 : gear.echo + 1)
     for (const crop of targets) { events.push({ id: state.nextId++, kind: 'rain', x: crop.x, y: crop.y, fromX: point[0], fromY: point[1], lane: 3 }); damage(crop, gear.echo * (forms.includes('echo') ? 2 : 1)) }

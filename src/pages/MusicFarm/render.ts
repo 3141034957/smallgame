@@ -175,6 +175,12 @@ function bunny(ctx: CanvasRenderingContext2D, state: FarmState, now: number, ass
     }
   }
   if (state.tick < state.hurtUntil && state.tick > 32) ctx.globalAlpha = Math.floor(now / 80) % 2 ? .45 : 1
+  if (state.combo >= 30) {
+    const heat = ctx.createRadialGradient(0, 0, 8, 0, 0, 40)
+    heat.addColorStop(0, state.combo >= 60 ? '#f2a35c59' : '#f2c96c40')
+    heat.addColorStop(1, '#f2c96c00')
+    ellipse(ctx, 0, 4, 40, 40, heat)
+  }
   if (state.shields > 0) {
     ctx.strokeStyle = '#7fd4e8'
     ctx.lineWidth = 2

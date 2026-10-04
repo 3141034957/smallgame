@@ -171,6 +171,19 @@ describe('survivor combat', () => {
     expect(wave.loot.some((drop) => drop.shield)).toBe(true)
     expect(wave.nextShield).toBe(128 + SHIELD_COOLDOWN)
   })
+  it('turns a long combo into stronger and wider sound waves', () => {
+    const wave = (combo) => {
+      const s = arena([{ id: 1, kind: 0, x: 50, y: 62, hp: 60, maxHp: 60, regrow: -1, boss: false }], 128)
+      s.combo = combo; s.lastPulse = 108; s.lastHarvest = 128
+      const result = step(s)
+      return { hp: result.state.crops[0].hp, radius: result.events.find((event) => event.kind === 'pulse').radius }
+    }
+    const calm = wave(0), warm = wave(30), hot = wave(60)
+    expect(warm.hp).toBeLessThan(calm.hp)
+    expect(hot.hp).toBeLessThan(warm.hp)
+    expect(hot.radius).toBeGreaterThan(warm.radius)
+    expect(warm.radius).toBe(calm.radius)
+  })
   it('ends immediately at zero health without upgrades or further moves', () => {
     const s=arena([enemy(0,0,50,50)]);s.hp=10;s.xp=100
     const r=step(s).state

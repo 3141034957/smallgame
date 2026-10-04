@@ -69,3 +69,5 @@
 .farm-build b{margin-left:auto;font-size:9px;color:#9b8da8;font-variant-numeric:tabular-nums}
 .farm-build li.is-evolved b{color:#a97c2c}
 .farm-shield-count{font-style:normal;background:#e7f7fb;border:1px solid #bfe6ef;color:#2f8ba5;border-radius:20px;padding:2px 7px;font-size:9px;font-weight:800;white-space:nowrap}
+.farm-combo.is-frenzy-1 b{color:#c98b2c}.farm-combo.is-frenzy-1 small{color:#c08a3a}
+.farm-combo.is-frenzy-2 b{color:#c2593a}.farm-combo.is-frenzy-2 small{color:#bf5a3c}
