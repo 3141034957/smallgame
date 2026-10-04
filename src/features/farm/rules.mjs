@@ -122,10 +122,10 @@ export function stepFarm(previous, point, useSurge = false) {
     state.combo = state.tick - state.lastHarvest <= FPS * 2 ? state.combo + 1 : 1
     state.maxCombo = Math.max(state.maxCombo, state.combo); state.lastHarvest = state.tick
     const multiplier = Math.min(5, 1 + Math.floor(state.combo / 10))
-    const points = (crop.bass ? 2400 : crop.boss ? 1200 : 40 + crop.kind * 10) * multiplier
-    state.score += points; state.charge = Math.min(100, state.charge + (crop.bass ? 60 : crop.boss ? 40 : 4))
+    const points = (crop.bass ? 2400 : crop.boss ? 1200 : crop.elite ? 320 : 40 + crop.kind * 10) * multiplier
+    state.score += points; state.charge = Math.min(100, state.charge + (crop.bass ? 60 : crop.boss ? 40 : crop.elite ? 12 : 4))
     const reward = modifier?.reward ?? 1
-    const dropXp = Math.round((crop.bass ? 110 : crop.boss ? 60 : 5 + gear.lucky) * reward), dropCoins = Math.round((crop.bass ? 340 : crop.boss ? 200 : 8 + crop.kind * 2 + gear.lucky * 5) * reward)
+    const dropXp = Math.round((crop.bass ? 110 : crop.boss ? 60 : crop.elite ? 30 : 5 + gear.lucky) * reward), dropCoins = Math.round((crop.bass ? 340 : crop.boss ? 200 : crop.elite ? 60 : 8 + crop.kind * 2 + gear.lucky * 5) * reward)
     const existingDrop = state.loot.find((drop) => !drop.heal && distance([drop.x, drop.y], [crop.x, crop.y]) < 3)
     if (existingDrop) { existingDrop.xp += dropXp; existingDrop.coins += dropCoins }
     else state.loot.push({ id: state.nextId++, x: crop.x, y: crop.y, xp: dropXp, coins: dropCoins })
@@ -162,9 +162,15 @@ export function stepFarm(previous, point, useSurge = false) {
   if (state.tick >= state.nextWave) {
     const count = Math.max(1, Math.round((3 + Math.floor(state.tick / 240)) * (modifier?.wave ?? 1)))
     const regularCount = state.crops.filter((crop) => !crop.boss).length
+    // Gold-record elites join the horde after 45 seconds: beefier, they dash
+    // now and then, and they pay far better than the monsters around them.
+    const elites = state.crops.filter((crop) => crop.elite && crop.hp > 0).length
+    const eliteDue = state.tick >= 45 * FPS && elites < 5 && Math.floor(state.tick / 12) % 6 === 0
     for (let index = 0; index < count && regularCount + index < 100; index++) {
-      const id = state.nextId++, kind = id % 4, hp = enemyHealth(state.tick, kind) + (modifier?.health ?? 0)
-      const enemy = { id, x: 0, y: 0, kind, hp, maxHp: hp, regrow: -1, boss: false }
+      const id = state.nextId++, kind = id % 4
+      const elite = eliteDue && index === 0
+      const hp = elite ? (enemyHealth(state.tick, 3) + (modifier?.health ?? 0)) * 6 + 8 : enemyHealth(state.tick, kind) + (modifier?.health ?? 0)
+      const enemy = elite ? { id, x: 0, y: 0, kind: 3, hp, maxHp: hp, regrow: -1, boss: false, elite: true, dashUntil: -1 } : { id, x: 0, y: 0, kind, hp, maxHp: hp, regrow: -1, boss: false }
       placeAtEdge(state, enemy); state.crops.push(enemy)
     }
     state.nextWave += 12
@@ -256,7 +262,8 @@ export function stepFarm(previous, point, useSurge = false) {
     if (distance([enemy.x, enemy.y], point) > 160) { placeAtEdge(state, enemy); continue }
     if (state.tick < (enemy.spawnAt ?? 0)) continue
     const dx = point[0] - enemy.x, dy = point[1] - enemy.y, dist = Math.max(.01, distance([enemy.x, enemy.y], point))
-    const speed = (enemy.bass ? .2 : enemy.boss ? .38 : [.48, .85, .34, .3][enemy.kind]) * (1 + Math.min(1.5, state.tick / (FPS * 60) * .55)) * (modifier?.speed ?? 1)
+    if (enemy.elite && (state.tick + enemy.id) % 80 === 0) enemy.dashUntil = state.tick + 8
+    const speed = (enemy.elite ? (state.tick < (enemy.dashUntil ?? -1) ? 1.7 : .42) : enemy.bass ? .2 : enemy.boss ? .38 : [.48, .85, .34, .3][enemy.kind]) * (1 + Math.min(1.5, state.tick / (FPS * 60) * .55)) * (modifier?.speed ?? 1)
     const approach = enemy.kind === 2 && !enemy.boss && dist < 28 ? (dist < 20 ? -.5 : 0) : 1
     const travel = Math.min(speed, dist) / dist * approach
     enemy.x += dx * travel; enemy.y += dy * travel
@@ -273,7 +280,7 @@ export function stepFarm(previous, point, useSurge = false) {
     } else if (!enemy.boss && enemy.kind === 2 && state.tick > 5 * FPS && (state.tick + enemy.id) % 64 === 0 && dist < 65 && state.shots.length < 60) {
       state.shots.push({ id: state.nextId++, x: enemy.x, y: enemy.y, dx: dx / dist * 1.1, dy: dy / dist * 1.1, expires: state.tick + FPS * 5 })
     }
-    if (distance([enemy.x, enemy.y], point) < (enemy.bass ? 10 : enemy.boss ? 9 : 5)) hurt(enemy.bass ? 20 : enemy.boss ? 24 : enemy.kind === 3 ? 18 : 12)
+    if (distance([enemy.x, enemy.y], point) < (enemy.bass ? 10 : enemy.boss ? 9 : enemy.elite ? 7 : 5)) hurt(enemy.bass ? 20 : enemy.boss ? 24 : enemy.elite ? 20 : enemy.kind === 3 ? 18 : 12)
   }
   state.shots = state.shots.filter((shot) => {
     shot.x += shot.dx; shot.y += shot.dy

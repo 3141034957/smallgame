@@ -125,6 +125,29 @@ describe('survivor combat', () => {
     expect(third.state.bellRings).toBe(0)
     expect(step({ ...third.state, tick: 120, lastPulse: 120 }).events.filter((event) => event.kind === 'shock')).toHaveLength(0)
   })
+  it('sends gold-record elites after 45 seconds: tougher, dashing and worth more', () => {
+    const wave = (tick) => {
+      const s = arena([], tick)
+      s.nextWave = tick
+      return step(s).state
+    }
+    expect(wave(20 * FPS).crops.some((crop) => crop.elite)).toBe(false)
+    const horde = wave(936).crops
+    const spawned = horde.filter((crop) => crop.elite)
+    expect(spawned.length).toBe(1)
+    const plain = horde.find((crop) => !crop.elite)
+    expect(spawned[0].maxHp).toBeGreaterThan(plain ? plain.maxHp : 0)
+    const elite = { id: 7, kind: 3, x: 20, y: 50, hp: 40, maxHp: 40, regrow: -1, boss: false, elite: true, dashUntil: -1 }
+    const calm = step({ ...arena([{ ...elite }], 100), crops: [{ ...elite }] }).state
+    const dashing = step({ ...arena([{ ...elite }], 100), crops: [{ ...elite, dashUntil: 200 }] }).state
+    expect(dashing.crops[0].x).toBeGreaterThan(calm.crops[0].x)
+    const earned = (crop) => {
+      const s = arena([], 128); s.hp = 40; s.lastPulse = 108
+      s.crops = [{ ...crop, x: 38, y: 50, hp: 1, maxHp: 1 }]
+      return step(s).state
+    }
+    expect(earned(elite).score).toBeGreaterThan(earned({ id: 8, kind: 3, x: 38, y: 50, hp: 1, maxHp: 1, regrow: -1, boss: false }).score)
+  })
   it('ends immediately at zero health without upgrades or further moves', () => {
     const s=arena([enemy(0,0,50,50)]);s.hp=10;s.xp=100
     const r=step(s).state

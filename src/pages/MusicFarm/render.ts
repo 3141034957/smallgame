@@ -134,6 +134,22 @@ function cropSprite(ctx: CanvasRenderingContext2D, crop: Crop, now: number, tick
     ctx.restore()
     return
   }
+  if (crop.elite) {
+    // Gold-record elites: a shining ring, a wider body and a small crown.
+    const shine = ctx.createRadialGradient(0, 0, 6, 0, 0, 34)
+    shine.addColorStop(0, '#f0cf6b3d')
+    shine.addColorStop(1, '#f0cf6b00')
+    ellipse(ctx, 0, 0, 34, 34, shine)
+    ellipse(ctx, 0, 20, 17, 6, '#5e775b35')
+    ctx.strokeStyle = tick < (crop.dashUntil ?? -1) ? '#e2537f' : '#e6b95f'
+    ctx.lineWidth = 2
+    ctx.beginPath(); ctx.ellipse(0, 0, 22, 22, 0, 0, Math.PI * 2); ctx.stroke()
+    ctx.drawImage(assets.crops[crop.kind], -38, -38, 76, 76)
+    ctx.fillStyle = '#a9803a'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'
+    ctx.fillText('♛', 0, -24)
+    ctx.restore()
+    return
+  }
   for (const side of [-1, 1]) ellipse(ctx, side * 7, 13 + Math.sin(now / 100 + side) * 2, 4, 2.5, '#797197')
   if (crop.kind === 2 && (tick + crop.id) % 64 > 48) {
     ctx.strokeStyle = '#e06f91'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, 19, 0, Math.PI * 2); ctx.stroke()
