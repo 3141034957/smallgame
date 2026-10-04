@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { loadPlayer, melodyRequest, savePlayer } from '@/features/melody/leaderboard'
 import type { Board } from '@/features/melody/leaderboard'
 import { formatFarmTime } from '@/features/farm/presentation'
+import { validDay } from '@/features/farm/rules.mjs'
 import { FPS } from '@/features/farm/rules.mjs'
 import type { FarmRound } from '@/features/farm/rules.mjs'
 import './FarmBoard.css'
 
 export function FarmBoard({ day, round }: { day: string; round?: FarmRound | null }) {
+  const [viewDay, setViewDay] = useState(day)
   const [player, setPlayer] = useState(loadPlayer)
   const [name, setName] = useState(player.name)
   const [board, setBoard] = useState<Board | null>(null)
@@ -21,22 +23,26 @@ export function FarmBoard({ day, round }: { day: string; round?: FarmRound | nul
     const controller = new AbortController()
     boardRef.current = controller
     setError('')
-    void melodyRequest<Board>(`leaderboard?${new URLSearchParams({ day, playerId: player.id })}`, controller.signal, undefined, 'farm')
+    void melodyRequest<Board>(`leaderboard?${new URLSearchParams({ day: viewDay, playerId: player.id })}`, controller.signal, undefined, 'farm')
       .then((value) => { if (!controller.signal.aborted) setBoard(value) })
       .catch(() => { if (!controller.signal.aborted) setError('生存榜暂时连不上，点刷新再试一次。') })
     return () => controller.abort()
-  }, [day, player.id, revision])
+  }, [viewDay, player.id, revision])
 
   useEffect(() => {
     setBusy(false)
     return () => submitRef.current?.abort()
   }, [round, day])
 
+  useEffect(() => { if (viewDay !== day && validDay(day)) setViewDay(day) }, [day, viewDay])
+
   const submitted = !!round && submittedRound === round
   return <section className="farm-board" aria-label="今日无限榜">
     <div className="farm-board-heading"><div><span>SURVIVOR CLUB</span><h2>🏆 今日无限榜</h2></div><button type="button" aria-label="刷新生存榜" disabled={busy} onClick={() => setRevision((value) => value + 1)}>↻</button></div>
     <p className="farm-board-caption">每日同一怪潮 · 无限生存 · 每人保留最高分</p>
-    {round && round.score > 0 && (submitted ? <p role="status" className="farm-board-success">上榜啦！{board?.own && `今天第 ${board.own.rank} 名`}，下次冲得更高 ♡</p> : <form onSubmit={(event) => {
+    <p className="farm-board-day"><label htmlFor="farm-board-day">查看日期</label><input id="farm-board-day" type="date" value={viewDay} max={day} onChange={(event) => { const next = event.target.value; if (!validDay(next)) { setError('请选择有效日期。'); return } setError(''); setViewDay(next) }} />{viewDay !== day && <button type="button" onClick={() => setViewDay(day)}>回到今天</button>}</p>
+    {viewDay !== day && !error && <p role="status" className="farm-board-empty">正在查看 {viewDay} 的榜单，上榜只对今天的成绩开放。</p>}
+    {viewDay === day && round && round.score > 0 && (submitted ? <p role="status" className="farm-board-success">上榜啦！{board?.own && `今天第 ${board.own.rank} 名`}，下次冲得更高 ♡</p> : <form onSubmit={(event) => {
       event.preventDefault()
       if (busy) return
       if (!name.trim()) { setError('给你的乐手取个昵称吧。'); return }
