@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FPS, RECIPES, TALENTS, THRESHOLDS, chooseTalent, clampPoint, createFarm, evolved, orbitPositions, replayFarm, stepFarm } from './rules.mjs'
+import { FARM_MODIFIERS, FPS, RECIPES, TALENTS, THRESHOLDS, chooseTalent, clampPoint, createFarm, evolved, farmModifier, orbitPositions, replayFarm, stepFarm } from './rules.mjs'
 
 const day = '2026-10-04'
 const TEST_TICKS = FPS * 60 * 10
@@ -174,11 +174,12 @@ describe('music roguelite farming', () => {
 
   it('collects experience on pickup, merges drops, and respawns enemies outside the arena', () => {
     const state = arena({ power: 1 }, [crop(0, 50, 8)])
+    const reward = FARM_MODIFIERS.find((item) => item.id === state.modifier)?.reward ?? 1
     state.loot = [{ id: 100, x: 50, y: 8, xp: 3, coins: 5 }]
     const result = stepFarm(state, state.position)
     expect(result.state.xp).toBe(0)
     expect(result.state.loot).toHaveLength(1)
-    expect(result.state.loot[0]).toMatchObject({ xp: 8, coins: 13 })
+    expect(result.state.loot[0]).toMatchObject({ xp: 3 + Math.round(5 * reward), coins: 5 + Math.round(8 * reward) })
     const waiting = { ...result.state, tick: result.state.crops[0].regrow, lastPulse: result.state.crops[0].regrow, gear: { ...result.state.gear, power: 0 } }
     const respawned = stepFarm(waiting, waiting.position).state
     expect(respawned.crops[0].hp).toBeGreaterThan(0)
@@ -189,11 +190,35 @@ describe('music roguelite farming', () => {
 
   })
 
-  it('lets a focused build evolve before forty seconds and preserves exact full-run replay', () => {
+  it('gives every day one shared modifier that reshapes waves, health, speed or rewards', () => {
+    const quiet = (extra = {}) => ({ ...arena({}, [], 100), nextWave: Infinity, nextBoss: Infinity, nextBass: Infinity, ...extra })
+    const wave = (id) => { const s = quiet({ modifier: id, nextWave: 100 }); return stepFarm(s, s.position).state.crops.length }
+    expect(wave('swarm')).toBeGreaterThan(wave('calm'))
+    expect(wave('nonsense')).toBe(3)
+    const health = (id) => { const s = quiet({ modifier: id, nextWave: 100 }); return stepFarm(s, s.position).state.crops[0].maxHp }
+    expect(health('tough')).toBe(health('calm') + 1)
+    const chase = (id) => {
+      const s = quiet({ modifier: id, crops: [{ id: 1, x: 10, y: 50, kind: 0, hp: 50, maxHp: 50, regrow: -1, boss: false }] })
+      return stepFarm(s, s.position).state.crops[0].x
+    }
+    expect(chase('swift')).toBeGreaterThan(chase('calm'))
+    const coins = (id) => {
+      const s = quiet({ modifier: id, lastPulse: 80, crops: [crop(0, 50, 58)] })
+      return stepFarm(s, s.position).state.loot.reduce((sum, drop) => sum + drop.coins, 0)
+    }
+    expect(coins('golden')).toBeGreaterThan(coins('calm'))
+    expect(createFarm('2026-10-04').modifier).toBe(farmModifier('2026-10-04').id)
+    expect(createFarm('2026-10-01').nextBoss).toBeLessThanOrEqual(16 * FPS)
+    const days = new Set()
+    for (let index = 0; index < 60; index++) days.add(farmModifier(`2026-11-${String(index % 28 + 1).padStart(2, '0')}`).id)
+    expect(days.size).toBeGreaterThan(1)
+    for (const id of days) expect(FARM_MODIFIERS.some((item) => item.id === id)).toBe(true)
+  })
+  it('lets a focused build evolve early on every daily modifier and preserves exact full-run replay', () => {
     for (const [focus, routeDay] of [['drum', '2026-10-01'], ['orbit', '2026-10-04'], ['power', '2026-10-02'], ['echo', '2026-10-01']]) {
       const round = run(focus, routeDay)
       expect(round.state.gear[focus]).toBe(3)
-      expect(round.terminalAt).toBeLessThan(FPS * 40)
+      expect(round.terminalAt).toBeLessThan(FPS * 60)
       expect(round.state.bosses).toBeGreaterThanOrEqual(2)
       const replay = replayFarm(routeDay, round.frames, round.choices, round.surges)
       expect(replay).toMatchObject({ score: round.state.score, harvested: round.state.harvested, bosses: round.state.bosses, coins: round.state.coins, xp: round.state.xp, maxCombo: round.state.maxCombo, gear: round.state.gear })

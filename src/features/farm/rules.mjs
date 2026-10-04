@@ -28,6 +28,17 @@ export const RECIPES = [
   { weapon: 'power', chip: 'magnet', name: '黑洞低音炮', icon: '◉', description: '黑洞大范围收割，全场经验涌向你' },
   { weapon: 'echo', chip: 'lucky', name: '星雨竖琴', icon: '♧', description: '一次追击八只怪，全场降下暴击音雨' },
 ]
+// Every calendar day plays under one modifier, drawn from the day seed so all
+// players on that day share it and the leaderboard stays comparable.
+export const FARM_MODIFIERS = [
+  { id: 'calm', name: '慢板', icon: '☾', desc: '怪物少两成，但经验与金币多四成', wave: 0.8, reward: 1.4 },
+  { id: 'swarm', name: '密潮', icon: '❋', desc: '每波怪物多五成，收割更爽', wave: 1.5 },
+  { id: 'tough', name: '重甲', icon: '▣', desc: '怪物生命 +1，需要更硬的构筑', health: 1 },
+  { id: 'swift', name: '急板', icon: '⚡', desc: '怪物移速快两成', speed: 1.2 },
+  { id: 'golden', name: '丰收', icon: '🪙', desc: '金币与经验多五成', reward: 1.5 },
+  { id: 'brisk', name: '短弓', icon: '♭', desc: '巨兽来得更早，奖励多两成', boss: 0.8, reward: 1.2 },
+]
+export const farmModifier = (day) => FARM_MODIFIERS[routeSeed(day, 'farm-mod') % FARM_MODIFIERS.length]
 export const evolved = (gear) => RECIPES.filter((recipe) => gear[recipe.weapon] >= 3 && gear[recipe.chip] >= 3).map((recipe) => recipe.weapon)
 const PITCHES = [60, 64, 67, 69, 72, 76]
 export function clampPoint(previous, desired) {
@@ -53,7 +64,8 @@ function placeAtEdge(state, enemy) {
 }
 export function createFarm(day) {
   if (!validDay(day)) throw new Error('Invalid farm date')
-  const state = { day, seed: routeSeed(day, 'farm-v3'), tick: 0, position: [...START], crops: [], loot: [], gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])), xp: 0, level: 0, offered: [], score: 0, coins: 0, harvested: 0, bosses: 0, combo: 0, maxCombo: 0, lastHarvest: -1000, charge: 0, nextId: 100, lastPulse: -8, echoDue: -1, nextBoss: 16 * FPS, nextBass: 90 * FPS, surgeUntil: -1, hp: 100, maxHp: 100, hurtUntil: 32, nextHeal: 0, shots: [], dangers: [], nextWave: 32 }
+  const modifier = farmModifier(day)
+  const state = { day, seed: routeSeed(day, 'farm-v3'), tick: 0, position: [...START], crops: [], loot: [], gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])), xp: 0, level: 0, offered: [], score: 0, coins: 0, harvested: 0, bosses: 0, combo: 0, maxCombo: 0, lastHarvest: -1000, charge: 0, nextId: 100, lastPulse: -8, echoDue: -1, modifier: modifier.id, nextBoss: Math.round(16 * FPS * (modifier.boss ?? 1)), nextBass: Math.round(90 * FPS * (modifier.boss ?? 1)), surgeUntil: -1, hp: 100, maxHp: 100, hurtUntil: 32, nextHeal: 0, shots: [], dangers: [], nextWave: 32 }
   for (let id = 0; id < 24; id++) {
     const enemy = { id, x: 0, y: 0, kind: id % 4, hp: 1, maxHp: 1, regrow: -1, boss: false }
     placeAtEdge(state, enemy)
@@ -96,6 +108,7 @@ export function stepFarm(previous, point, useSurge = false) {
   const state = { ...previous, position: [...point], crops: previous.crops.filter((crop) => !crop.boss || crop.hp > 0).map((crop) => ({ ...crop })), loot: previous.loot.map((drop) => ({ ...drop })), shots: previous.shots.map((shot) => ({ ...shot })), dangers: previous.dangers.map((danger) => ({ ...danger })), offered: [] }
   const events = []
   const gear = state.gear
+  const modifier = FARM_MODIFIERS.find((item) => item.id === state.modifier)
   const forms = evolved(gear)
   const boomFlow = gear.orbit && gear.drum
   const pulseDamage = 1 + Math.floor(gear.tempo / 3)
@@ -108,7 +121,8 @@ export function stepFarm(previous, point, useSurge = false) {
     const multiplier = Math.min(5, 1 + Math.floor(state.combo / 10))
     const points = (crop.bass ? 2400 : crop.boss ? 1200 : 40 + crop.kind * 10) * multiplier
     state.score += points; state.charge = Math.min(100, state.charge + (crop.bass ? 60 : crop.boss ? 40 : 4))
-    const dropXp = crop.bass ? 110 : crop.boss ? 60 : 5 + gear.lucky, dropCoins = crop.bass ? 340 : crop.boss ? 200 : 8 + crop.kind * 2 + gear.lucky * 5
+    const reward = modifier?.reward ?? 1
+    const dropXp = Math.round((crop.bass ? 110 : crop.boss ? 60 : 5 + gear.lucky) * reward), dropCoins = Math.round((crop.bass ? 340 : crop.boss ? 200 : 8 + crop.kind * 2 + gear.lucky * 5) * reward)
     const existingDrop = state.loot.find((drop) => !drop.heal && distance([drop.x, drop.y], [crop.x, crop.y]) < 3)
     if (existingDrop) { existingDrop.xp += dropXp; existingDrop.coins += dropCoins }
     else state.loot.push({ id: state.nextId++, x: crop.x, y: crop.y, xp: dropXp, coins: dropCoins })
@@ -139,14 +153,14 @@ export function stepFarm(previous, point, useSurge = false) {
   }
   for (const crop of state.crops) if (!crop.boss && crop.hp <= 0 && state.tick >= crop.regrow) {
     crop.kind = (crop.id + Math.floor(state.tick / 160)) % 4
-    crop.hp = enemyHealth(state.tick, crop.kind); crop.maxHp = crop.hp
+    crop.hp = enemyHealth(state.tick, crop.kind) + (modifier?.health ?? 0); crop.maxHp = crop.hp
     placeAtEdge(state, crop)
   }
   if (state.tick >= state.nextWave) {
-    const count = 3 + Math.floor(state.tick / 240)
+    const count = Math.max(1, Math.round((3 + Math.floor(state.tick / 240)) * (modifier?.wave ?? 1)))
     const regularCount = state.crops.filter((crop) => !crop.boss).length
     for (let index = 0; index < count && regularCount + index < 100; index++) {
-      const id = state.nextId++, kind = id % 4, hp = enemyHealth(state.tick, kind)
+      const id = state.nextId++, kind = id % 4, hp = enemyHealth(state.tick, kind) + (modifier?.health ?? 0)
       const enemy = { id, x: 0, y: 0, kind, hp, maxHp: hp, regrow: -1, boss: false }
       placeAtEdge(state, enemy); state.crops.push(enemy)
     }
@@ -220,7 +234,7 @@ export function stepFarm(previous, point, useSurge = false) {
     if (distance([enemy.x, enemy.y], point) > 160) { placeAtEdge(state, enemy); continue }
     if (state.tick < (enemy.spawnAt ?? 0)) continue
     const dx = point[0] - enemy.x, dy = point[1] - enemy.y, dist = Math.max(.01, distance([enemy.x, enemy.y], point))
-    const speed = (enemy.bass ? .2 : enemy.boss ? .38 : [.48, .85, .34, .3][enemy.kind]) * (1 + Math.min(1.5, state.tick / (FPS * 60) * .55))
+    const speed = (enemy.bass ? .2 : enemy.boss ? .38 : [.48, .85, .34, .3][enemy.kind]) * (1 + Math.min(1.5, state.tick / (FPS * 60) * .55)) * (modifier?.speed ?? 1)
     const approach = enemy.kind === 2 && !enemy.boss && dist < 28 ? (dist < 20 ? -.5 : 0) : 1
     const travel = Math.min(speed, dist) / dist * approach
     enemy.x += dx * travel; enemy.y += dy * travel

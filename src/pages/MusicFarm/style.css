@@ -35,3 +35,4 @@
 .farm-fresh-badges span{background:#fffdf4;border:1px solid #eddcb0;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700}
 @media(max-width:520px){.farm-badges h2{font-size:21px}.farm-badge-list{max-height:46vh}}
 .farm-career{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}.farm-career span{background:#f6f1fa;border:1px solid #e6ddef;border-radius:20px;padding:5px 10px;font-size:10px;color:#8c7d99}.farm-career b{color:#5f5470;font-variant-numeric:tabular-nums}
+.farm-modifier{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:5px;margin:7px auto 0;max-width:290px;background:#f4eefb;border:1px solid #e4d9ee;border-radius:20px;padding:6px 12px;font-size:10px;color:#8b7c99;line-height:1.5}.farm-modifier span{font-size:14px}.farm-modifier b{color:#6a5986}

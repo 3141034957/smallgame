@@ -10,11 +10,12 @@ const day = '2026-10-04'
 // would die long before the long-run behaviour under test.
 const flee = (state, target) => {
   let closest = null, nearest = Infinity
-  for (const crop of state.crops) {
-    if (crop.hp <= 0) continue
-    const dist = Math.hypot((crop.x - state.position[0]) * .84, crop.y - state.position[1])
-    if (dist < nearest) { nearest = dist; closest = crop }
+  const consider = (x, y, bias) => {
+    const dist = Math.hypot((x - state.position[0]) * .84, y - state.position[1]) + bias
+    if (dist < nearest) { nearest = dist; closest = { x, y } }
   }
+  for (const crop of state.crops) if (crop.hp > 0) consider(crop.x, crop.y, 0)
+  for (const shot of state.shots) consider(shot.x, shot.y, -8)
   if (!closest || nearest >= 26) return target
   return [state.position[0] + (state.position[0] - closest.x) * 2, state.position[1] + (state.position[1] - closest.y) * 2]
 }
