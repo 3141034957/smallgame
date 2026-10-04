@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FPS, MAX_BOSSES, TALENTS, THRESHOLDS, chooseTalent, createFarm, evolved, finishFarm, stepFarm } from './rules.mjs'
+import { FPS, MAX_BOSSES, RECIPES, TALENTS, THRESHOLDS, chooseTalent, createFarm, evolved, finishFarm, stepFarm } from './rules.mjs'
 
 const day = '2026-10-04'
 const arena = (tick) => ({ ...createFarm(day), tick, crops: [], nextWave: Infinity, nextBoss: Infinity, lastPulse: tick })
@@ -15,7 +15,7 @@ describe('endless survival', () => {
     }
   })
 
-  it('allows all four final forms after the old time limit, without over-leveling or empty upgrade locks', () => {
+  it('allows every final form after the old time limit, without over-leveling or empty upgrade locks', () => {
     let state = arena(2 * 60 * FPS)
     state.xp = THRESHOLDS.at(-1)
     state = stepFarm(state, state.position).state
@@ -24,8 +24,8 @@ describe('endless survival', () => {
       expect(state.offered.every((id) => state.gear[id] < 3)).toBe(true)
       state = chooseTalent(state, state.offered[0])
     }
-    expect(state.level).toBe(24)
-    expect(evolved(state.gear)).toHaveLength(4)
+    expect(state.level).toBe(TALENTS.length * 3)
+    expect(evolved(state.gear)).toHaveLength(RECIPES.length)
     expect(state.offered).toEqual([])
     expect(stepFarm(state, state.position)?.state.tick).toBe(state.tick + 1)
   })

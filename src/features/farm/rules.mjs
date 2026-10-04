@@ -4,7 +4,7 @@ export const FPS = 16
 export const MOVE_STEP = 3
 export const START = [50, 76]
 export const THRESHOLDS = [20, 65, 140, 250, 400, 600, 850, 1150, 1500, 1900, 2350, 2850,
-  ...Array.from({ length: 12 }, (_, index) => 2850 + (index + 1) * 550 + index * (index + 1) * 25)]
+  ...Array.from({ length: 18 }, (_, index) => 2850 + (index + 1) * 550 + index * (index + 1) * 25)]
 export const MAX_BOSSES = 4
 // Healing drops are limited: at most one pack on the field, one every
 // HEAL_COOLDOWN, and each pack vanishes after HEAL_TTL. Without this the
@@ -21,12 +21,15 @@ export const TALENTS = [
   { id: 'tempo', kind: 'chip', partner: 'orbit', name: '节拍芯片', icon: '⚡', color: '#d9bb74', description: '音浪发射更快，配吉他进化。', tag: '攻击速度' },
   { id: 'magnet', kind: 'chip', partner: 'power', name: '引力芯片', icon: '🧲', color: '#91baac', description: '经验和金币从远处飞来，配大提琴进化。', tag: '掉落磁吸' },
   { id: 'lucky', kind: 'chip', partner: 'echo', name: '丰收芯片', icon: '★', color: '#dbbb6b', description: '增加暴击、金币和经验，配竖琴进化。', tag: '暴击与收益' },
+  { id: 'bell', kind: 'weapon', partner: 'sustain', name: '星光铃鼓', icon: '✵', color: '#8fb7d9', description: '每隔几秒向外扩散一圈星浪，推开并伤害身边怪群。', tag: '环形冲击' },
+  { id: 'sustain', kind: 'chip', partner: 'bell', name: '延音芯片', icon: '◐', color: '#7fa8c4', description: '星浪更快更广，配铃鼓进化。', tag: '冲击强化' },
 ]
 export const RECIPES = [
   { weapon: 'drum', chip: 'range', name: '雷霆节拍机', icon: '🥁', description: '爆破范围大幅扩张，连锁伤害翻倍' },
   { weapon: 'orbit', chip: 'tempo', name: '星环电吉他', icon: '✦', description: '六道音刃环绕，触碰伤害翻倍' },
   { weapon: 'power', chip: 'magnet', name: '黑洞低音炮', icon: '◉', description: '黑洞大范围收割，全场经验涌向你' },
   { weapon: 'echo', chip: 'lucky', name: '星雨竖琴', icon: '♧', description: '一次追击八只怪，全场降下暴击音雨' },
+  { weapon: 'bell', chip: 'sustain', name: '银河铃鼓阵', icon: '✵', description: '星浪连发三圈，范围与伤害大幅提升' },
 ]
 // Every calendar day plays under one modifier, drawn from the day seed so all
 // players on that day share it and the leaderboard stays comparable.
@@ -65,7 +68,7 @@ function placeAtEdge(state, enemy) {
 export function createFarm(day) {
   if (!validDay(day)) throw new Error('Invalid farm date')
   const modifier = farmModifier(day)
-  const state = { day, seed: routeSeed(day, 'farm-v3'), tick: 0, position: [...START], crops: [], loot: [], gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])), xp: 0, level: 0, offered: [], score: 0, coins: 0, harvested: 0, bosses: 0, combo: 0, maxCombo: 0, lastHarvest: -1000, charge: 0, nextId: 100, lastPulse: -8, echoDue: -1, modifier: modifier.id, nextBoss: Math.round(16 * FPS * (modifier.boss ?? 1)), nextBass: Math.round(90 * FPS * (modifier.boss ?? 1)), surgeUntil: -1, hp: 100, maxHp: 100, hurtUntil: 32, nextHeal: 0, shots: [], dangers: [], nextWave: 32 }
+  const state = { day, seed: routeSeed(day, 'farm-v3'), tick: 0, position: [...START], crops: [], loot: [], gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])), xp: 0, level: 0, offered: [], score: 0, coins: 0, harvested: 0, bosses: 0, combo: 0, maxCombo: 0, lastHarvest: -1000, charge: 0, nextId: 100, lastPulse: -8, echoDue: -1, bellRings: 0, modifier: modifier.id, nextBoss: Math.round(16 * FPS * (modifier.boss ?? 1)), nextBass: Math.round(90 * FPS * (modifier.boss ?? 1)), surgeUntil: -1, hp: 100, maxHp: 100, hurtUntil: 32, nextHeal: 0, shots: [], dangers: [], nextWave: 32 }
   for (let id = 0; id < 24; id++) {
     const enemy = { id, x: 0, y: 0, kind: id % 4, hp: 1, maxHp: 1, regrow: -1, boss: false }
     placeAtEdge(state, enemy)
@@ -206,6 +209,25 @@ export function stepFarm(previous, point, useSurge = false) {
     } else {
       events.push({ id: state.nextId++, kind: 'beam', x: point[0], y: point[1], radius: 4 + gear.power * 2, lane: 2 })
       for (const crop of state.crops) if (crop.hp > 0 && Math.abs(crop.x - point[0]) <= 4 + gear.power * 2 && Math.abs(crop.y - point[1]) <= 120) damage(crop, gear.power + 1)
+    }
+  }
+  // Star tambourine: a slow, wide ring that also pushes monsters away, so it
+  // covers the builds that keep getting cornered.
+  if (gear.bell) {
+    const interval = Math.max(12, 30 - gear.sustain * 4)
+    if (state.tick % interval === 0) state.bellRings = forms.includes('bell') ? 3 : 1
+    if (state.bellRings > 0 && state.tick % 4 === 0) {
+      state.bellRings--
+      const radius = 24 + gear.bell * 6 + gear.sustain * 4 + (forms.includes('bell') ? 18 : 0)
+      events.push({ id: state.nextId++, kind: 'shock', x: point[0], y: point[1], radius, lane: 2 })
+      for (const crop of state.crops) {
+        if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
+        const dist = distance([crop.x, crop.y], point)
+        if (dist > radius) continue
+        damage(crop, gear.bell + (forms.includes('bell') ? 2 : 0))
+        const factor = 6 / Math.max(1, dist)
+        crop.x += (crop.x - point[0] || 1) * factor; crop.y += (crop.y - point[1] || 1) * factor
+      }
     }
   }
   if (state.tick % 2 === 0) for (const orb of orbitPositions(state)) for (const crop of state.crops) if (crop.hp > 0 && distance([crop.x, crop.y], orb) <= 6) damage(crop, (gear.orbit + (boomFlow ? 1 : 0)) * (forms.includes('orbit') ? 2 : 1))

@@ -101,6 +101,30 @@ describe('survivor combat', () => {
     expect(bassKill.state.hp).toBe(75)
     expect(bruteKill.state.hp).toBe(70)
   })
+  it('rings the star tambourine outwards, damaging and pushing monsters back', () => {
+    const ring = (gear, tick) => {
+      const s = arena([{ id: 1, kind: 0, x: 56, y: 50, hp: 40, maxHp: 40, regrow: -1, boss: false }], tick)
+      Object.assign(s.gear, gear)
+      s.nextWave = Infinity; s.nextBoss = Infinity; s.nextBass = Infinity; s.lastPulse = tick
+      return step(s)
+    }
+    const idle = ring({ bell: 0 }, 120)
+    expect(idle.events.some((event) => event.kind === 'shock')).toBe(false)
+    const struck = ring({ bell: 1 }, 120)
+    expect(struck.state.crops[0].hp).toBeLessThan(40)
+    expect(struck.state.crops[0].x).toBeGreaterThan(56)
+    expect(struck.events.find((event) => event.kind === 'shock').radius).toBe(30)
+    // The final form fires three rings in a row instead of one.
+    const first = ring({ bell: 3, sustain: 3 }, 108)
+    expect(first.events.filter((event) => event.kind === 'shock')).toHaveLength(1)
+    expect(first.state.bellRings).toBe(2)
+    const second = step({ ...first.state, tick: 112, lastPulse: 112 })
+    const third = step({ ...second.state, tick: 116, lastPulse: 116 })
+    expect(second.events.filter((event) => event.kind === 'shock')).toHaveLength(1)
+    expect(third.events.filter((event) => event.kind === 'shock')).toHaveLength(1)
+    expect(third.state.bellRings).toBe(0)
+    expect(step({ ...third.state, tick: 120, lastPulse: 120 }).events.filter((event) => event.kind === 'shock')).toHaveLength(0)
+  })
   it('ends immediately at zero health without upgrades or further moves', () => {
     const s=arena([enemy(0,0,50,50)]);s.hp=10;s.xp=100
     const r=step(s).state

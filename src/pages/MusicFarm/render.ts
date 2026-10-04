@@ -250,7 +250,18 @@ function assetsFor(ctx: CanvasRenderingContext2D): Assets {
 function groundEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress: number, now: number) {
   const x = X(event.x), y = Y(event.y), radius = Y(event.radius ?? 15)
   ctx.save()
-  if (['pulse', 'blast', 'surge', 'echo', 'slam'].includes(event.kind)) {
+  if (event.kind === 'shock') {
+    // Star tambourine rings push outwards twice as wide as a pulse.
+    const expanding = radius * (.2 + Math.min(1, progress * 1.2) * .8)
+    ctx.globalAlpha = (1 - progress) * .85
+    ctx.strokeStyle = '#8fb7d9'
+    ctx.lineWidth = 3
+    ctx.beginPath(); ctx.arc(x, y, expanding, 0, Math.PI * 2); ctx.stroke()
+    ctx.globalAlpha *= .5
+    ctx.strokeStyle = '#e8f2ff'
+    ctx.lineWidth = 1
+    ctx.beginPath(); ctx.arc(x, y, expanding * .72, 0, Math.PI * 2); ctx.stroke()
+  } else if (['pulse', 'blast', 'surge', 'echo', 'slam'].includes(event.kind)) {
     const color = event.kind === 'slam' ? '#e45e87' : event.kind === 'blast' ? '#eda578' : event.kind === 'surge' ? '#efc561' : '#94b0d7'
     const expanding = radius * (.18 + Math.min(1, progress * 1.5) * .82)
     ctx.globalAlpha = (1 - progress) * (event.kind === 'pulse' ? .5 : .8)
@@ -365,7 +376,7 @@ export function drawFarm(ctx: CanvasRenderingContext2D, state: FarmState, effect
   // Sample dense drum bursts; every important weapon cast still gets its own visual.
   for (const { event, born } of active) {
     if (event.kind === 'blast' && event.id % 3 !== 0) continue
-    const duration = event.kind === 'pulse' ? 650 : event.kind === 'blast' ? 450 : 900
+    const duration = event.kind === 'pulse' ? 650 : event.kind === 'blast' ? 450 : event.kind === 'shock' ? 700 : 900
     const progress = (now - born) / duration
     if (progress < 1) groundEffect(ctx, event, progress, now)
   }

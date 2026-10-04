@@ -5,7 +5,7 @@ import type { FarmRound } from './rules.mjs'
 const round = (patch: Partial<FarmRound> = {}): FarmRound => ({
   day: '2026-10-04', frames: [[50, 76]], choices: [], surges: [], outcome: 'defeated', hp: 0, seconds: 40, score: 500,
   maxCombo: 8, harvested: 30, bosses: 2, coins: 100, xp: 40, stars: 1,
-  gear: { drum: 0, orbit: 0, magnet: 0, range: 0, tempo: 0, power: 0, echo: 0, lucky: 0 }, ...patch,
+  gear: { drum: 0, orbit: 0, magnet: 0, range: 0, tempo: 0, power: 0, echo: 0, lucky: 0, bell: 0, sustain: 0 }, ...patch,
 })
 
 let data: Map<string, string>

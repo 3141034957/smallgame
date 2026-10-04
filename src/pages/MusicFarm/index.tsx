@@ -177,6 +177,7 @@ export default function MusicFarm() {
           const harvests = result.events.filter((event) => event.kind === 'harvest' || event.kind === 'boss')
           harvests.slice(0, 4).forEach((event, index) => audio.current?.playLane(1, event.midi, index * .025))
           if (useSurge) { audio.current?.playLane(0); audio.current?.playLane(3, 84) }
+          if (result.events.some((event) => event.kind === 'shock')) audio.current?.playLane(2, 71, .1)
           const arrival = result.events.find((event) => event.kind === 'arrival')
           if (arrival) { setNotice(arrival.bass ? '低音炮王登场！弹幕成环，别站在原地' : '鼓噪巨兽登场！躲开红圈，击败它爆经验'); noticeUntil.current = now + 2400 }
           if (result.events.some((event) => event.kind === 'boss')) { setNotice('Boss 击破！回血与经验全部飞向你 ✦'); noticeUntil.current = now + 2200 }
