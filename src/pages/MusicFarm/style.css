@@ -56,3 +56,15 @@
 .farm-quests li.is-done b{color:#6d8a62}
 .farm-quests em{display:block;width:100%;font-size:8px;font-style:normal;color:#b4903f}
 .farm-result .farm-quests{max-width:none;margin-top:11px}
+.farm-build{margin-top:11px;background:#f7f4fb;border:1px solid #e5dcf0;border-radius:13px;padding:10px 12px;text-align:left}
+.farm-build-heading{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:7px}
+.farm-build-heading small{font-size:9px;letter-spacing:1.2px;color:#8d7d9c;font-weight:800}
+.farm-build-heading span{font-size:9px;color:#a99bb4}
+.farm-build ul{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.farm-build li{display:flex;align-items:center;gap:8px;background:#fffdf8;border:1px solid #ece4f2;border-radius:10px;padding:6px 9px}
+.farm-build li.is-evolved{border-color:#e7d9b4;background:#fff8e8}
+.farm-build li>span{font-size:15px;width:20px;text-align:center;flex:none}
+.farm-build strong{display:block;font-size:11px;color:#5f5470}
+.farm-build small{display:block;font-size:9px;color:#a294b0}
+.farm-build b{margin-left:auto;font-size:9px;color:#9b8da8;font-variant-numeric:tabular-nums}
+.farm-build li.is-evolved b{color:#a97c2c}
