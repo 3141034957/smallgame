@@ -2,7 +2,7 @@ import { evolved, orbitPositions, type Crop, type FarmEvent, type FarmState, typ
 import { farmCamera, farmVisibleTiles } from '../../features/farm/presentation'
 
 type Effect = { event: FarmEvent; born: number }
-export type FarmPose = { position: Point; tick: number; previousEnemies?: ReadonlyMap<number, { x: number; y: number }>; previousShots?: ReadonlyMap<number, { x: number; y: number }>; previousLoot?: ReadonlyMap<number, { x: number; y: number }>; alpha: number }
+export type FarmPose = { character?: HTMLCanvasElement | null; position: Point; tick: number; previousEnemies?: ReadonlyMap<number, { x: number; y: number }>; previousShots?: ReadonlyMap<number, { x: number; y: number }>; previousLoot?: ReadonlyMap<number, { x: number; y: number }>; alpha: number }
 type Assets = { garden: HTMLCanvasElement[]; crops: HTMLCanvasElement[]; sprout: HTMLCanvasElement; bunny: HTMLCanvasElement[]; loot: HTMLCanvasElement; notes: HTMLCanvasElement[] }
 const cachedAssets = new WeakMap<CanvasRenderingContext2D, Assets>()
 const COLORS = ['#f3a0b0', '#f7ab67', '#ed817c', '#f3cd67']
@@ -142,7 +142,7 @@ function cropSprite(ctx: CanvasRenderingContext2D, crop: Crop, now: number, tick
   ctx.restore()
 }
 
-function bunny(ctx: CanvasRenderingContext2D, state: FarmState, now: number, assets: Assets) {
+function bunny(ctx: CanvasRenderingContext2D, state: FarmState, now: number, assets: Assets, character?: HTMLCanvasElement | null) {
   const x = X(state.position[0]), y = Y(state.position[1]), ultimate = evolved(state.gear).length > 0
   const bob = Math.sin(now / 150) * 1.1
   ctx.save()
@@ -159,7 +159,10 @@ function bunny(ctx: CanvasRenderingContext2D, state: FarmState, now: number, ass
     }
   }
   if (state.tick < state.hurtUntil && state.tick > 32) ctx.globalAlpha = Math.floor(now / 80) % 2 ? .45 : 1
-  ctx.drawImage(assets.bunny[state.tick < state.surgeUntil ? 1 : 0], -40, -40, 80, 80)
+  if (character) {
+    ellipse(ctx, 0, 17, 16, 5, '#70608030')
+    ctx.drawImage(character, -40, -52, 80, 80)
+  } else ctx.drawImage(assets.bunny[state.tick < state.surgeUntil ? 1 : 0], -40, -40, 80, 80)
   ctx.restore()
 }
 
@@ -409,7 +412,7 @@ export function drawFarm(ctx: CanvasRenderingContext2D, state: FarmState, effect
       ctx.drawImage(assets.notes[terminalOrbit ? 1 : 0], X(x) - 24, Y(y) - 24, 48, 48)
     }
   }
-  bunny(ctx, moving, now, assets)
+  bunny(ctx, moving, now, assets, pose?.character)
   for (const { event, born } of active) airEffect(ctx, event, (now - born) / 900)
   ctx.restore()
   ctx.save()
