@@ -153,8 +153,8 @@ describe('survivor combat', () => {
       const s = arena([], 128); s.hp = 60; s.lastPulse = 108; s.loot = loot
       return step(s).state
     }
-    expect(pick([{ id: 1, x: 50, y: 52, xp: 0, coins: 0, shield: 1 }]).shields).toBe(1)
-    expect(pick([{ id: 1, x: 50, y: 52, xp: 0, coins: 0, shield: 1 }, { id: 2, x: 50, y: 53, xp: 0, coins: 0, shield: 1 }, { id: 3, x: 50, y: 54, xp: 0, coins: 0, shield: 1 }, { id: 4, x: 50, y: 55, xp: 0, coins: 0, shield: 1 }]).shields).toBe(SHIELD_LIMIT)
+    expect(pick([{ id: 1, x: 50, y: 52, xp: 0, coins: 0, shield: 1 }])).toMatchObject({ shields: 1, maxShields: 1 })
+    expect(pick([{ id: 1, x: 50, y: 52, xp: 0, coins: 0, shield: 1 }, { id: 2, x: 50, y: 53, xp: 0, coins: 0, shield: 1 }, { id: 3, x: 50, y: 54, xp: 0, coins: 0, shield: 1 }, { id: 4, x: 50, y: 55, xp: 0, coins: 0, shield: 1 }])).toMatchObject({ shields: SHIELD_LIMIT, maxShields: SHIELD_LIMIT })
     const guarded = arena([enemy(0, 0, 50, 50)], 128)
     guarded.shields = 1
     const absorbed = step(guarded)

@@ -357,6 +357,7 @@ function airEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress: nu
     ctx.fillStyle = '#3f9db8'; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'
     ctx.fillText('🛡', x, y + 4)
     ctx.globalAlpha = 1
+    ctx.restore()
     return
   }
   if (event.kind === 'hurt' || event.kind === 'heal') {

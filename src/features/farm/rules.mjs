@@ -279,7 +279,7 @@ export function stepFarm(previous, point, useSurge = false) {
       const amount = Math.min(1, (3 + gear.magnet * 1.5) / Math.max(.01, dist))
       drop.x += (point[0] - drop.x) * amount; drop.y += (point[1] - drop.y) * amount
     }
-    if (distance([drop.x, drop.y], point) <= 4) { state.xp += drop.xp; state.coins += drop.coins; if (drop.shield) state.shields = Math.min(SHIELD_LIMIT, state.shields + drop.shield); if (drop.heal) { const healed = Math.min(drop.heal, state.maxHp - state.hp); state.hp += healed; if (healed) events.push({ id: state.nextId++, kind: 'heal', x: point[0], y: point[1], points: healed, lane: 1 }) } drop.collected = true; events.push({ id: state.nextId++, kind: 'collect', x: point[0], y: point[1], lane: 2 }) }
+    if (distance([drop.x, drop.y], point) <= 4) { state.xp += drop.xp; state.coins += drop.coins; if (drop.shield) { state.shields = Math.min(SHIELD_LIMIT, state.shields + drop.shield); state.maxShields = Math.max(state.maxShields, state.shields) } if (drop.heal) { const healed = Math.min(drop.heal, state.maxHp - state.hp); state.hp += healed; if (healed) events.push({ id: state.nextId++, kind: 'heal', x: point[0], y: point[1], points: healed, lane: 1 }) } drop.collected = true; events.push({ id: state.nextId++, kind: 'collect', x: point[0], y: point[1], lane: 2 }) }
   }
   state.loot = state.loot.filter((drop) => !drop.collected && !(drop.expires && state.tick >= drop.expires) && distance([drop.x, drop.y], point) <= 240).slice(-600)
   const hurt = (amount) => {

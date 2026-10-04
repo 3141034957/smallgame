@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Readable } from 'node:stream'
 import { createMelodyStore } from './melody.mjs'
-import { farmKey, handleFarmRequest, MAX_FARM_BODY_BYTES, verifyFarm } from './farm.mjs'
+import { farmKey, handleFarmRequest, MAX_FARM_BODY_BYTES, MAX_FARM_FRAMES, verifyFarm } from './farm.mjs'
 import { FPS, RECIPES, chooseTalent, clampPoint, createFarm, replayFarm, stepFarm } from '../src/features/farm/rules.mjs'
 
 const day = '2026-10-04'
@@ -85,6 +85,11 @@ describe('replay-verified daily farm leaderboard', () => {
     expect(verifyFarm({ ...input, frames, choices, surges })).toBeNull()
   })
 
+  it('refuses absurdly long replays so one upload cannot stall the server', () => {
+    expect(input.frames.length).toBeLessThan(MAX_FARM_FRAMES)
+    expect(verifyFarm({ ...input, frames: [] })).toBeNull()
+    expect(verifyFarm({ ...input, frames: [...input.frames, ...Array.from({ length: MAX_FARM_FRAMES }, () => input.frames[0])] })).toBeNull()
+  })
   it('rejects forged points, shortcuts, impossible upgrades and uncharged surges', () => {
     const badFrames = round.frames.map((point) => [...point]); badFrames[0] = [97, 4]
     for (const bad of [null, { ...input, score: input.score + 1 }, { ...input, score: String(input.score) }, { ...input, frames: input.frames.slice(1) },
