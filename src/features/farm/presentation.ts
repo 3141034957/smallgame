@@ -89,6 +89,12 @@ export function farmOffscreenMarkers(position: Point, bosses: { x: number; y: nu
   return markers
 }
 
+// Seconds until the next boss arrival, shared by the HUD countdown.
+export function farmBossCountdown(state: { tick: number; nextBoss: number; nextBass: number }): number {
+  const due = Math.min(state.nextBoss, state.nextBass)
+  return Math.max(0, Math.ceil((due - state.tick) / FPS))
+}
+
 export function formatFarmTime(ticks: number) {
   const seconds = Math.floor(ticks / FPS)
   const hours = Math.floor(seconds / 3600)

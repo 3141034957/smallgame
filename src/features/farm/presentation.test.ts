@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { advanceFarmPosition, farmPointerTarget, farmStickRadius, farmStickVector, farmCamera, farmOffscreenMarkers, farmVisibleTiles, formatFarmTime, FARM_STICK_DEAD_ZONE } from './presentation'
+import { advanceFarmPosition, farmBossCountdown, farmPointerTarget, farmStickRadius, farmStickVector, farmCamera, farmOffscreenMarkers, farmVisibleTiles, formatFarmTime, FARM_STICK_DEAD_ZONE } from './presentation'
 import { clampPoint, FPS, MOVE_STEP, type Point } from './rules.mjs'
 
 describe('farm display motion', () => {
@@ -83,6 +83,11 @@ describe('endless world camera', () => {
     expect(farmOffscreenMarkers(position, [{ x: 50, y: 80, hp: 40 }], 375, 500)).toHaveLength(0)
     expect(farmOffscreenMarkers(position, [{ x: 50, y: 76 - 120, hp: 0 }], 375, 500)).toHaveLength(0)
     expect(farmOffscreenMarkers(position, [], 375, 0)).toHaveLength(0)
+  })
+  it('counts down to the earlier of the two boss timers', () => {
+    expect(farmBossCountdown({ tick: 0, nextBoss: 16 * FPS, nextBass: 90 * FPS })).toBe(16)
+    expect(farmBossCountdown({ tick: 20 * FPS, nextBoss: 40 * FPS, nextBass: 90 * FPS })).toBe(20)
+    expect(farmBossCountdown({ tick: 500 * FPS, nextBoss: 16 * FPS, nextBass: 90 * FPS })).toBe(0)
   })
   it('keeps a held pointer direction moving as the player passes the original arena', () => {
     let position: Point = [50, 76]
