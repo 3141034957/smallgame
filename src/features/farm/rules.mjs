@@ -170,6 +170,9 @@ export function stepFarm(previous, point, useSurge = false) {
   }
   for (const crop of state.crops) if (!crop.boss && crop.hp <= 0 && state.tick >= crop.regrow) {
     crop.kind = (crop.id + Math.floor(state.tick / 160)) % 4
+    // A recycled slot always comes back as a regular monster, even if an elite
+    // died in it — otherwise the crown and the elite rewards would stick.
+    crop.elite = false; crop.dashUntil = -1
     crop.hp = enemyHealth(state.tick, crop.kind) + (modifier?.health ?? 0); crop.maxHp = crop.hp
     placeAtEdge(state, crop)
   }

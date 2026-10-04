@@ -207,6 +207,12 @@ describe('survivor combat', () => {
     expect(faded.trails[0].id).not.toBe(9)
     const many = walk({ whistle: 1 }, Array.from({ length: 40 }, (_, index) => note(index, 50, 50, 9999)), 120)
     expect(many.trails.length).toBeLessThanOrEqual(30)
+    // A recycled monster slot must not keep the elite crown.
+    const dead = { id: 3, kind: 3, x: 20, y: 50, hp: 0, maxHp: 40, regrow: 100, boss: false, elite: true, dashUntil: 500 }
+    const recycled = step({ ...arena([], 100), crops: [dead], nextWave: Infinity, nextBoss: Infinity, nextBass: Infinity }).state.crops[0]
+    expect(recycled.elite).toBe(false)
+    expect(recycled.dashUntil).toBe(-1)
+    expect(recycled.hp).toBeGreaterThan(0)
   })
   it('ends immediately at zero health without upgrades or further moves', () => {
     const s=arena([enemy(0,0,50,50)]);s.hp=10;s.xp=100

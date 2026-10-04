@@ -53,6 +53,16 @@ describe('farm screens render', () => {
     expect(long).toContain('本局复盘')
     expect(long).toContain('90')
   })
+  it('renders the leaderboard submit form for a finished round and the stats overlay', () => {
+    const round = { day, frames: [[50, 76]], choices: [], surges: [], outcome: 'defeated', hp: 0, seconds: 42, score: 4321,
+      maxCombo: 12, harvested: 90, bosses: 1, elites: 0, blocks: 0, maxShields: 0, coins: 200, xp: 30, stars: 1,
+      gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])) }
+    const html = renderToStaticMarkup(<FarmBoard day={day} round={round as never} />)
+    expect(html).toContain('上榜')
+    expect(html).toContain('留下这一局的战绩')
+    const stats = renderToStaticMarkup(<MemoryRouter initialEntries={[`/farm?day=${day}&stats=1`]}><MusicFarm /></MemoryRouter>)
+    expect(stats).toContain('性能诊断')
+  })
   it('renders the shop and the leaderboard without a board response', () => {
     const profile = { coins: 500, owned: ['steampunk'], selected: 'steampunk', rewardedRuns: [] }
     const shop = renderToStaticMarkup(<CharacterShop profile={profile as never} onChange={() => {}} />)
