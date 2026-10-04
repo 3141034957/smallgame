@@ -1,8 +1,8 @@
 import { evolved, FPS, orbitPositions, type Crop, type FarmEvent, type FarmState, type Point } from '../../features/farm/rules.mjs'
-import { farmCamera, farmVisibleTiles } from '../../features/farm/presentation'
+import { farmCamera, farmStickRadius, farmVisibleTiles, farmWorldBounds } from '../../features/farm/presentation'
 
 type Effect = { event: FarmEvent; born: number }
-export type FarmPose = { character?: HTMLCanvasElement | null; position: Point; tick: number; previousEnemies?: ReadonlyMap<number, { x: number; y: number }>; previousShots?: ReadonlyMap<number, { x: number; y: number }>; previousLoot?: ReadonlyMap<number, { x: number; y: number }>; alpha: number }
+export type FarmPose = { character?: HTMLCanvasElement | null; joystick?: { base: Point; knob: Point }; position: Point; tick: number; previousEnemies?: ReadonlyMap<number, { x: number; y: number }>; previousShots?: ReadonlyMap<number, { x: number; y: number }>; previousLoot?: ReadonlyMap<number, { x: number; y: number }>; alpha: number }
 type Assets = { garden: HTMLCanvasElement[]; crops: HTMLCanvasElement[]; sprout: HTMLCanvasElement; bunny: HTMLCanvasElement[]; loot: HTMLCanvasElement; notes: HTMLCanvasElement[] }
 const cachedAssets = new WeakMap<CanvasRenderingContext2D, Assets>()
 const COLORS = ['#f3a0b0', '#f7ab67', '#ed817c', '#f3cd67']
@@ -426,5 +426,20 @@ export function drawFarm(ctx: CanvasRenderingContext2D, state: FarmState, effect
   }
   const recentHurt = active.find(({ event, born }) => event.kind === 'hurt' && now - born < 220)
   if (recentHurt) { ctx.strokeStyle = `rgba(218,73,112,${(1 - (now - recentHurt.born) / 220) * .7})`; ctx.lineWidth = 12; ctx.strokeRect(0, 0, width, height) }
+  const stick = pose?.joystick
+  if (stick) {
+    // The phone stick is drawn in screen space: base at the press point, knob
+    // pulled up to the stick radius so the thumb can feel the direction.
+    const world = farmWorldBounds({ left: 0, top: 0, width, height })
+    const baseX = world.left + stick.base[0] / 100 * world.width, baseY = world.top + stick.base[1] / 100 * world.height
+    const knobX = world.left + stick.knob[0] / 100 * world.width, knobY = world.top + stick.knob[1] / 100 * world.height
+    const radius = farmStickRadius(world.width, world.height)
+    ctx.fillStyle = '#6b5a7d1f'
+    ctx.beginPath(); ctx.arc(baseX, baseY, radius, 0, Math.PI * 2); ctx.fill()
+    ctx.strokeStyle = '#ffffff73'; ctx.lineWidth = 2; ctx.stroke()
+    ctx.fillStyle = '#fffdf6e6'
+    ctx.beginPath(); ctx.arc(knobX, knobY, radius * .46, 0, Math.PI * 2); ctx.fill()
+    ctx.strokeStyle = '#b79ed0cc'; ctx.stroke()
+  }
   ctx.restore()
 }

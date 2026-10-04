@@ -1,27 +1,48 @@
+import { farmStickRadius, farmStickVector } from './presentation'
 import type { Point } from './rules.mjs'
+
+// Coordinates are percentages of the field box, matching pointer aim input.
+export type FarmStick = { vector: Point | null; base: Point; knob: Point }
 
 type Options = {
   canMove: () => boolean
   bounds: () => Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>
   refreshBounds: () => void
-  target: (point: Point, mode: 'touch' | 'mouse') => void
+  target: (point: Point) => void
+  stick: (stick: FarmStick) => void
   stop: () => void
 }
 
 export function bindFarmControls(field: HTMLElement, canvas: HTMLCanvasElement, options: Options) {
   let activePointer: number | null = null
+  let origin: [number, number] | null = null
   const removers: (() => void)[] = []
   const listen = (name: string, callback: EventListener, settings?: AddEventListenerOptions) => {
     field.addEventListener(name, callback, settings)
     removers.push(() => field.removeEventListener(name, callback, settings))
   }
-  const move = (x: number, y: number, mode: 'touch' | 'mouse') => {
+  const move = (x: number, y: number) => {
     const rect = options.bounds()
     if (!rect.width || !rect.height) return
-    options.target([(x - rect.left) / rect.width * 100, (y - rect.top) / rect.height * 100], mode)
+    options.target([(x - rect.left) / rect.width * 100, (y - rect.top) / rect.height * 100])
+  }
+  const percent = (x: number, y: number): Point => {
+    const rect = options.bounds()
+    return [(x - rect.left) / rect.width * 100, (y - rect.top) / rect.height * 100]
+  }
+  // Touch keeps the press point as a fixed stick base: direction comes from the
+  // offset, so the camera can follow without the hero chasing the finger.
+  const stickAt = (x: number, y: number) => {
+    const rect = options.bounds()
+    if (!rect.width || !rect.height || !origin) return
+    const radius = farmStickRadius(rect.width, rect.height)
+    const dx = x - origin[0], dy = y - origin[1]
+    const distance = Math.hypot(dx, dy)
+    const pull = distance > radius ? radius / distance : 1
+    options.stick({ vector: farmStickVector(dx, dy, rect.width, rect.height, radius), base: percent(origin[0], origin[1]), knob: percent(origin[0] + dx * pull, origin[1] + dy * pull) })
   }
   const onField = (event: Event) => event.target === field || event.target === canvas
-  const reset = () => { activePointer = null; options.stop() }
+  const reset = () => { activePointer = null; origin = null; options.stop() }
   if ('PointerEvent' in field.ownerDocument.defaultView!) {
     listen('pointerenter', () => options.refreshBounds())
     listen('pointerdown', (raw) => {
@@ -31,14 +52,18 @@ export function bindFarmControls(field: HTMLElement, canvas: HTMLCanvasElement, 
       if (event.pointerType !== 'mouse') {
         if (activePointer !== null) return
         activePointer = event.pointerId
+        origin = [event.clientX, event.clientY]
         field.setPointerCapture?.(event.pointerId)
+        stickAt(event.clientX, event.clientY)
+        return
       }
-      move(event.clientX, event.clientY, event.pointerType === 'mouse' ? 'mouse' : 'touch')
+      move(event.clientX, event.clientY)
     })
     listen('pointermove', (raw) => {
       const event = raw as PointerEvent
       if (!options.canMove() || event.isPrimary === false) return
-      if (event.pointerType === 'mouse' || activePointer === event.pointerId) move(event.clientX, event.clientY, event.pointerType === 'mouse' ? 'mouse' : 'touch')
+      if (event.pointerType === 'mouse') move(event.clientX, event.clientY)
+      else if (activePointer === event.pointerId) stickAt(event.clientX, event.clientY)
     })
     const release = (raw: Event) => {
       const event = raw as PointerEvent
@@ -51,25 +76,25 @@ export function bindFarmControls(field: HTMLElement, canvas: HTMLCanvasElement, 
   } else {
     // Older embedded webviews can expose touch/mouse events without PointerEvent.
     listen('mouseenter', () => options.refreshBounds())
-    listen('mousemove', (raw) => { const event = raw as MouseEvent; if (options.canMove()) move(event.clientX, event.clientY, 'mouse') })
+    listen('mousemove', (raw) => { const event = raw as MouseEvent; if (options.canMove()) move(event.clientX, event.clientY) })
     listen('mouseleave', () => options.stop())
     listen('touchstart', (raw) => {
       const event = raw as TouchEvent
       if (!options.canMove() || !onField(event) || activePointer !== null) return
       const touch = event.changedTouches[0]
       if (!touch) return
-      options.refreshBounds(); activePointer = touch.identifier
-      event.preventDefault(); move(touch.clientX, touch.clientY, 'touch')
+      options.refreshBounds(); activePointer = touch.identifier; origin = [touch.clientX, touch.clientY]
+      event.preventDefault(); stickAt(touch.clientX, touch.clientY)
     }, { passive: false })
     listen('touchmove', (raw) => {
       const event = raw as TouchEvent
       if (!options.canMove()) return
       const touch = Array.from(event.touches).find((touch) => touch.identifier === activePointer)
       if (!touch) return
-      event.preventDefault(); move(touch.clientX, touch.clientY, 'touch')
+      event.preventDefault(); stickAt(touch.clientX, touch.clientY)
     }, { passive: false })
     const release = (raw: Event) => { const event = raw as TouchEvent; if (Array.from(event.changedTouches).some((touch) => touch.identifier === activePointer)) reset() }
     listen('touchend', release); listen('touchcancel', release)
   }
-  return { reset, dispose: () => { removers.forEach((remove) => remove()); activePointer = null } }
+  return { reset, dispose: () => { removers.forEach((remove) => remove()); activePointer = null; origin = null } }
 }

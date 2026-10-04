@@ -31,6 +31,23 @@ export function farmPointerTarget(position: Point, screen: Point): Point {
   return Math.hypot(dx * .84, dy) <= 3 ? [...position] : [position[0] + dx, position[1] + dy]
 }
 
+export const FARM_STICK_DEAD_ZONE = 0.16
+export function farmStickRadius(width: number, height: number) {
+  return Math.max(28, Math.min(width, height) * 0.18)
+}
+
+// Touch drags steer a virtual stick: the press point becomes the base and the
+// offset direction is the walking direction, so the hero never chases the
+// finger across the arena. Null inside the dead zone means "stand still".
+export function farmStickVector(dx: number, dy: number, width: number, height: number, radius: number): Point | null {
+  if (!width || !height || Math.hypot(dx, dy) < radius * FARM_STICK_DEAD_ZONE) return null
+  // Pixels per world unit differ per axis, so scale each axis separately and
+  // the movement direction matches the drag drawn on screen.
+  const wx = dx / width * 100, wy = dy / height * 100
+  const length = Math.hypot(wx, wy) || 1
+  return [wx / length * MOVE_STEP, wy / length * MOVE_STEP]
+}
+
 export function farmCamera(position: Point, width: number, height: number) {
   const bounds = farmWorldBounds({ left: 0, top: 0, width, height })
   const scale = bounds.width / 360

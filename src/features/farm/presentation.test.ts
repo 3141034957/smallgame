@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { advanceFarmPosition, farmPointerTarget, farmCamera, farmVisibleTiles, formatFarmTime } from './presentation'
+import { advanceFarmPosition, farmPointerTarget, farmStickRadius, farmStickVector, farmCamera, farmVisibleTiles, formatFarmTime, FARM_STICK_DEAD_ZONE } from './presentation'
 import { clampPoint, FPS, MOVE_STEP, type Point } from './rules.mjs'
 
 describe('farm display motion', () => {
@@ -53,6 +53,18 @@ describe('farm display motion', () => {
 })
 
 describe('endless world camera', () => {
+  it('turns a phone drag into a stick direction and ignores the dead zone', () => {
+    const radius = farmStickRadius(360, 430)
+    expect(radius).toBeGreaterThanOrEqual(28)
+    expect(farmStickVector(0, 0, 360, 430, radius)).toBeNull()
+    expect(farmStickVector(radius * FARM_STICK_DEAD_ZONE - 1, 0, 360, 430, radius)).toBeNull()
+    expect(farmStickVector(60, 0, 360, 430, radius)).toEqual([MOVE_STEP, 0])
+    expect(farmStickVector(0, -60, 360, 430, radius)).toEqual([0, -MOVE_STEP])
+    const diagonal = farmStickVector(-40, 40, 360, 430, radius)!
+    expect(diagonal[0]).toBeLessThan(0); expect(diagonal[1]).toBeGreaterThan(0)
+    expect(Math.hypot(...diagonal)).toBeCloseTo(MOVE_STEP)
+    expect(farmStickVector(10, 10, 0, 430, radius)).toBeNull()
+  })
   it('keeps a held pointer direction moving as the player passes the original arena', () => {
     let position: Point = [50, 76]
     for (let tick = 0; tick < 120; tick++) position = clampPoint(position, farmPointerTarget(position, [80, 50]))
