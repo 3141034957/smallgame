@@ -1,4 +1,4 @@
-import { evolved, orbitPositions, type Crop, type FarmEvent, type FarmState, type Point } from '../../features/farm/rules.mjs'
+import { evolved, FPS, orbitPositions, type Crop, type FarmEvent, type FarmState, type Point } from '../../features/farm/rules.mjs'
 import { farmCamera, farmVisibleTiles } from '../../features/farm/presentation'
 
 type Effect = { event: FarmEvent; born: number }
@@ -395,7 +395,13 @@ export function drawFarm(ctx: CanvasRenderingContext2D, state: FarmState, effect
     const alpha = pose?.alpha ?? 1
     const x = X(previous ? previous.x + (drop.x - previous.x) * alpha : drop.x)
     const y = Y(previous ? previous.y + (drop.y - previous.y) * alpha : drop.y) + Math.sin(now / 230 + drop.id) * 1.8
-    if (drop.heal) { ellipse(ctx, x, y, 9, 9, '#fff7ed'); ctx.fillStyle = '#e8759e'; ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center'; ctx.fillText('♥', x, y + 6) }
+    if (drop.heal) {
+      // Healing packs expire, so blink during the last three seconds.
+      const expiring = drop.expires !== undefined && drop.expires - moving.tick < 3 * FPS
+      ctx.globalAlpha = expiring && Math.floor(now / 120) % 2 ? .4 : 1
+      ellipse(ctx, x, y, 9, 9, '#fff7ed'); ctx.fillStyle = '#e8759e'; ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center'; ctx.fillText('♥', x, y + 6)
+      ctx.globalAlpha = 1
+    }
     else ctx.drawImage(assets.loot, x - 9, y - 9, 18, 18)
   }
   const orbit = orbitPositions(moving), terminalOrbit = evolved(state.gear).includes('orbit')

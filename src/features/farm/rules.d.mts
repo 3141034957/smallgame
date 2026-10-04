@@ -2,6 +2,9 @@ import type { Lane } from '../melody/engine'
 export { todayRoute, validDay } from '../island/rules.mjs'
 export const FPS: number
 export const MAX_BOSSES: number
+export const HEAL_COOLDOWN: number
+export const HEAL_TTL: number
+export const HEAL_WOUNDED: number
 export const MOVE_STEP: number
 export const START: Point
 export const THRESHOLDS: number[]
@@ -12,11 +15,11 @@ export const RECIPES: { weapon: TalentId; chip: TalentId; name: string; icon: st
 export function evolved(gear: Gear): TalentId[]
 export type Gear = Record<TalentId, number>
 export type Crop = { id: number; x: number; y: number; kind: Lane; hp: number; maxHp: number; regrow: number; boss: boolean; spawnAt?: number }
-export type Loot = { id: number; x: number; y: number; xp: number; coins: number; heal?: number }
+export type Loot = { id: number; x: number; y: number; xp: number; coins: number; heal?: number; expires?: number }
 export type FarmEvent = { id: number; kind: 'harvest' | 'boss' | 'blast' | 'pulse' | 'echo' | 'surge' | 'arrival' | 'hit' | 'collect' | 'rain' | 'beam' | 'blackhole' | 'hurt' | 'heal' | 'slam'; x: number; y: number; lane: Lane; midi?: number; points?: number; radius?: number; chain?: boolean; fromX?: number; fromY?: number }
 export type Shot = { id: number; x: number; y: number; dx: number; dy: number; expires: number }
 export type Danger = { id: number; x: number; y: number; radius: number; due: number }
-export type FarmState = { day: string; seed: number; tick: number; position: Point; crops: Crop[]; loot: Loot[]; gear: Gear; xp: number; level: number; offered: TalentId[]; score: number; coins: number; harvested: number; bosses: number; combo: number; maxCombo: number; lastHarvest: number; charge: number; nextId: number; lastPulse: number; echoDue: number; nextBoss: number; surgeUntil: number; hp: number; maxHp: number; hurtUntil: number; shots: Shot[]; dangers: Danger[]; nextWave: number }
+export type FarmState = { day: string; seed: number; tick: number; position: Point; crops: Crop[]; loot: Loot[]; gear: Gear; xp: number; level: number; offered: TalentId[]; score: number; coins: number; harvested: number; bosses: number; combo: number; maxCombo: number; lastHarvest: number; charge: number; nextId: number; lastPulse: number; echoDue: number; nextBoss: number; surgeUntil: number; hp: number; maxHp: number; hurtUntil: number; nextHeal: number; shots: Shot[]; dangers: Danger[]; nextWave: number }
 export type Choice = { tick: number; id: TalentId }
 export type FarmRound = { outcome: 'defeated'; hp: number; seconds: number; day: string; frames: Point[]; choices: Choice[]; surges: number[]; score: number; maxCombo: number; harvested: number; bosses: number; coins: number; xp: number; gear: Gear; stars: number }
 export function clampPoint(previous: Point, desired: Point): Point

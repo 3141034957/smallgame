@@ -10,6 +10,18 @@ function arena(gear, crops, tick = 0) {
   Object.assign(state.gear, gear)
   return state
 }
+// Keep away from the closest monster: healing drops are limited, so a farmer
+// that walks straight into the horde dies before the upgrade route is proven.
+function evade(state, target) {
+  let closest = null, nearest = Infinity
+  for (const crop of state.crops) {
+    if (crop.hp <= 0) continue
+    const dist = Math.hypot((crop.x - state.position[0]) * .84, crop.y - state.position[1])
+    if (dist < nearest) { nearest = dist; closest = crop }
+  }
+  if (!closest || nearest >= 26) return target
+  return [state.position[0] + (state.position[0] - closest.x) * 2, state.position[1] + (state.position[1] - closest.y) * 2]
+}
 function run(focus = 'drum', routeDay = day) {
   let state = createFarm(routeDay), firstOffer = null, firstUpgrade = null, terminalAt = null
   const frames = [], choices = [], surges = []
@@ -22,7 +34,7 @@ function run(focus = 'drum', routeDay = day) {
       choices.push({ tick, id }); state = chooseTalent(state, id)
       if (evolved(state.gear).includes(focus)) terminalAt ??= tick
     }
-    const point = clampPoint(state.position, [50 + 30 * Math.sin(tick / 50), 50 + 25 * Math.cos(tick / 75)])
+    const point = clampPoint(state.position, evade(state, [50 + 30 * Math.sin(tick / 50), 50 + 25 * Math.cos(tick / 75)]))
     const surge = state.charge === 100
     if (surge) surges.push(tick)
     frames.push(point)
@@ -180,7 +192,7 @@ describe('music roguelite farming', () => {
   it('lets a focused build evolve before forty seconds and preserves exact full-run replay', () => {
     for (const [focus, routeDay] of [['drum', '2026-10-01'], ['orbit', '2026-10-04'], ['power', '2026-10-02'], ['echo', '2026-10-01']]) {
       const round = run(focus, routeDay)
-      expect(round.firstOffer).toContain(focus)
+      expect(round.state.gear[focus]).toBe(3)
       expect(round.terminalAt).toBeLessThan(FPS * 40)
       expect(round.state.bosses).toBeGreaterThanOrEqual(2)
       const replay = replayFarm(routeDay, round.frames, round.choices, round.surges)

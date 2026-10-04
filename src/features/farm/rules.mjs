@@ -6,6 +6,12 @@ export const START = [50, 76]
 export const THRESHOLDS = [20, 65, 140, 250, 400, 600, 850, 1150, 1500, 1900, 2350, 2850,
   ...Array.from({ length: 12 }, (_, index) => 2850 + (index + 1) * 550 + index * (index + 1) * 25)]
 export const MAX_BOSSES = 4
+// Healing drops are limited: at most one pack on the field, one every
+// HEAL_COOLDOWN, and each pack vanishes after HEAL_TTL. Without this the
+// endless mode never ends once the build harvests faster than enemies hurt.
+export const HEAL_COOLDOWN = 15 * FPS
+export const HEAL_TTL = 10 * FPS
+export const HEAL_WOUNDED = 0.8
 export const TALENTS = [
   { id: 'drum', kind: 'weapon', partner: 'range', name: '爆米花鼓', icon: '🥁', color: '#edaa8e', description: '击败怪物，鼓点引爆周围怪群。', tag: '连锁爆破' },
   { id: 'orbit', kind: 'weapon', partner: 'tempo', name: '回旋吉他', icon: '♫', color: '#b7a0dd', description: '旋转音符绕着你飞，碰到怪物就造成伤害。', tag: '旋转音刃' },
@@ -47,7 +53,7 @@ function placeAtEdge(state, enemy) {
 }
 export function createFarm(day) {
   if (!validDay(day)) throw new Error('Invalid farm date')
-  const state = { day, seed: routeSeed(day, 'farm-v3'), tick: 0, position: [...START], crops: [], loot: [], gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])), xp: 0, level: 0, offered: [], score: 0, coins: 0, harvested: 0, bosses: 0, combo: 0, maxCombo: 0, lastHarvest: -1000, charge: 0, nextId: 100, lastPulse: -8, echoDue: -1, nextBoss: 16 * FPS, surgeUntil: -1, hp: 100, maxHp: 100, hurtUntil: 32, shots: [], dangers: [], nextWave: 32 }
+  const state = { day, seed: routeSeed(day, 'farm-v3'), tick: 0, position: [...START], crops: [], loot: [], gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])), xp: 0, level: 0, offered: [], score: 0, coins: 0, harvested: 0, bosses: 0, combo: 0, maxCombo: 0, lastHarvest: -1000, charge: 0, nextId: 100, lastPulse: -8, echoDue: -1, nextBoss: 16 * FPS, surgeUntil: -1, hp: 100, maxHp: 100, hurtUntil: 32, nextHeal: 0, shots: [], dangers: [], nextWave: 32 }
   for (let id = 0; id < 24; id++) {
     const enemy = { id, x: 0, y: 0, kind: id % 4, hp: 1, maxHp: 1, regrow: -1, boss: false }
     placeAtEdge(state, enemy)
@@ -106,7 +112,12 @@ export function stepFarm(previous, point, useSurge = false) {
     const existingDrop = state.loot.find((drop) => !drop.heal && distance([drop.x, drop.y], [crop.x, crop.y]) < 3)
     if (existingDrop) { existingDrop.xp += dropXp; existingDrop.coins += dropCoins }
     else state.loot.push({ id: state.nextId++, x: crop.x, y: crop.y, xp: dropXp, coins: dropCoins })
-    if (crop.boss || state.harvested % 16 === 0) state.loot.push({ id: state.nextId++, x: crop.x, y: crop.y, xp: 0, coins: 0, heal: crop.boss ? 30 : 18 })
+    // One healing pack at a time, only while wounded, and on a long cooldown.
+    const wounded = state.hp < state.maxHp * HEAL_WOUNDED
+    if (state.tick >= state.nextHeal && !state.loot.some((drop) => drop.heal) && (crop.boss && state.hp < state.maxHp || state.harvested % 16 === 0 && wounded)) {
+      state.loot.push({ id: state.nextId++, x: crop.x, y: crop.y, xp: 0, coins: 0, heal: crop.boss ? 30 : 18, expires: state.tick + HEAL_TTL })
+      state.nextHeal = state.tick + HEAL_COOLDOWN
+    }
     events.push({ id: state.nextId++, kind: crop.boss ? 'boss' : 'harvest', x: crop.x, y: crop.y, points, lane: crop.kind, midi: PITCHES[crop.id % PITCHES.length], chain })
     if (gear.drum) {
       const radius = 7 + gear.drum * 2 + (boomFlow ? 3 : 0) + (forms.includes('drum') ? 12 : 0)
@@ -181,7 +192,7 @@ export function stepFarm(previous, point, useSurge = false) {
     }
     if (distance([drop.x, drop.y], point) <= 4) { state.xp += drop.xp; state.coins += drop.coins; if (drop.heal) { const healed = Math.min(drop.heal, state.maxHp - state.hp); state.hp += healed; if (healed) events.push({ id: state.nextId++, kind: 'heal', x: point[0], y: point[1], points: healed, lane: 1 }) } drop.collected = true; events.push({ id: state.nextId++, kind: 'collect', x: point[0], y: point[1], lane: 2 }) }
   }
-  state.loot = state.loot.filter((drop) => !drop.collected && distance([drop.x, drop.y], point) <= 240).slice(-600)
+  state.loot = state.loot.filter((drop) => !drop.collected && !(drop.expires && state.tick >= drop.expires) && distance([drop.x, drop.y], point) <= 240).slice(-600)
   const hurt = (amount) => {
     if (state.tick < state.hurtUntil || state.hp <= 0) return
     state.hp = Math.max(0, state.hp - amount); state.hurtUntil = state.tick + FPS

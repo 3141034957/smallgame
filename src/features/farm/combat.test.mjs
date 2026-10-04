@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createFarm, stepFarm, FPS } from './rules.mjs'
+import { createFarm, stepFarm, FPS, HEAL_COOLDOWN, HEAL_TTL } from './rules.mjs'
 const enemy = (id, kind, x, y, boss = false) => ({ id, kind, x, y, hp: 100, maxHp: 100, boss, regrow: -1 })
 const arena = (enemies, tick = 100) => ({ ...createFarm('2026-10-04'), position: [50,50], crops: enemies, tick, nextBoss: Infinity, nextWave: Infinity, lastPulse: tick, hurtUntil: 0 })
 const step = (s, surge = false) => stepFarm(s, s.position, surge)
@@ -56,6 +56,29 @@ describe('survivor combat', () => {
     expect(burst.shots).toHaveLength(0)
     expect(burst.dangers).toHaveLength(0)
     expect(burst.hurtUntil).toBe(116)
+  })
+  it('limits healing drops to one expiring pack, only while wounded, on a long cooldown', () => {
+    const run = ({ tick = 200, hp = 70, harvested = 15, boss = false, loot = [] } = {}) => {
+      const s = arena([], tick)
+      s.hp = hp; s.harvested = harvested; s.lastPulse = tick - 20; s.loot = loot
+      s.crops = [enemy(1, 0, 62, 50, boss)]
+      return step({ ...s, crops: [{ ...s.crops[0], hp: 1, maxHp: 1 }] }).state
+    }
+    const packs = (state) => state.loot.filter((drop) => drop.heal)
+    const wounded = run()
+    expect(packs(wounded)).toHaveLength(1)
+    expect(packs(wounded)[0]).toMatchObject({ heal: 18, expires: 200 + HEAL_TTL })
+    expect(wounded.nextHeal).toBe(200 + HEAL_COOLDOWN)
+    expect(packs(run({ hp: 100 }))).toHaveLength(0)
+    const killAgain = (state, tick) => step({ ...state, tick, lastPulse: tick - 20, harvested: 31, loot: [], crops: [{ ...enemy(2, 0, 62, 50), hp: 1, maxHp: 1 }] }).state
+    expect(packs(killAgain(wounded, 200 + HEAL_COOLDOWN - 1))).toHaveLength(0)
+    expect(packs(killAgain(wounded, 200 + HEAL_COOLDOWN))).toHaveLength(1)
+    const occupied = step({ ...wounded, tick: 200 + HEAL_COOLDOWN, lastPulse: 200 + HEAL_COOLDOWN - 20, harvested: 31, loot: [{ id: 900, x: 120, y: 50, xp: 0, coins: 0, heal: 18, expires: 9999 }], crops: [{ ...enemy(2, 0, 62, 50), hp: 1, maxHp: 1 }] }).state
+    expect(packs(occupied)).toHaveLength(1)
+    expect(packs(run({ loot: [{ id: 901, x: 60, y: 60, xp: 0, coins: 0, heal: 18, expires: 200 }] }))).toHaveLength(0)
+    const bossKill = run({ boss: true, hp: 90, harvested: 1 })
+    expect(bossKill.hp).toBe(100)
+    expect(run({ boss: true, hp: 100, harvested: 1 }).hp).toBe(100)
   })
   it('ends immediately at zero health without upgrades or further moves', () => {
     const s=arena([enemy(0,0,50,50)]);s.hp=10;s.xp=100

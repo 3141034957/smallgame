@@ -5,6 +5,19 @@ import { farmKey, handleFarmRequest, MAX_FARM_BODY_BYTES, verifyFarm } from './f
 import { FPS, chooseTalent, clampPoint, createFarm, replayFarm, stepFarm } from '../src/features/farm/rules.mjs'
 
 const day = '2026-10-04'
+// The fixture farmer keeps its distance from the closest monster instead of
+// walking into the horde: healing drops are limited now, so a passive route
+// would die long before the long-run behaviour under test.
+const flee = (state, target) => {
+  let closest = null, nearest = Infinity
+  for (const crop of state.crops) {
+    if (crop.hp <= 0) continue
+    const dist = Math.hypot((crop.x - state.position[0]) * .84, crop.y - state.position[1])
+    if (dist < nearest) { nearest = dist; closest = crop }
+  }
+  if (!closest || nearest >= 26) return target
+  return [state.position[0] + (state.position[0] - closest.x) * 2, state.position[1] + (state.position[1] - closest.y) * 2]
+}
 function playFixture(active = true) {
   let state = createFarm(day)
   const frames = [], choices = [], surges = []
@@ -13,7 +26,7 @@ function playFixture(active = true) {
       const id = state.offered[0]
       choices.push({ tick, id }); state = chooseTalent(state, id)
     }
-    const point = clampPoint(state.position, active ? [50 + 32 * Math.sin(tick / 45), 50 + 30 * Math.cos(tick / 61)] : state.position)
+    const point = clampPoint(state.position, active ? flee(state, [50 + 32 * Math.sin(tick / 45), 50 + 30 * Math.cos(tick / 61)]) : state.position)
     const surge = active && state.charge === 100
     if (surge) surges.push(tick)
     frames.push(point)
