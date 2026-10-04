@@ -19,3 +19,18 @@
 @media(max-height:500px) and (min-width:681px){.music-farm .farm-health{left:17px;top:183px;transform:none;width:135px;flex-wrap:wrap;gap:4px}.farm-health small{width:100%;text-align:center}.music-farm .farm-field{top:0}}
 
 .farm-time b{display:flex;flex-direction:column;align-items:center;font-variant-numeric:tabular-nums;font-size:clamp(16px,4vw,23px);white-space:nowrap}.farm-time b>small{font-size:8px;line-height:1.2;letter-spacing:1px}
+.farm-badges-head{display:flex;align-items:center;justify-content:space-between;padding-right:34px;gap:10px}.farm-badges-head>div>small{font-size:9px;letter-spacing:1.3px;color:#a294b0;font-weight:800}.farm-badges h2{margin:5px 0 0;font-size:24px;color:#5c4b73}.farm-badges-count{background:#f1ecf8;border:1px solid #e2d8ee;padding:8px 12px;border-radius:14px;text-align:center}.farm-badges-count>small{display:block;font-size:9px;color:#a294b0}.farm-badges-count strong{font-size:17px;color:#6d5c85;font-variant-numeric:tabular-nums}
+.farm-badge-list{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:8px;max-height:52vh;overflow-y:auto;overscroll-behavior:contain}
+.farm-badge-list li{display:flex;align-items:center;gap:11px;border:1px solid #e9e1ec;background:#fffdf9;border-radius:14px;padding:9px 12px;color:#8b7d97}
+.farm-badge-list li.is-unlocked{border-color:#e7d9b4;background:#fff8e8;color:#6f5c46}
+.farm-badge-icon{font-size:21px;width:30px;text-align:center;flex:none}
+.farm-badge-list strong{display:block;font-size:13px;color:#5f5470}
+.farm-badge-list li.is-unlocked strong{color:#6a5335}
+.farm-badge-list small{display:block;font-size:10px;color:#9d90a8;line-height:1.5}
+.farm-badge-list em{display:block;font-size:9px;font-style:normal;color:#a793b0;margin-top:3px;font-variant-numeric:tabular-nums}
+.farm-badge-note{display:block;margin-top:11px;text-align:center;font-size:9px;color:#b3a7bb}
+.farm-fresh-badges{background:#fff4dc;border:1px solid #ecdcae;border-radius:13px;padding:10px 14px;margin-bottom:11px;color:#9a7534}
+.farm-fresh-badges>small{display:block;font-size:9px;letter-spacing:1px;color:#b4903f;margin-bottom:6px}
+.farm-fresh-badges>div{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.farm-fresh-badges span{background:#fffdf4;border:1px solid #eddcb0;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700}
+@media(max-width:520px){.farm-badges h2{font-size:21px}.farm-badge-list{max-height:46vh}}

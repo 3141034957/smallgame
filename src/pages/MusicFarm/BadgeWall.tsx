@@ -1,0 +1,20 @@
+import { FARM_ACHIEVEMENTS, formatFarmAchievement, type FarmAchievementLog } from '@/features/farm/achievements'
+
+export function BadgeWall({ log }: { log: FarmAchievementLog }) {
+  const unlocked = FARM_ACHIEVEMENTS.filter((achievement) => log.unlocked[achievement.id] !== undefined)
+  return <div className="farm-badges">
+    <header className="farm-badges-head"><div><small>YOUR SURVIVOR MEDALS</small><h2>成就墙</h2></div><div className="farm-badges-count"><small>已解锁</small><strong>{unlocked.length} / {FARM_ACHIEVEMENTS.length}</strong></div></header>
+    <ul className="farm-badge-list" aria-label="成就列表">{FARM_ACHIEVEMENTS.map((achievement) => {
+      const at = log.unlocked[achievement.id], done = at !== undefined
+      return <li key={achievement.id} className={done ? 'is-unlocked' : ''}>
+        <span className="farm-badge-icon" aria-hidden="true">{done ? achievement.icon : '🔒'}</span>
+        <div>
+          <strong>{achievement.name}</strong>
+          <small>{achievement.desc}</small>
+          <em>{done ? `已解锁 · ${new Date(at).toLocaleDateString('zh-CN')}` : `${formatFarmAchievement(achievement, log.best[achievement.id] ?? 0)} / ${formatFarmAchievement(achievement, achievement.target)}`}</em>
+        </div>
+      </li>
+    })}</ul>
+    <small className="farm-badge-note">成就保存在当前浏览器，每局死亡结算后解锁。</small>
+  </div>
+}
