@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Readable } from 'node:stream'
 import { createMelodyStore } from './melody.mjs'
 import { farmKey, handleFarmRequest, MAX_FARM_BODY_BYTES, verifyFarm } from './farm.mjs'
-import { FPS, chooseTalent, clampPoint, createFarm, replayFarm, stepFarm } from '../src/features/farm/rules.mjs'
+import { FPS, RECIPES, chooseTalent, clampPoint, createFarm, replayFarm, stepFarm } from '../src/features/farm/rules.mjs'
 
 const day = '2026-10-04'
 // The fixture farmer keeps its distance from the closest monster instead of
@@ -18,12 +18,17 @@ const flee = (state, target) => {
   if (!closest || nearest >= 26) return target
   return [state.position[0] + (state.position[0] - closest.x) * 2, state.position[1] + (state.position[1] - closest.y) * 2]
 }
+// It also plays one focused build: late runs now meet a second boss, and a
+// scattered build would not survive long enough to exercise the big payload.
+const FOCUS = 'echo'
 function playFixture(active = true) {
   let state = createFarm(day)
   const frames = [], choices = [], surges = []
+  const recipe = RECIPES.find((item) => item.weapon === FOCUS)
   for (let tick = 0; tick < FPS * 60 * 10 && state.hp > 0; tick++) {
     while (state.offered.length) {
-      const id = state.offered[0]
+      const id = state.offered.includes(FOCUS) && state.gear[FOCUS] < 3 ? FOCUS
+        : state.offered.includes(recipe.chip) && state.gear[recipe.chip] < 3 ? recipe.chip : state.offered[0]
       choices.push({ tick, id }); state = chooseTalent(state, id)
     }
     const point = clampPoint(state.position, active ? flee(state, [50 + 32 * Math.sin(tick / 45), 50 + 30 * Math.cos(tick / 61)]) : state.position)

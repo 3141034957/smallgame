@@ -80,6 +80,27 @@ describe('survivor combat', () => {
     expect(bossKill.hp).toBe(100)
     expect(run({ boss: true, hp: 100, harvested: 1 }).hp).toBe(100)
   })
+  it('sends a slower bass boss with ring barrages, wide slams and richer rewards', () => {
+    const bass = { ...enemy(0, 3, 20, 50, true), bass: true }
+    const brute = { ...enemy(1, 3, 20, 50, true) }
+    const chase = step({ ...arena([bass, brute], 128), crops: [{ ...bass, hp: 50, maxHp: 50 }, { ...brute, hp: 50, maxHp: 50 }] }).state
+    expect(chase.crops[0].x - 20).toBeLessThan(chase.crops[1].x - 20)
+    const barrage = step({ ...arena([bass], 144), crops: [{ ...bass, hp: 50, maxHp: 50 }] }).state
+    expect(barrage.shots).toHaveLength(8)
+    expect(new Set(barrage.shots.map((shot) => Math.round(Math.atan2(shot.dy, shot.dx) * 100))).size).toBe(8)
+    const slam = step({ ...arena([bass], 96), crops: [{ ...bass, hp: 50, maxHp: 50 }] }).state
+    expect(slam.dangers[0]).toMatchObject({ x: 50, y: 50, radius: 21, due: 112 })
+    // Close enough for the sound wave, far enough to avoid contact damage.
+    const killed = (boss) => {
+      const s = arena([], 128); s.hp = 40; s.lastPulse = 108
+      s.crops = [{ ...boss, x: 38, y: 50, hp: 1, maxHp: 1 }]
+      return step(s)
+    }
+    const bassKill = killed(bass), bruteKill = killed(brute)
+    expect(bassKill.state.score).toBeGreaterThan(bruteKill.state.score)
+    expect(bassKill.state.hp).toBe(75)
+    expect(bruteKill.state.hp).toBe(70)
+  })
   it('ends immediately at zero health without upgrades or further moves', () => {
     const s=arena([enemy(0,0,50,50)]);s.hp=10;s.xp=100
     const r=step(s).state

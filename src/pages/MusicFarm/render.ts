@@ -103,31 +103,34 @@ function cropSprite(ctx: CanvasRenderingContext2D, crop: Crop, now: number, tick
   ctx.save()
   ctx.translate(x + wobble, y + bob)
   if (crop.boss) {
-    ellipse(ctx, 0, 19, 28, 6, '#5e775b35')
+    const bass = crop.bass === true
+    ellipse(ctx, 0, 19, bass ? 32 : 28, 6, '#5e775b35')
     const glow = ctx.createRadialGradient(0, 0, 5, 0, 0, 38)
-    glow.addColorStop(0, '#f5c96b4d')
-    glow.addColorStop(1, '#f5c96b00')
+    glow.addColorStop(0, bass ? '#8f7ae04d' : '#f5c96b4d')
+    glow.addColorStop(1, bass ? '#8f7ae000' : '#f5c96b00')
     ellipse(ctx, 0, 0, 38, 38, glow)
-    ellipse(ctx, -16, 19, 10, 6, '#8880bb')
-    ellipse(ctx, 16, 19, 10, 6, '#8880bb')
-    ellipse(ctx, 0, 0, 28, 24, '#a299d3')
-    for (const side of [-1, 1]) {
+    ellipse(ctx, bass ? -19 : -16, 19, bass ? 12 : 10, 6, '#8880bb')
+    ellipse(ctx, bass ? 19 : 16, 19, bass ? 12 : 10, 6, '#8880bb')
+    ellipse(ctx, 0, 0, bass ? 32 : 28, bass ? 27 : 24, bass ? '#7159ad' : '#a299d3')
+    // The bass boss is a stack of speakers: rings instead of ears and horns.
+    if (bass) for (const ring of [-9, 4]) { ellipse(ctx, 0, ring, 20 - Math.abs(ring), 6, '#f6e7bd'); ellipse(ctx, 0, ring, 10 - Math.abs(ring) / 2, 3, '#4a3a72') }
+    else for (const side of [-1, 1]) {
       ctx.fillStyle = '#eee4ff'; ctx.beginPath(); ctx.moveTo(side * 15, -17); ctx.lineTo(side * 25, -35); ctx.lineTo(side * 5, -21); ctx.fill()
       ellipse(ctx, side * 10, -3, 5, 7, '#fff9ed'); ellipse(ctx, side * 10, -2, 2.4, 4, INK)
     }
-    ctx.fillStyle = '#675687'; ctx.beginPath(); roundedRect(ctx, -9, 9, 18, 6, 3); ctx.fill()
+    ctx.fillStyle = bass ? '#3f3163' : '#675687'; ctx.beginPath(); roundedRect(ctx, -9, 9, 18, 6, 3); ctx.fill()
     ctx.fillStyle = '#fffdf3'
     ctx.beginPath()
     roundedRect(ctx, -24, 28, 48, 6, 3)
     ctx.fill()
-    ctx.fillStyle = '#e3a44f'
+    ctx.fillStyle = bass ? '#8a63c9' : '#e3a44f'
     ctx.beginPath()
     roundedRect(ctx, -23, 29, Math.max(2, 46 * crop.hp / crop.maxHp), 4, 2)
     ctx.fill()
     ctx.font = '600 9px system-ui, sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillStyle = '#846b44'
-    ctx.fillText('鼓噪巨兽', 0, -35)
+    ctx.fillStyle = bass ? '#5b4788' : '#846b44'
+    ctx.fillText(bass ? '低音炮王' : '鼓噪巨兽', 0, -35)
     ctx.restore()
     return
   }
