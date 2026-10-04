@@ -137,6 +137,8 @@ export default function MusicFarm() {
     const next = chooseTalent(before, id)
     if (!next) return
     logs.current.choices.push({ tick: before.tick, id }); model.current = next; setView(next)
+    // Picking an instrument for the first time reads as the member joining.
+    if (talent(id).kind === 'weapon' && next.gear[id] === 1) { setNotice(`${talent(id).icon} ${talent(id).name} 加入乐队！`); noticeUntil.current = performance.now() + 2600 }
     const newForm = evolved(next.gear).find((weapon) => !evolved(before.gear).includes(weapon))
     if (newForm) { evolutionMarks.current = [...evolutionMarks.current, before.tick]; setEvolutionTicks(evolutionMarks.current); setCelebration(RECIPES.find((recipe) => recipe.weapon === newForm)!.name); celebrationUntil.current = performance.now() + 2800; audio.current?.playLane(1, 72); audio.current?.playLane(3, 84, .12); audio.current?.playLane(1, 79, .24) }
     else { audio.current?.playLane(1, 76); audio.current?.playLane(3, 81, .09) }
