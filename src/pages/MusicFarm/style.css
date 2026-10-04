@@ -36,3 +36,13 @@
 @media(max-width:520px){.farm-badges h2{font-size:21px}.farm-badge-list{max-height:46vh}}
 .farm-career{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}.farm-career span{background:#f6f1fa;border:1px solid #e6ddef;border-radius:20px;padding:5px 10px;font-size:10px;color:#8c7d99}.farm-career b{color:#5f5470;font-variant-numeric:tabular-nums}
 .farm-modifier{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:5px;margin:7px auto 0;max-width:290px;background:#f4eefb;border:1px solid #e4d9ee;border-radius:20px;padding:6px 12px;font-size:10px;color:#8b7c99;line-height:1.5}.farm-modifier span{font-size:14px}.farm-modifier b{color:#6a5986}
+.farm-recap{margin:12px 0 0;background:#fbf7ff;border:1px solid #e6dcf0;border-radius:13px;padding:10px 12px}
+.farm-recap figcaption{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:7px}
+.farm-recap figcaption small{font-size:9px;letter-spacing:1.2px;color:#8d7d9c;font-weight:800}
+.farm-recap figcaption span{font-size:9px;color:#a99bb4}
+.farm-recap svg{display:block;width:100%;height:76px;overflow:visible}
+.farm-recap polyline{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.farm-recap .farm-recap-score{stroke:#e0a94f}.farm-recap .farm-recap-hp{stroke:#dd86ae}
+.farm-recap .farm-recap-mark{fill:#9a7fd0}
+.farm-recap-legend{display:flex;flex-wrap:wrap;gap:9px;margin-top:7px;font-size:9px;color:#9b8da8}
+.farm-recap-legend .is-score{color:#a97c2c}.farm-recap-legend .is-hp{color:#b9597f}
