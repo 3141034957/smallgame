@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Readable } from 'node:stream'
+import { DatabaseSync } from 'node:sqlite'
+import { rmSync } from 'node:fs'
 import { createMelodyStore, handleMelodyRequest, verifyPerformance } from './melody.mjs'
 import { SONGS, DIFFICULTIES, makeChart, emptyRun, hitNote, advanceRun, runAccuracy } from '../src/features/melody/rules.mjs'
 
@@ -116,6 +118,25 @@ describe('separate online melody leaderboards', () => {
     expect(db.board('strawberry', 'cozy', 'player_later').own.rank).toBe(2)
     expect(db.board('strawberry', 'cozy', 'player_low_combo').own.rank).toBe(3)
     expect(db.board('strawberry', 'cozy', 'player_low_accuracy').own.rank).toBe(4)
+  })
+  it('adds the survival clock column to databases created before it existed', () => {
+    const file = '/tmp/melody-migrate-test.db'
+    rmSync(file, { force: true })
+    const legacy = new DatabaseSync(file)
+    legacy.exec(`CREATE TABLE melody_scores (
+      player_id TEXT NOT NULL, song_id TEXT NOT NULL, difficulty TEXT NOT NULL, name TEXT NOT NULL,
+      score INTEGER NOT NULL CHECK(score >= 0), accuracy INTEGER NOT NULL CHECK(accuracy BETWEEN 0 AND 10000),
+      max_combo INTEGER NOT NULL CHECK(max_combo >= 0), stars INTEGER NOT NULL CHECK(stars BETWEEN 0 AND 3), updated_at INTEGER NOT NULL,
+      PRIMARY KEY(player_id, song_id, difficulty)
+    ) STRICT;`)
+    legacy.prepare('INSERT INTO melody_scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run('player_legacy_1', 'strawberry', 'cozy', '老玩家', 5000, 3000, 40, 2, 1700000000000)
+    legacy.close()
+    const migrated = createMelodyStore(file)
+    expect(migrated.board('strawberry', 'cozy', 'player_legacy_1').data[0]).toMatchObject({ name: '老玩家', score: 5000, seconds: 0 })
+    migrated.submit({ playerId: 'player_fresh_1', songId: 'strawberry', difficulty: 'cozy', name: '新玩家', score: 9000, accuracy: 2000, maxCombo: 60, stars: 3, seconds: 123 }, 1700000001000)
+    expect(migrated.board('strawberry', 'cozy', 'player_fresh_1').own).toMatchObject({ score: 9000, seconds: 123 })
+    migrated.close()
+    rmSync(file, { force: true })
   })
   it('returns the personal rank even outside the first fifty', () => {
     const db = store()
