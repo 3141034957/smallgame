@@ -73,3 +73,6 @@
 .farm-combo.is-frenzy-2 b{color:#c2593a}.farm-combo.is-frenzy-2 small{color:#bf5a3c}
 .farm-choices button{position:relative}.farm-choice-key{position:absolute;top:7px;left:8px;min-width:15px;height:15px;line-height:15px;border-radius:8px;background:#e9e0f2;color:#6f5f85;font-size:9px;font-weight:800;font-style:normal;text-align:center}
 @media(max-width:520px){.farm-choice-key{display:none}}
+.farm-badge-bar{display:block;height:3px;margin-top:4px;background:#ece3f3;border-radius:3px;overflow:hidden}.farm-badge-bar b{display:block;height:100%;background:#b79ed0}
+.farm-pause-goals{margin:9px 0 0;text-align:left}.farm-pause-goals>small{display:block;font-size:9px;color:#8d7d9c;font-weight:800;margin-bottom:6px}
+.farm-pause-goals .farm-quests{max-width:none}
