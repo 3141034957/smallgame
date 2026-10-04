@@ -31,9 +31,9 @@ export function FarmBoard({ day, round }: { day: string; round?: FarmRound | nul
   }, [round, day])
 
   const submitted = !!round && submittedRound === round
-  return <section className="farm-board" aria-label="今日生存榜">
-    <div className="farm-board-heading"><div><span>SURVIVOR CLUB</span><h2>🏆 今日生存榜</h2></div><button type="button" aria-label="刷新生存榜" disabled={busy} onClick={() => setRevision((value) => value + 1)}>↻</button></div>
-    <p className="farm-board-caption">每日同一怪潮 · 生存 60 秒 · 每人保留最高分</p>
+  return <section className="farm-board" aria-label="今日无限榜">
+    <div className="farm-board-heading"><div><span>SURVIVOR CLUB</span><h2>🏆 今日无限榜</h2></div><button type="button" aria-label="刷新生存榜" disabled={busy} onClick={() => setRevision((value) => value + 1)}>↻</button></div>
+    <p className="farm-board-caption">每日同一怪潮 · 无限生存 · 每人保留最高分</p>
     {round && round.score > 0 && (submitted ? <p role="status" className="farm-board-success">上榜啦！{board?.own && `今天第 ${board.own.rank} 名`}，下次冲得更高 ♡</p> : <form onSubmit={(event) => {
       event.preventDefault()
       if (busy) return

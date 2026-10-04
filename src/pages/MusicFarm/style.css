@@ -17,3 +17,5 @@
 .music-farm .farm-field{top:169px;background:#e6e8f5}.music-farm .farm-game,.music-farm .farm-shell{background:#e6e8f5}.music-farm .farm-ready{background:#e9e7f046}.music-farm .farm-start-card{box-shadow:0 16px 60px #74688924}.music-farm .farm-start-card h2{font-size:24px}.music-farm .farm-ready-icon{color:#9470b8;background:#ece0f0}.music-farm .farm-primary{background:#7e739f}.music-farm .farm-primary:hover{background:#70658f}
 @media(max-width:680px){.music-farm .farm-health{top:141px}.music-farm .farm-field{top:163px}.music-farm .farm-start-card h2{font-size:22px}}
 @media(max-height:500px) and (min-width:681px){.music-farm .farm-health{left:17px;top:183px;transform:none;width:135px;flex-wrap:wrap;gap:4px}.farm-health small{width:100%;text-align:center}.music-farm .farm-field{top:0}}
+
+.farm-time b{display:flex;flex-direction:column;align-items:center;font-variant-numeric:tabular-nums;font-size:clamp(16px,4vw,23px);white-space:nowrap}.farm-time b>small{font-size:8px;line-height:1.2;letter-spacing:1px}

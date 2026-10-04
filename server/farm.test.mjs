@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { Readable } from 'node:stream'
 import { createMelodyStore } from './melody.mjs'
-import { farmKey, handleFarmRequest, verifyFarm } from './farm.mjs'
-import { FRAMES, chooseTalent, clampPoint, createFarm, replayFarm, stepFarm } from '../src/features/farm/rules.mjs'
+import { farmKey, handleFarmRequest, MAX_FARM_BODY_BYTES, verifyFarm } from './farm.mjs'
+import { FPS, chooseTalent, clampPoint, createFarm, replayFarm, stepFarm } from '../src/features/farm/rules.mjs'
 
 const day = '2026-10-04'
 function playFixture(active = true) {
   let state = createFarm(day)
   const frames = [], choices = [], surges = []
-  for (let tick = 0; tick < FRAMES && state.hp > 0; tick++) {
+  for (let tick = 0; tick < FPS * 60 * 10 && state.hp > 0; tick++) {
     while (state.offered.length) {
       const id = state.offered[0]
       choices.push({ tick, id }); state = chooseTalent(state, id)
@@ -36,8 +36,9 @@ function createRequest(store) {
 }
 
 describe('replay-verified daily farm leaderboard', () => {
-  it('derives the ranking from a complete minute, ignoring client-provided rewards', () => {
-    expect(round.frames).toHaveLength(FRAMES)
+  it('derives the ranking from a completed endless run, ignoring client-provided rewards', () => {
+    expect(round.frames.length).toBeGreaterThan(FPS * 60)
+    expect(round.outcome).toBe('defeated')
     expect(round.score).toBeGreaterThan(0)
     expect(verifyFarm({ ...input, maxCombo: 999999, bosses: 999999, stars: 999, harvested: 999999, gear: { drum: 99 } })).toEqual({
       playerId: input.playerId, name: input.name, songId: farmKey(day), difficulty: 'farm', score: round.score,
@@ -47,13 +48,21 @@ describe('replay-verified daily farm leaderboard', () => {
 
   it('accepts a replay-verified defeat, but rejects truncation and frames after death', () => {
     expect(lowerRound.outcome).toBe('defeated')
-    expect(lowerRound.frames.length).toBeLessThan(FRAMES)
+    expect(lowerRound.frames.length).toBeLessThan(FPS * 60)
     const defeat = { ...lowerRound, name: input.name, playerId: input.playerId }
     expect(verifyFarm(defeat)?.score).toBe(lowerRound.score)
     expect(verifyFarm({ ...defeat, frames: lowerRound.frames.slice(0, -1) })).toBeNull()
     expect(verifyFarm({ ...defeat, frames: [...lowerRound.frames, lowerRound.frames.at(-1)] })).toBeNull()
     expect(verifyFarm({ ...defeat, surges: [lowerRound.frames.length] })).toBeNull()
-    expect(farmKey(day)).toBe(`farm:v3:${day}`)
+    expect(farmKey(day)).toBe(`farm:v4:endless:${day}`)
+  })
+
+  it('rejects the former one-minute finish while the player is alive', () => {
+    const frames = round.frames.slice(0, FPS * 60)
+    const choices = round.choices.filter((choice) => choice.tick < frames.length)
+    const surges = round.surges.filter((tick) => tick < frames.length)
+    expect(replayFarm(day, frames, choices, surges)).toBeNull()
+    expect(verifyFarm({ ...input, frames, choices, surges })).toBeNull()
   })
 
   it('rejects forged points, shortcuts, impossible upgrades and uncharged surges', () => {
@@ -69,6 +78,7 @@ describe('replay-verified daily farm leaderboard', () => {
     const request = createRequest(store)
     try {
       const accepted = await request('POST', '/api/farm/score', JSON.stringify(input))
+      expect(Buffer.byteLength(JSON.stringify(input))).toBeGreaterThan(32768)
       expect(accepted.status).toBe(200)
       expect(accepted.headers['Cache-Control']).toBe('no-store')
       expect(accepted.data).toMatchObject({ acceptedScore: round.score, total: 1, own: { score: round.score, rank: 1 } })
@@ -83,6 +93,7 @@ describe('replay-verified daily farm leaderboard', () => {
       expect(board.data.own.rank).toBe(1)
       expect((await request('GET', '/api/farm/leaderboard?day=2026-10-05')).data.total).toBe(0)
       expect(store.board(`wave:v1:${day}`, 'wave').total).toBe(0)
+      expect(store.board(`farm:v3:${day}`, 'farm').total).toBe(0)
       expect(store.board(`island:v1:${day}`, 'island').total).toBe(0)
     } finally { store.close() }
   })
@@ -94,7 +105,7 @@ describe('replay-verified daily farm leaderboard', () => {
       expect((await request('GET', '/api/farm/leaderboard?day=2026-02-30')).status).toBe(400)
       expect((await request('GET', '/api/farm/leaderboard')).status).toBe(400)
       expect((await request('POST', '/api/farm/score', '{')).status).toBe(400)
-      expect((await request('POST', '/api/farm/score', 'a'.repeat(32769))).status).toBe(413)
+      expect((await request('POST', '/api/farm/score', 'a'.repeat(MAX_FARM_BODY_BYTES + 1))).status).toBe(413)
       expect((await request('POST', '/api/farm/score', JSON.stringify({ ...input, score: 999999 }))).status).toBe(400)
       expect((await request('GET', '/api/farm/no-such-route')).status).toBe(404)
       expect((await request('POST', '/api/farm/leaderboard', '{}')).status).toBe(404)

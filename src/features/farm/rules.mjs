@@ -1,11 +1,11 @@
 import { routeSeed, todayRoute, validDay } from '../island/rules.mjs'
 export { todayRoute, validDay }
 export const FPS = 16
-export const DURATION = 60
-export const FRAMES = FPS * DURATION
 export const MOVE_STEP = 3
 export const START = [50, 76]
-export const THRESHOLDS = [20, 65, 140, 250, 400, 600, 850, 1150, 1500, 1900, 2350, 2850]
+export const THRESHOLDS = [20, 65, 140, 250, 400, 600, 850, 1150, 1500, 1900, 2350, 2850,
+  ...Array.from({ length: 12 }, (_, index) => 2850 + (index + 1) * 550 + index * (index + 1) * 25)]
+export const MAX_BOSSES = 4
 export const TALENTS = [
   { id: 'drum', kind: 'weapon', partner: 'range', name: '爆米花鼓', icon: '🥁', color: '#edaa8e', description: '击败怪物，鼓点引爆周围怪群。', tag: '连锁爆破' },
   { id: 'orbit', kind: 'weapon', partner: 'tempo', name: '回旋吉他', icon: '♫', color: '#b7a0dd', description: '旋转音符绕着你飞，碰到怪物就造成伤害。', tag: '旋转音刃' },
@@ -33,6 +33,10 @@ export function synergies(gear) {
 }
 const random = (state) => { state.seed = (Math.imul(state.seed, 1664525) + 1013904223) >>> 0; return state.seed / 4294967296 }
 const distance = (a, b) => Math.hypot((a[0] - b[0]) * .84, a[1] - b[1])
+// Keep the opening minute familiar, then increase pressure without spawning
+// unbounded entities or letting movement speed grow past controllable levels.
+const enemyHealth = (tick, kind) => 1 + Math.floor(tick / 240)
+  + Math.floor(Math.max(0, tick - FPS * 60) / (FPS * 30)) ** 2 + (kind === 3 ? 2 : 0)
 // World coordinates have no arena walls. A short portal warning makes arrivals
 // fair even when a wide desktop camera can see the surrounding spawn ring.
 function placeAtEdge(state, enemy) {
@@ -61,7 +65,7 @@ export function orbitPositions(state) {
   })
 }
 function offer(state) {
-  if (state.level >= THRESHOLDS.length || state.xp < THRESHOLDS[state.level] || state.tick >= FRAMES || state.hp <= 0) return
+  if (state.level >= THRESHOLDS.length || state.xp < THRESHOLDS[state.level] || state.hp <= 0) return
   if (!state.level) {
     const weapons = TALENTS.filter((talent) => talent.kind === 'weapon').map((talent) => talent.id)
     const omitted = Math.floor(random(state) * weapons.length)
@@ -82,8 +86,8 @@ export function chooseTalent(previous, id) {
   return state
 }
 export function stepFarm(previous, point, useSurge = false) {
-  if (previous.offered.length || previous.tick >= FRAMES || previous.hp <= 0 || !Array.isArray(point) || point.length !== 2 || point.some((value) => !Number.isSafeInteger(value)) || Math.hypot(point[0] - previous.position[0], point[1] - previous.position[1]) > MOVE_STEP + Math.SQRT1_2 || useSurge && previous.charge < 100) return null
-  const state = { ...previous, position: [...point], crops: previous.crops.map((crop) => ({ ...crop })), loot: previous.loot.map((drop) => ({ ...drop })), shots: previous.shots.map((shot) => ({ ...shot })), dangers: previous.dangers.map((danger) => ({ ...danger })), offered: [] }
+  if (previous.offered.length || previous.hp <= 0 || !Array.isArray(point) || point.length !== 2 || point.some((value) => !Number.isSafeInteger(value)) || Math.hypot(point[0] - previous.position[0], point[1] - previous.position[1]) > MOVE_STEP + Math.SQRT1_2 || useSurge && previous.charge < 100) return null
+  const state = { ...previous, position: [...point], crops: previous.crops.filter((crop) => !crop.boss || crop.hp > 0).map((crop) => ({ ...crop })), loot: previous.loot.map((drop) => ({ ...drop })), shots: previous.shots.map((shot) => ({ ...shot })), dangers: previous.dangers.map((danger) => ({ ...danger })), offered: [] }
   const events = []
   const gear = state.gear
   const forms = evolved(gear)
@@ -124,25 +128,28 @@ export function stepFarm(previous, point, useSurge = false) {
   }
   for (const crop of state.crops) if (!crop.boss && crop.hp <= 0 && state.tick >= crop.regrow) {
     crop.kind = (crop.id + Math.floor(state.tick / 160)) % 4
-    crop.hp = 1 + Math.floor(state.tick / 240) + (crop.kind === 3 ? 2 : 0); crop.maxHp = crop.hp
+    crop.hp = enemyHealth(state.tick, crop.kind); crop.maxHp = crop.hp
     placeAtEdge(state, crop)
   }
   if (state.tick >= state.nextWave) {
     const count = 3 + Math.floor(state.tick / 240)
-    for (let index = 0; index < count && state.crops.length < 100; index++) {
-      const id = state.nextId++, kind = id % 4, hp = 1 + Math.floor(state.tick / 240) + (kind === 3 ? 2 : 0)
+    const regularCount = state.crops.filter((crop) => !crop.boss).length
+    for (let index = 0; index < count && regularCount + index < 100; index++) {
+      const id = state.nextId++, kind = id % 4, hp = enemyHealth(state.tick, kind)
       const enemy = { id, x: 0, y: 0, kind, hp, maxHp: hp, regrow: -1, boss: false }
       placeAtEdge(state, enemy); state.crops.push(enemy)
     }
     state.nextWave += 12
   }
   if (state.tick >= state.nextBoss) {
-    const index = state.bosses + state.crops.filter((crop) => crop.boss && crop.hp > 0).length
-    const maxHp = 65 + index * 45
-    const boss = { id: state.nextId++, x: 0, y: 0, kind: 3, hp: maxHp, maxHp, regrow: -1, boss: true }
-    placeAtEdge(state, boss); state.crops.push(boss)
     state.nextBoss += 18 * FPS
-    events.push({ id: state.nextId++, kind: 'arrival', x: point[0], y: point[1], lane: 3 })
+    if (state.crops.filter((crop) => crop.boss).length < MAX_BOSSES) {
+      const index = state.bosses + state.crops.filter((crop) => crop.boss).length
+      const maxHp = 65 + index * 45
+      const boss = { id: state.nextId++, x: 0, y: 0, kind: 3, hp: maxHp, maxHp, regrow: -1, boss: true }
+      placeAtEdge(state, boss); state.crops.push(boss)
+      events.push({ id: state.nextId++, kind: 'arrival', x: point[0], y: point[1], lane: 3 })
+    }
   }
   if (useSurge) { state.charge = 0; state.surgeUntil = state.tick + FPS * 3; state.hurtUntil = Math.max(state.hurtUntil, state.tick + FPS); state.shots = []; state.dangers = []; pulse(38 + gear.range * 2, 8 + gear.power, 'surge') }
   const rainDue = state.echoDue
@@ -190,7 +197,7 @@ export function stepFarm(previous, point, useSurge = false) {
     if (distance([enemy.x, enemy.y], point) > 160) { placeAtEdge(state, enemy); continue }
     if (state.tick < (enemy.spawnAt ?? 0)) continue
     const dx = point[0] - enemy.x, dy = point[1] - enemy.y, dist = Math.max(.01, distance([enemy.x, enemy.y], point))
-    const speed = (enemy.boss ? .38 : [.48, .85, .34, .3][enemy.kind]) * (1 + state.tick / FRAMES * .55)
+    const speed = (enemy.boss ? .38 : [.48, .85, .34, .3][enemy.kind]) * (1 + Math.min(1.5, state.tick / (FPS * 60) * .55))
     const approach = enemy.kind === 2 && !enemy.boss && dist < 28 ? (dist < 20 ? -.5 : 0) : 1
     const travel = Math.min(speed, dist) / dist * approach
     enemy.x += dx * travel; enemy.y += dy * travel
@@ -217,7 +224,7 @@ export function stepFarm(previous, point, useSurge = false) {
   return { state, events }
 }
 export function replayFarm(day, frames, choices, surges = []) {
-  if (!validDay(day) || !Array.isArray(frames) || (!frames.length || frames.length > FRAMES) || !Array.isArray(choices) || choices.length > THRESHOLDS.length || !Array.isArray(surges) || surges.length > 100 || !surges.every((tick, index) => Number.isInteger(tick) && tick >= 0 && tick < frames.length && (!index || tick > surges[index - 1]))) return null
+  if (!validDay(day) || !Array.isArray(frames) || !frames.length || !Array.isArray(choices) || choices.length > THRESHOLDS.length || !Array.isArray(surges) || surges.length > frames.length || !surges.every((tick, index) => Number.isInteger(tick) && tick >= 0 && tick < frames.length && (!index || tick > surges[index - 1]))) return null
   let state = createFarm(day), cursor = 0
   const surgeSet = new Set(surges)
   for (let tick = 0; tick < frames.length; tick++) {
@@ -231,6 +238,13 @@ export function replayFarm(day, frames, choices, surges = []) {
     if (!result) return null
     state = result.state
   }
-  if (cursor !== choices.length || state.tick < FRAMES && state.hp > 0) return null
-  return { day, frames, choices, surges, outcome: state.hp > 0 ? 'survived' : 'defeated', hp: state.hp, seconds: state.tick / FPS, score: state.score, maxCombo: state.maxCombo, harvested: state.harvested, bosses: state.bosses, coins: state.coins, xp: state.xp, gear: state.gear, stars: state.score >= 65000 ? 3 : state.score >= 22000 ? 2 : state.score > 0 ? 1 : 0 }
+  if (cursor !== choices.length || state.hp > 0) return null
+  return finishFarm(state, frames, choices, surges)
+}
+
+// The live client already simulated every frame. Build its result without
+// replaying a long run on the render thread; the server still replays inputs.
+export function finishFarm(state, frames, choices, surges) {
+  if (state.hp > 0) return null
+  return { day: state.day, frames, choices, surges, outcome: 'defeated', hp: state.hp, seconds: state.tick / FPS, score: state.score, maxCombo: state.maxCombo, harvested: state.harvested, bosses: state.bosses, coins: state.coins, xp: state.xp, gear: state.gear, stars: state.score >= 65000 ? 3 : state.score >= 22000 ? 2 : state.score > 0 ? 1 : 0 }
 }

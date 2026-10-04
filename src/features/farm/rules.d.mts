@@ -1,8 +1,7 @@
 import type { Lane } from '../melody/engine'
 export { todayRoute, validDay } from '../island/rules.mjs'
 export const FPS: number
-export const DURATION: number
-export const FRAMES: number
+export const MAX_BOSSES: number
 export const MOVE_STEP: number
 export const START: Point
 export const THRESHOLDS: number[]
@@ -19,7 +18,7 @@ export type Shot = { id: number; x: number; y: number; dx: number; dy: number; e
 export type Danger = { id: number; x: number; y: number; radius: number; due: number }
 export type FarmState = { day: string; seed: number; tick: number; position: Point; crops: Crop[]; loot: Loot[]; gear: Gear; xp: number; level: number; offered: TalentId[]; score: number; coins: number; harvested: number; bosses: number; combo: number; maxCombo: number; lastHarvest: number; charge: number; nextId: number; lastPulse: number; echoDue: number; nextBoss: number; surgeUntil: number; hp: number; maxHp: number; hurtUntil: number; shots: Shot[]; dangers: Danger[]; nextWave: number }
 export type Choice = { tick: number; id: TalentId }
-export type FarmRound = { outcome: 'survived' | 'defeated'; hp: number; seconds: number; day: string; frames: Point[]; choices: Choice[]; surges: number[]; score: number; maxCombo: number; harvested: number; bosses: number; coins: number; xp: number; gear: Gear; stars: number }
+export type FarmRound = { outcome: 'defeated'; hp: number; seconds: number; day: string; frames: Point[]; choices: Choice[]; surges: number[]; score: number; maxCombo: number; harvested: number; bosses: number; coins: number; xp: number; gear: Gear; stars: number }
 export function clampPoint(previous: Point, desired: Point): Point
 export function synergies(gear: Gear): string[]
 export function createFarm(day: string): FarmState
@@ -27,3 +26,4 @@ export function orbitPositions(state: FarmState): Point[]
 export function chooseTalent(state: FarmState, id: TalentId): FarmState | null
 export function stepFarm(state: FarmState, point: Point, useSurge?: boolean): { state: FarmState; events: FarmEvent[] } | null
 export function replayFarm(day: string, frames: Point[], choices: Choice[], surges?: number[]): FarmRound | null
+export function finishFarm(state: FarmState, frames: Point[], choices: Choice[], surges: number[]): FarmRound | null

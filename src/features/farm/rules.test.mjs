@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { FPS, FRAMES, RECIPES, TALENTS, THRESHOLDS, chooseTalent, clampPoint, createFarm, evolved, orbitPositions, replayFarm, stepFarm } from './rules.mjs'
+import { FPS, RECIPES, TALENTS, THRESHOLDS, chooseTalent, clampPoint, createFarm, evolved, orbitPositions, replayFarm, stepFarm } from './rules.mjs'
 
 const day = '2026-10-04'
+const TEST_TICKS = FPS * 60 * 10
 const crop = (id, x, y, hp = 1) => ({ id, x, y, hp, maxHp: hp, kind: id % 4, regrow: -1, boss: false })
 function arena(gear, crops, tick = 0) {
   const state = createFarm(day)
@@ -13,7 +14,7 @@ function run(focus = 'drum', routeDay = day) {
   let state = createFarm(routeDay), firstOffer = null, firstUpgrade = null, terminalAt = null
   const frames = [], choices = [], surges = []
   const recipe = RECIPES.find((item) => item.weapon === focus)
-  for (let tick = 0; tick < FRAMES && state.hp > 0; tick++) {
+  for (let tick = 0; tick < TEST_TICKS && state.hp > 0; tick++) {
     while (state.offered.length) {
       firstOffer ??= [...state.offered]; firstUpgrade ??= tick
       const id = state.offered.includes(focus) && state.gear[focus] < 3 ? focus
@@ -62,7 +63,7 @@ describe('music roguelite farming', () => {
       expect(stepFarm(state, point)).toBeNull()
     }
     expect(stepFarm(state, state.position, true)).toBeNull()
-    expect(stepFarm({ ...state, tick: FRAMES }, state.position)).toBeNull()
+    expect(stepFarm({ ...state, hp: 0 }, state.position)).toBeNull()
   })
 
   it('rotates starter options across days and keeps the chosen instrument recipe available', () => {
@@ -184,7 +185,8 @@ describe('music roguelite farming', () => {
       expect(round.state.bosses).toBeGreaterThanOrEqual(2)
       const replay = replayFarm(routeDay, round.frames, round.choices, round.surges)
       expect(replay).toMatchObject({ score: round.state.score, harvested: round.state.harvested, bosses: round.state.bosses, coins: round.state.coins, xp: round.state.xp, maxCombo: round.state.maxCombo, gear: round.state.gear })
-      expect(round.state.loot.length).toBeLessThan(200)
+      expect(round.state.hp).toBe(0)
+      expect(round.state.loot.length).toBeLessThanOrEqual(600)
     }
   })
 
@@ -197,8 +199,8 @@ describe('music roguelite farming', () => {
     expect(replay(round.frames, [])).toBeNull()
     expect(replay(round.frames, [{ ...round.choices[0], id: 'forged' }, ...round.choices.slice(1)])).toBeNull()
     expect(replay(round.frames, [{ ...round.choices[0], tick: round.choices[0].tick + 1 }, ...round.choices.slice(1)])).toBeNull()
-    expect(replay(round.frames, [...round.choices, { tick: FRAMES, id: 'drum' }])).toBeNull()
-    for (const surges of [[0], [1, 1], [5, 4], [-1], [FRAMES], [NaN]]) expect(replay(round.frames, round.choices, surges)).toBeNull()
+    expect(replay(round.frames, [...round.choices, { tick: round.frames.length, id: 'drum' }])).toBeNull()
+    for (const surges of [[0], [1, 1], [5, 4], [-1], [round.frames.length], [NaN]]) expect(replay(round.frames, round.choices, surges)).toBeNull()
     expect(replayFarm('2026-02-30', round.frames, round.choices, round.surges)).toBeNull()
   })
 })

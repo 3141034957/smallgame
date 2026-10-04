@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { advanceFarmPosition, farmPointerTarget, farmCamera, farmVisibleTiles } from './presentation'
+import { advanceFarmPosition, farmPointerTarget, farmCamera, farmVisibleTiles, formatFarmTime } from './presentation'
 import { clampPoint, FPS, MOVE_STEP, type Point } from './rules.mjs'
 
 describe('farm display motion', () => {
+  it('shows elapsed survival time across minute and hour boundaries', () => {
+    for (const [seconds, expected] of [[0, '00:00'], [30, '00:30'], [60, '01:00'], [3599, '59:59'], [3600, '1:00:00'], [3661, '1:01:01']] as const) {
+      expect(formatFarmTime(seconds * FPS)).toBe(expected)
+    }
+    expect(formatFarmTime(60 * FPS - 1)).toBe('00:59')
+  })
   it('moves on every display frame between fixed simulation ticks, without changing the replay position', () => {
     let authority: Point = [50, 76], displayed: Point = [...authority], elapsed = 0
     const target: Point = [90, 40], positions: Point[] = []

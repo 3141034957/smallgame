@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampPoint, createFarm, stepFarm, chooseTalent, replayFarm, FRAMES } from './rules.mjs'
+import { clampPoint, createFarm, stepFarm, chooseTalent, replayFarm, FPS, MAX_BOSSES } from './rules.mjs'
 import { verifyFarm } from '../../../server/farm.mjs'
 const day = '2026-10-04'
 const monster = (id, x, y) => ({id, x, y, kind: 0, hp: 30, maxHp: 30, boss: false, regrow: -1})
@@ -55,7 +55,7 @@ describe('unbounded combat world', () => {
   it('replays and verifies a completed journey beyond multiple old boundaries', () => {
     let state=createFarm(day)
     const frames=[],choices=[],surges=[]
-    while(state.tick<FRAMES && state.hp>0){
+    while(state.tick<FPS*60*10 && state.hp>0){
       while(state.offered.length){const id=state.offered[0];choices.push({tick:state.tick,id});state=chooseTalent(state,id)}
       const point=clampPoint(state.position,[50+state.tick*.9,76-state.tick*.4])
       const burst=state.charge===100
@@ -63,15 +63,15 @@ describe('unbounded combat world', () => {
       frames.push(point);state=stepFarm(state,point,burst).state
     }
     expect(state.tick).toBeGreaterThan(400)
-    expect(state.hp === 0 || state.tick === FRAMES).toBe(true)
+    expect(state.hp).toBe(0)
     expect(state.position[0]).toBeGreaterThan(400)
     expect(state.position[1]).toBeLessThan(-100)
     const round=replayFarm(day,frames,choices,surges)
-    expect(round).toMatchObject({score:state.score,hp:state.hp,seconds:state.tick / 16,outcome:state.hp > 0 ? 'survived' : 'defeated'})
+    expect(round).toMatchObject({score:state.score,hp:state.hp,seconds:state.tick / 16,outcome:'defeated'})
     expect(verifyFarm({...round,playerId:'world_test_player',name:'远行乐手'})?.score).toBe(state.score)
     const forged=frames.map(p=>[...p]);forged[300][0]+=100
     expect(replayFarm(day,forged,choices,surges)).toBeNull()
-    expect(state.crops.length).toBeLessThanOrEqual(103)
+    expect(state.crops.length).toBeLessThanOrEqual(100 + MAX_BOSSES)
     expect(state.loot.length).toBeLessThanOrEqual(600)
   })
 })

@@ -50,3 +50,11 @@ export function farmVisibleTiles(camera: ReturnType<typeof farmCamera>) {
   }
   return tiles
 }
+
+export function formatFarmTime(ticks: number) {
+  const seconds = Math.floor(ticks / FPS)
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor(seconds / 60) % 60
+  const tail = `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+  return hours ? `${hours}:${tail}` : tail
+}
