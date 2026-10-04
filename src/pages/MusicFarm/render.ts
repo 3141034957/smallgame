@@ -131,6 +131,8 @@ function cropSprite(ctx: CanvasRenderingContext2D, crop: Crop, now: number, tick
     ctx.textAlign = 'center'
     ctx.fillStyle = bass ? '#5b4788' : '#846b44'
     ctx.fillText(bass ? '低音炮王' : '鼓噪巨兽', 0, -35)
+    ctx.font = '700 8px system-ui, sans-serif'
+    ctx.fillText(`${Math.max(1, Math.ceil(crop.hp / crop.maxHp * 100))}%`, 0, 42)
     ctx.restore()
     return
   }
