@@ -207,6 +207,12 @@ describe('survivor combat', () => {
     expect(faded.trails[0].id).not.toBe(9)
     const many = walk({ whistle: 1 }, Array.from({ length: 40 }, (_, index) => note(index, 50, 50, 9999)), 120)
     expect(many.trails.length).toBeLessThanOrEqual(30)
+    // A saturated arena still gets elites: they take over a slot that is
+    // waiting to respawn instead of waiting for room in the monster pool.
+    const crowded = { ...arena(Array.from({ length: 100 }, (_, index) => ({ id: index, kind: 0, x: 40, y: 50, hp: index < 20 ? 30 : 0, maxHp: 30, regrow: 1e9, boss: false })), 720), nextWave: Infinity }
+    const promoted = step(crowded).state
+    expect(promoted.crops.filter((crop) => crop.elite && crop.hp > 0).length).toBe(1)
+    expect(promoted.crops.length).toBe(100)
     // A recycled monster slot must not keep the elite crown.
     const dead = { id: 3, kind: 3, x: 20, y: 50, hp: 0, maxHp: 40, regrow: 100, boss: false, elite: true, dashUntil: 500 }
     const recycled = step({ ...arena([], 100), crops: [dead], nextWave: Infinity, nextBoss: Infinity, nextBass: Infinity }).state.crops[0]

@@ -179,18 +179,26 @@ export function stepFarm(previous, point, useSurge = false) {
   if (state.tick >= state.nextWave) {
     const count = Math.max(1, Math.round((3 + Math.floor(state.tick / 240)) * (modifier?.wave ?? 1)))
     const regularCount = state.crops.filter((crop) => !crop.boss).length
-    // Gold-record elites join the horde after 45 seconds: beefier, they dash
-    // now and then, and they pay far better than the monsters around them.
-    const elites = state.crops.filter((crop) => crop.elite && crop.hp > 0).length
-    const eliteDue = state.tick >= 45 * FPS && elites < 5 && Math.floor(state.tick / 12) % 6 === 0
     for (let index = 0; index < count && regularCount + index < 100; index++) {
-      const id = state.nextId++, kind = id % 4
-      const elite = eliteDue && index === 0
-      const hp = elite ? (enemyHealth(state.tick, 3) + (modifier?.health ?? 0)) * 6 + 8 : enemyHealth(state.tick, kind) + (modifier?.health ?? 0)
-      const enemy = elite ? { id, x: 0, y: 0, kind: 3, hp, maxHp: hp, regrow: -1, boss: false, elite: true, dashUntil: -1 } : { id, x: 0, y: 0, kind, hp, maxHp: hp, regrow: -1, boss: false }
+      const id = state.nextId++, kind = id % 4, hp = enemyHealth(state.tick, kind) + (modifier?.health ?? 0)
+      const enemy = { id, x: 0, y: 0, kind, hp, maxHp: hp, regrow: -1, boss: false }
       placeAtEdge(state, enemy); state.crops.push(enemy)
     }
     state.nextWave += 12
+  }
+  // Gold-record elites join the horde after 45 seconds: beefier, they dash now
+  // and then, and they pay far better than the monsters around them. The
+  // monster pool caps at 100 and that cap also counts monsters waiting to
+  // respawn, so a saturated arena would never see an elite. Elites therefore
+  // take over a dead slot (or a free one) on their own timer.
+  if (state.tick >= 45 * FPS && state.tick % 72 === 0 && state.crops.filter((crop) => crop.elite && crop.hp > 0).length < 5) {
+    const hp = (enemyHealth(state.tick, 3) + (modifier?.health ?? 0)) * 6 + 8
+    const slot = state.crops.find((crop) => !crop.boss && crop.hp <= 0)
+    if (slot) { slot.kind = 3; slot.hp = hp; slot.maxHp = hp; slot.elite = true; slot.dashUntil = -1; placeAtEdge(state, slot) }
+    else if (state.crops.filter((crop) => !crop.boss).length < 100) {
+      const elite = { id: state.nextId++, x: 0, y: 0, kind: 3, hp, maxHp: hp, regrow: -1, boss: false, elite: true, dashUntil: -1 }
+      placeAtEdge(state, elite); state.crops.push(elite)
+    }
   }
   if (state.tick >= state.nextBoss) {
     state.nextBoss += 18 * FPS
