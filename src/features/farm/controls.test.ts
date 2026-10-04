@@ -1,0 +1,89 @@
+import { describe, expect, it } from 'vitest'
+import { bindFarmControls } from './controls'
+import { farmWorldBounds } from './presentation'
+import type { Point } from './rules.mjs'
+
+function harness(pointerEvents = true) {
+  const field = new EventTarget() as EventTarget & { ownerDocument: object; setPointerCapture: (id: number) => void; hasPointerCapture: (id: number) => boolean; releasePointerCapture: (id: number) => void }
+  field.ownerDocument = { defaultView: pointerEvents ? { PointerEvent: class {} } : {} }
+  const captures = new Set<number>()
+  field.setPointerCapture = (id) => { captures.add(id) }; field.hasPointerCapture = (id) => captures.has(id); field.releasePointerCapture = (id) => { captures.delete(id) }
+  const canvas = new EventTarget(), moves: { point: Point; mode: string }[] = []
+  let playing = true, stops = 0
+  const controls = bindFarmControls(field as unknown as HTMLElement, canvas as unknown as HTMLCanvasElement, {
+    canMove: () => playing, bounds: () => ({ left: 10, top: 20, width: 360, height: 430 }), refreshBounds: () => {}, target: (point, mode) => { moves.push({ point, mode }) }, stop: () => { stops++ },
+  })
+  const send = (name: string, data: object = {}, target: EventTarget = field) => {
+    const event = new Event(name, { cancelable: true })
+    Object.assign(event, { pointerId: 1, pointerType: 'mouse', isPrimary: true, clientX: 190, clientY: 235, buttons: 0 }, data)
+    Object.defineProperty(event, 'target', { value: target })
+    field.dispatchEvent(event)
+    return event
+  }
+  return { send, moves, captures, controls, canvas, setPlaying: (value: boolean) => { playing = value }, stops: () => stops }
+}
+
+describe('farm controls across devices', () => {
+  it('follows hovering mouse movement without a pressed button, and stops on leaving the field', () => {
+    const h = harness()
+    h.send('pointermove', { buttons: 0 })
+    expect(h.moves).toEqual([{ point: [50, 50], mode: 'mouse' }])
+    h.send('pointerup')
+    expect(h.stops()).toBe(0)
+    h.send('pointerleave')
+    expect(h.stops()).toBe(1)
+    h.controls.dispose(); h.send('pointermove')
+    expect(h.moves).toHaveLength(1)
+  })
+  it('captures one finger, ignores extra fingers and stops on release or cancellation', () => {
+    const h = harness()
+    h.send('pointermove', { pointerType: 'touch' })
+    expect(h.moves).toHaveLength(0)
+    h.send('pointerdown', { pointerType: 'touch' }, h.canvas)
+    expect(h.captures.has(1)).toBe(true)
+    h.send('pointermove', { pointerType: 'touch', clientX: 226, clientY: 278 })
+    h.send('pointermove', { pointerId: 2, pointerType: 'touch', isPrimary: false })
+    expect(h.moves.at(-1)).toEqual({ point: [60, 60], mode: 'touch' })
+    expect(h.moves).toHaveLength(2)
+    h.send('pointercancel', { pointerType: 'touch' })
+    expect(h.stops()).toBe(1); expect(h.captures.has(1)).toBe(false)
+    h.send('pointermove', { pointerType: 'touch' })
+    expect(h.moves).toHaveLength(2)
+    h.send('pointerdown', { pointerId: 3, pointerType: 'touch' })
+    h.send('pointerup', { pointerId: 3, pointerType: 'touch' })
+    expect(h.stops()).toBe(2)
+    h.controls.dispose()
+  })
+  it('does not hijack buttons or paused menus and retains pointer direction outside the canonical view', () => {
+    const h = harness()
+    h.send('pointerdown', { pointerType: 'touch' }, new EventTarget())
+    expect(h.moves).toHaveLength(0)
+    h.setPlaying(false); h.send('pointerdown'); h.send('pointermove')
+    expect(h.moves).toHaveLength(0)
+    h.setPlaying(true); h.send('pointermove', { clientX: -1000, clientY: 2000 })
+    expect(h.moves[0].point[0]).toBeLessThan(0)
+    expect(h.moves[0].point[1]).toBeGreaterThan(100)
+    h.controls.dispose()
+  })
+  it('supports touch-only webviews with non-scrolling drag and release behavior', () => {
+    const h = harness(false), touch = { identifier: 0, clientX: 190, clientY: 235 }
+    expect(h.send('touchstart', { changedTouches: [touch] }).defaultPrevented).toBe(true)
+    expect(h.send('touchmove', { touches: [{ ...touch, clientX: 226 }] }).defaultPrevented).toBe(true)
+    expect(h.moves.at(-1)).toEqual({ point: [60, 50], mode: 'touch' })
+    h.send('touchend', { changedTouches: [touch] })
+    h.send('touchmove', { touches: [touch] })
+    expect(h.moves).toHaveLength(2); expect(h.stops()).toBe(1)
+    h.controls.dispose()
+  })
+  it('uses identical world proportions on phone and desktop instead of stretching input coordinates', () => {
+    for (const [width, height] of [[375, 380], [1661, 667], [844, 185]]) {
+      const world = farmWorldBounds({ left: 12, top: 140, width, height })
+      expect(world.width / world.height).toBeCloseTo(360 / 430)
+      expect(world.left + world.width / 2).toBeCloseTo(12 + width / 2)
+      expect(world.top + world.height / 2).toBeCloseTo(140 + height / 2)
+      expect(world.width).toBeGreaterThan(0)
+      expect(width / world.width * 100).toBeLessThanOrEqual(250)
+      expect(height / world.height * 100).toBeLessThanOrEqual(198)
+    }
+  })
+})

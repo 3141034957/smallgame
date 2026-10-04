@@ -1,0 +1,75 @@
+import { describe, it, expect } from 'vitest'
+import { createFarm, stepFarm, FPS } from './rules.mjs'
+const enemy = (id, kind, x, y, boss = false) => ({ id, kind, x, y, hp: 100, maxHp: 100, boss, regrow: -1 })
+const arena = (enemies, tick = 100) => ({ ...createFarm('2026-10-04'), position: [50,50], crops: enemies, tick, nextBoss: Infinity, nextWave: Infinity, lastPulse: tick, hurtUntil: 0 })
+const step = (s, surge = false) => stepFarm(s, s.position, surge)
+
+describe('survivor combat', () => {
+  it('chases the player at different speeds while ranged enemies keep distance', () => {
+    const s = arena([enemy(0, 0, 10,50), enemy(1, 1,10,50), enemy(2,2,40,50), enemy(3,3,10,50)])
+    const r = step(s).state
+    expect(r.crops[0].x).toBeGreaterThan(10)
+    expect(r.crops[1].x).toBeGreaterThan(r.crops[0].x)
+    expect(r.crops[2].x).toBeLessThan(40)
+    expect(r.crops[3].x).toBeLessThan(r.crops[0].x)
+    expect(s.crops[0].x).toBe(10)
+  })
+  it('applies contact damage once, knocks back enemies and protects against piled-up attacks', () => {
+    const s = arena([enemy(0,0,50,50),enemy(1,1,51,50)])
+    const r = step(s)
+    expect(r.state.hp).toBe(88)
+    expect(r.events.filter(e=>e.kind==='hurt')).toHaveLength(1)
+    expect(r.state.hurtUntil).toBe(100+FPS)
+    expect(Math.hypot(r.state.crops[0].x-50,r.state.crops[0].y-50)).toBeGreaterThan(5)
+    const protectedState = {...r.state,crops:[enemy(2,0,50,50)]}
+    expect(step(protectedState).state.hp).toBe(88)
+    expect(step({...protectedState,tick:protectedState.hurtUntil}).state.hp).toBe(76)
+  })
+  it('fires aimed projectiles and allows the player to avoid their path', () => {
+    const s = arena([enemy(0,2,20,50)],128)
+    const fired = step(s).state
+    expect(fired.shots).toHaveLength(1)
+    expect(fired.shots[0].dx).toBeGreaterThan(0)
+    expect(fired.shots[0].dy).toBe(0)
+    const incoming = {...s,crops:[],shots:[{id:200,x:46,y:50,dx:1,dy:0,expires:200}]}
+    expect(step(incoming).state.hp).toBe(86)
+    expect(stepFarm(incoming,[50,53]).state.hp).toBe(100)
+  })
+  it('telegraphs a boss slam for one second, then damages only players inside the marked area', () => {
+    const s = arena([enemy(0,3,20,20,true)],128)
+    const warning = step(s).state
+    expect(warning.dangers).toHaveLength(1)
+    expect(warning.dangers[0]).toMatchObject({x:50,y:50,due:144,radius:15})
+    expect(warning.hp).toBe(100)
+    const due = {...warning,crops:[],tick:144}
+    expect(step(due).state.hp).toBe(74)
+    expect(step({...due,position:[80,80]}).state.hp).toBe(100)
+  })
+  it('collects healing up to max health and grants defensive protection on burst', () => {
+    const s = arena([]); s.hp=90;s.loot=[{id:1,x:50,y:50,xp:0,coins:0,heal:18}]
+    const r = step(s)
+    expect(r.state.hp).toBe(100)
+    expect(r.events.find(e=>e.kind==='heal').points).toBe(10)
+    const charged = {...s,charge:100,loot:[],shots:[{id:1,x:49,y:50,dx:1,dy:0,expires:200}],dangers:[{id:2,x:50,y:50,due:100,radius:15}]}
+    const burst = step(charged,true).state
+    expect(burst.hp).toBe(90)
+    expect(burst.shots).toHaveLength(0)
+    expect(burst.dangers).toHaveLength(0)
+    expect(burst.hurtUntil).toBe(116)
+  })
+  it('ends immediately at zero health without upgrades or further moves', () => {
+    const s=arena([enemy(0,0,50,50)]);s.hp=10;s.xp=100
+    const r=step(s).state
+    expect(r.hp).toBe(0)
+    expect(r.offered).toHaveLength(0)
+    expect(step(r)).toBeNull()
+  })
+  it('keeps spawning outside the player area and caps the enemy pool', () => {
+    const s=arena([],100);s.nextWave=100
+    const r=step(s).state
+    expect(r.crops).toHaveLength(3)
+    expect(r.crops.every(e=>Math.hypot(e.x-50,e.y-50)>40)).toBe(true)
+    const capped={...s,crops:Array.from({length:100},(_,id)=>enemy(id,0,-10,0))}
+    expect(step(capped).state.crops).toHaveLength(100)
+  })
+})

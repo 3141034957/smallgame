@@ -1,0 +1,236 @@
+import { routeSeed, todayRoute, validDay } from '../island/rules.mjs'
+export { todayRoute, validDay }
+export const FPS = 16
+export const DURATION = 60
+export const FRAMES = FPS * DURATION
+export const MOVE_STEP = 3
+export const START = [50, 76]
+export const THRESHOLDS = [20, 65, 140, 250, 400, 600, 850, 1150, 1500, 1900, 2350, 2850]
+export const TALENTS = [
+  { id: 'drum', kind: 'weapon', partner: 'range', name: '爆米花鼓', icon: '🥁', color: '#edaa8e', description: '击败怪物，鼓点引爆周围怪群。', tag: '连锁爆破' },
+  { id: 'orbit', kind: 'weapon', partner: 'tempo', name: '回旋吉他', icon: '♫', color: '#b7a0dd', description: '旋转音符绕着你飞，碰到怪物就造成伤害。', tag: '旋转音刃' },
+  { id: 'power', kind: 'weapon', partner: 'magnet', name: '低音大提琴', icon: '♬', color: '#a5b7d1', description: '奏出低音光柱，击穿同列敌人。', tag: '贯穿攻击' },
+  { id: 'echo', kind: 'weapon', partner: 'lucky', name: '雨落竖琴', icon: '♧', color: '#df9bb1', description: '追击附近的敌人，降下音符箭雨。', tag: '自动追踪' },
+  { id: 'range', kind: 'chip', partner: 'drum', name: '共鸣芯片', icon: '◉', color: '#9ebf86', description: '扩大收割音浪，让身边更多小怪一起爆开。', tag: '收割范围' },
+  { id: 'tempo', kind: 'chip', partner: 'orbit', name: '节拍芯片', icon: '⚡', color: '#d9bb74', description: '音浪发射更快，配吉他进化。', tag: '攻击速度' },
+  { id: 'magnet', kind: 'chip', partner: 'power', name: '引力芯片', icon: '🧲', color: '#91baac', description: '经验和金币从远处飞来，配大提琴进化。', tag: '掉落磁吸' },
+  { id: 'lucky', kind: 'chip', partner: 'echo', name: '丰收芯片', icon: '★', color: '#dbbb6b', description: '增加暴击、金币和经验，配竖琴进化。', tag: '暴击与收益' },
+]
+export const RECIPES = [
+  { weapon: 'drum', chip: 'range', name: '雷霆节拍机', icon: '🥁', description: '爆破范围大幅扩张，连锁伤害翻倍' },
+  { weapon: 'orbit', chip: 'tempo', name: '星环电吉他', icon: '✦', description: '六道音刃环绕，触碰伤害翻倍' },
+  { weapon: 'power', chip: 'magnet', name: '黑洞低音炮', icon: '◉', description: '黑洞大范围收割，全场经验涌向你' },
+  { weapon: 'echo', chip: 'lucky', name: '星雨竖琴', icon: '♧', description: '一次追击八只怪，全场降下暴击音雨' },
+]
+export const evolved = (gear) => RECIPES.filter((recipe) => gear[recipe.weapon] >= 3 && gear[recipe.chip] >= 3).map((recipe) => recipe.weapon)
+const PITCHES = [60, 64, 67, 69, 72, 76]
+export function clampPoint(previous, desired) {
+  const dx = desired[0] - previous[0], dy = desired[1] - previous[1], length = Math.hypot(dx, dy), scale = length > MOVE_STEP ? MOVE_STEP / length : 1
+  return [Math.round(previous[0] + dx * scale), Math.round(previous[1] + dy * scale)]
+}
+export function synergies(gear) {
+  return RECIPES.filter((recipe) => gear[recipe.weapon] >= 3 && gear[recipe.chip] >= 3).map((recipe) => recipe.name)
+}
+const random = (state) => { state.seed = (Math.imul(state.seed, 1664525) + 1013904223) >>> 0; return state.seed / 4294967296 }
+const distance = (a, b) => Math.hypot((a[0] - b[0]) * .84, a[1] - b[1])
+// World coordinates have no arena walls. A short portal warning makes arrivals
+// fair even when a wide desktop camera can see the surrounding spawn ring.
+function placeAtEdge(state, enemy) {
+  const angle = random(state) * Math.PI * 2, radius = 52 + random(state) * 16
+  enemy.x = state.position[0] + Math.cos(angle) * radius / .84
+  enemy.y = state.position[1] + Math.sin(angle) * radius
+  enemy.spawnAt = state.tick + 12
+}
+export function createFarm(day) {
+  if (!validDay(day)) throw new Error('Invalid farm date')
+  const state = { day, seed: routeSeed(day, 'farm-v3'), tick: 0, position: [...START], crops: [], loot: [], gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])), xp: 0, level: 0, offered: [], score: 0, coins: 0, harvested: 0, bosses: 0, combo: 0, maxCombo: 0, lastHarvest: -1000, charge: 0, nextId: 100, lastPulse: -8, echoDue: -1, nextBoss: 16 * FPS, surgeUntil: -1, hp: 100, maxHp: 100, hurtUntil: 32, shots: [], dangers: [], nextWave: 32 }
+  for (let id = 0; id < 24; id++) {
+    const enemy = { id, x: 0, y: 0, kind: id % 4, hp: 1, maxHp: 1, regrow: -1, boss: false }
+    placeAtEdge(state, enemy)
+    state.crops.push(enemy)
+  }
+  // Keep a ready-to-harvest patch within the first sound wave.
+  for (const [id, x, y] of [[64, 45, 72], [65, 55, 74], [66, 48, 83]]) state.crops.push({ id, x, y, kind: 0, hp: 1, maxHp: 1, regrow: -1, boss: false })
+  return state
+}
+export function orbitPositions(state) {
+  const count = evolved(state.gear).includes('orbit') ? 6 : state.gear.orbit ? 1 + state.gear.orbit : 0
+  return Array.from({ length: count }, (_, index) => {
+    const angle = state.tick * .18 + index * Math.PI * 2 / count
+    return [state.position[0] + Math.cos(angle) * (13 + state.gear.orbit * 2) / .84, state.position[1] + Math.sin(angle) * (13 + state.gear.orbit * 2)]
+  })
+}
+function offer(state) {
+  if (state.level >= THRESHOLDS.length || state.xp < THRESHOLDS[state.level] || state.tick >= FRAMES || state.hp <= 0) return
+  if (!state.level) {
+    const weapons = TALENTS.filter((talent) => talent.kind === 'weapon').map((talent) => talent.id)
+    const omitted = Math.floor(random(state) * weapons.length)
+    state.offered = weapons.filter((_, index) => index !== omitted)
+    return
+  }
+  const available = TALENTS.filter((talent) => state.gear[talent.id] < 3).map((talent) => talent.id)
+  const choices = []
+  const focus = TALENTS.filter((talent) => talent.kind === 'weapon' && state.gear[talent.id] > 0 && !(state.gear[talent.id] >= 3 && state.gear[talent.partner] >= 3)).sort((a, b) => state.gear[b.id] - state.gear[a.id])[0]
+  if (focus) { const needed = state.gear[focus.id] < 3 ? focus.id : focus.partner; choices.push(needed); available.splice(available.indexOf(needed), 1) }
+  while (choices.length < 3 && available.length) choices.push(available.splice(Math.floor(random(state) * available.length), 1)[0])
+  state.offered = choices
+}
+export function chooseTalent(previous, id) {
+  if (!previous.offered.includes(id)) return null
+  const state = { ...previous, gear: { ...previous.gear, [id]: previous.gear[id] + 1 }, level: previous.level + 1, offered: [] }
+  offer(state)
+  return state
+}
+export function stepFarm(previous, point, useSurge = false) {
+  if (previous.offered.length || previous.tick >= FRAMES || previous.hp <= 0 || !Array.isArray(point) || point.length !== 2 || point.some((value) => !Number.isSafeInteger(value)) || Math.hypot(point[0] - previous.position[0], point[1] - previous.position[1]) > MOVE_STEP + Math.SQRT1_2 || useSurge && previous.charge < 100) return null
+  const state = { ...previous, position: [...point], crops: previous.crops.map((crop) => ({ ...crop })), loot: previous.loot.map((drop) => ({ ...drop })), shots: previous.shots.map((shot) => ({ ...shot })), dangers: previous.dangers.map((danger) => ({ ...danger })), offered: [] }
+  const events = []
+  const gear = state.gear
+  const forms = evolved(gear)
+  const boomFlow = gear.orbit && gear.drum
+  const pulseDamage = 1 + Math.floor(gear.tempo / 3)
+  const harvest = (crop, chain = false) => {
+    if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) return
+    crop.hp = 0; crop.regrow = crop.boss ? Infinity : state.tick + Math.max(28, 60 - Math.floor(state.tick / 150))
+    state.harvested++; state.bosses += crop.boss ? 1 : 0
+    state.combo = state.tick - state.lastHarvest <= FPS * 2 ? state.combo + 1 : 1
+    state.maxCombo = Math.max(state.maxCombo, state.combo); state.lastHarvest = state.tick
+    const multiplier = Math.min(5, 1 + Math.floor(state.combo / 10))
+    const points = (crop.boss ? 1200 : 40 + crop.kind * 10) * multiplier
+    state.score += points; state.charge = Math.min(100, state.charge + (crop.boss ? 40 : 4))
+    const dropXp = crop.boss ? 60 : 5 + gear.lucky, dropCoins = crop.boss ? 200 : 8 + crop.kind * 2 + gear.lucky * 5
+    const existingDrop = state.loot.find((drop) => !drop.heal && distance([drop.x, drop.y], [crop.x, crop.y]) < 3)
+    if (existingDrop) { existingDrop.xp += dropXp; existingDrop.coins += dropCoins }
+    else state.loot.push({ id: state.nextId++, x: crop.x, y: crop.y, xp: dropXp, coins: dropCoins })
+    if (crop.boss || state.harvested % 16 === 0) state.loot.push({ id: state.nextId++, x: crop.x, y: crop.y, xp: 0, coins: 0, heal: crop.boss ? 30 : 18 })
+    events.push({ id: state.nextId++, kind: crop.boss ? 'boss' : 'harvest', x: crop.x, y: crop.y, points, lane: crop.kind, midi: PITCHES[crop.id % PITCHES.length], chain })
+    if (gear.drum) {
+      const radius = 7 + gear.drum * 2 + (boomFlow ? 3 : 0) + (forms.includes('drum') ? 12 : 0)
+      events.push({ id: state.nextId++, kind: 'blast', x: crop.x, y: crop.y, radius, lane: 0 })
+      for (const other of state.crops) if (other.hp > 0 && distance([other.x, other.y], [crop.x, crop.y]) <= radius) damage(other, (gear.drum + (boomFlow ? 1 : 0)) * (forms.includes('drum') ? 2 : 1), true)
+    }
+    if (crop.boss) for (const drop of state.loot) { drop.x = state.position[0]; drop.y = state.position[1] }
+  }
+  const damage = (crop, amount, chain = false) => {
+    if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) return
+    const critical = gear.lucky > 0 && (crop.id + state.tick) % Math.max(3, 8 - gear.lucky) === 0
+    crop.hp -= amount * (critical ? 2 : 1)
+    if (crop.hp <= 0) { crop.hp = .001; harvest(crop, chain) }
+    else events.push({ id: state.nextId++, kind: 'hit', x: crop.x, y: crop.y, lane: crop.kind })
+  }
+  const pulse = (radius, amount, kind = 'pulse') => {
+    events.push({ id: state.nextId++, kind, x: point[0], y: point[1], radius, lane: 1 })
+    for (const crop of state.crops) if (crop.hp > 0 && distance([crop.x, crop.y], point) <= radius) damage(crop, amount)
+  }
+  for (const crop of state.crops) if (!crop.boss && crop.hp <= 0 && state.tick >= crop.regrow) {
+    crop.kind = (crop.id + Math.floor(state.tick / 160)) % 4
+    crop.hp = 1 + Math.floor(state.tick / 240) + (crop.kind === 3 ? 2 : 0); crop.maxHp = crop.hp
+    placeAtEdge(state, crop)
+  }
+  if (state.tick >= state.nextWave) {
+    const count = 3 + Math.floor(state.tick / 240)
+    for (let index = 0; index < count && state.crops.length < 100; index++) {
+      const id = state.nextId++, kind = id % 4, hp = 1 + Math.floor(state.tick / 240) + (kind === 3 ? 2 : 0)
+      const enemy = { id, x: 0, y: 0, kind, hp, maxHp: hp, regrow: -1, boss: false }
+      placeAtEdge(state, enemy); state.crops.push(enemy)
+    }
+    state.nextWave += 12
+  }
+  if (state.tick >= state.nextBoss) {
+    const index = state.bosses + state.crops.filter((crop) => crop.boss && crop.hp > 0).length
+    const maxHp = 65 + index * 45
+    const boss = { id: state.nextId++, x: 0, y: 0, kind: 3, hp: maxHp, maxHp, regrow: -1, boss: true }
+    placeAtEdge(state, boss); state.crops.push(boss)
+    state.nextBoss += 18 * FPS
+    events.push({ id: state.nextId++, kind: 'arrival', x: point[0], y: point[1], lane: 3 })
+  }
+  if (useSurge) { state.charge = 0; state.surgeUntil = state.tick + FPS * 3; state.hurtUntil = Math.max(state.hurtUntil, state.tick + FPS); state.shots = []; state.dangers = []; pulse(38 + gear.range * 2, 8 + gear.power, 'surge') }
+  const rainDue = state.echoDue
+  const interval = Math.max(3, 8 - gear.tempo - (state.tick < state.surgeUntil ? 2 : 0))
+  if (state.tick - state.lastPulse >= interval) { pulse(15 + gear.range * 4, pulseDamage); state.lastPulse = state.tick; if (gear.echo) state.echoDue = state.tick + Math.max(1, 4 - gear.echo) }
+  if (state.tick === rainDue) {
+    const targets = state.crops.filter((crop) => crop.hp > 0 && state.tick >= (crop.spawnAt ?? 0) && (forms.includes('echo') || distance([crop.x, crop.y], point) <= 38)).sort((a, b) => distance([a.x, a.y], point) - distance([b.x, b.y], point)).slice(0, forms.includes('echo') ? 8 : gear.echo + 1)
+    for (const crop of targets) { events.push({ id: state.nextId++, kind: 'rain', x: crop.x, y: crop.y, fromX: point[0], fromY: point[1], lane: 3 }); damage(crop, gear.echo * (forms.includes('echo') ? 2 : 1)) }
+    // A fast sound wave can schedule the next rain on the same tick. Keep it
+    // without cancelling the rain that was already due.
+    if (state.echoDue === rainDue) state.echoDue = -1
+  }
+  if (gear.power && state.tick % 12 === 0) {
+    if (forms.includes('power')) {
+      pulse(32, 4 + gear.power, 'blackhole')
+      for (const drop of state.loot) { drop.x += (point[0] - drop.x) * .55; drop.y += (point[1] - drop.y) * .55 }
+    } else {
+      events.push({ id: state.nextId++, kind: 'beam', x: point[0], y: point[1], radius: 4 + gear.power * 2, lane: 2 })
+      for (const crop of state.crops) if (crop.hp > 0 && Math.abs(crop.x - point[0]) <= 4 + gear.power * 2 && Math.abs(crop.y - point[1]) <= 120) damage(crop, gear.power + 1)
+    }
+  }
+  if (state.tick % 2 === 0) for (const orb of orbitPositions(state)) for (const crop of state.crops) if (crop.hp > 0 && distance([crop.x, crop.y], orb) <= 6) damage(crop, (gear.orbit + (boomFlow ? 1 : 0)) * (forms.includes('orbit') ? 2 : 1))
+  const attraction = 15 + gear.magnet * 15
+  for (const drop of state.loot) {
+    const dist = distance([drop.x, drop.y], point)
+    if (dist <= attraction || state.tick < state.surgeUntil) {
+      const amount = Math.min(1, (3 + gear.magnet * 1.5) / Math.max(.01, dist))
+      drop.x += (point[0] - drop.x) * amount; drop.y += (point[1] - drop.y) * amount
+    }
+    if (distance([drop.x, drop.y], point) <= 4) { state.xp += drop.xp; state.coins += drop.coins; if (drop.heal) { const healed = Math.min(drop.heal, state.maxHp - state.hp); state.hp += healed; if (healed) events.push({ id: state.nextId++, kind: 'heal', x: point[0], y: point[1], points: healed, lane: 1 }) } drop.collected = true; events.push({ id: state.nextId++, kind: 'collect', x: point[0], y: point[1], lane: 2 }) }
+  }
+  state.loot = state.loot.filter((drop) => !drop.collected && distance([drop.x, drop.y], point) <= 240).slice(-600)
+  const hurt = (amount) => {
+    if (state.tick < state.hurtUntil || state.hp <= 0) return
+    state.hp = Math.max(0, state.hp - amount); state.hurtUntil = state.tick + FPS
+    events.push({ id: state.nextId++, kind: 'hurt', x: point[0], y: point[1], points: amount, lane: 0 })
+    // A short invulnerability window and knockback prevent crowd contact from melting health.
+    for (const enemy of state.crops) {
+      const dist = distance([enemy.x, enemy.y], point)
+      if (enemy.hp > 0 && dist < 15) { const factor = 7 / Math.max(1, dist); enemy.x += (enemy.x - point[0] || 1) * factor; enemy.y += (enemy.y - point[1] || 1) * factor }
+    }
+  }
+  for (const enemy of state.crops) {
+    if (enemy.hp <= 0) continue
+    if (distance([enemy.x, enemy.y], point) > 160) { placeAtEdge(state, enemy); continue }
+    if (state.tick < (enemy.spawnAt ?? 0)) continue
+    const dx = point[0] - enemy.x, dy = point[1] - enemy.y, dist = Math.max(.01, distance([enemy.x, enemy.y], point))
+    const speed = (enemy.boss ? .38 : [.48, .85, .34, .3][enemy.kind]) * (1 + state.tick / FRAMES * .55)
+    const approach = enemy.kind === 2 && !enemy.boss && dist < 28 ? (dist < 20 ? -.5 : 0) : 1
+    const travel = Math.min(speed, dist) / dist * approach
+    enemy.x += dx * travel; enemy.y += dy * travel
+    if (enemy.boss && (state.tick + enemy.id) % 64 === 0) {
+      state.dangers.push({ id: state.nextId++, x: point[0], y: point[1], radius: 15, due: state.tick + 16 })
+    } else if (!enemy.boss && enemy.kind === 2 && state.tick > 5 * FPS && (state.tick + enemy.id) % 64 === 0 && dist < 65 && state.shots.length < 60) {
+      state.shots.push({ id: state.nextId++, x: enemy.x, y: enemy.y, dx: dx / dist * 1.1, dy: dy / dist * 1.1, expires: state.tick + FPS * 5 })
+    }
+    if (distance([enemy.x, enemy.y], point) < (enemy.boss ? 9 : 5)) hurt(enemy.boss ? 24 : enemy.kind === 3 ? 18 : 12)
+  }
+  state.shots = state.shots.filter((shot) => {
+    shot.x += shot.dx; shot.y += shot.dy
+    if (distance([shot.x, shot.y], point) < 3.5) { hurt(14); return false }
+    return shot.expires > state.tick && distance([shot.x, shot.y], point) < 180
+  })
+  state.dangers = state.dangers.filter((danger) => {
+    if (state.tick < danger.due) return true
+    events.push({ id: state.nextId++, kind: 'slam', x: danger.x, y: danger.y, radius: danger.radius, lane: 0 })
+    if (distance([danger.x, danger.y], point) < danger.radius) hurt(26)
+    return false
+  })
+  state.tick++
+  offer(state)
+  return { state, events }
+}
+export function replayFarm(day, frames, choices, surges = []) {
+  if (!validDay(day) || !Array.isArray(frames) || (!frames.length || frames.length > FRAMES) || !Array.isArray(choices) || choices.length > THRESHOLDS.length || !Array.isArray(surges) || surges.length > 100 || !surges.every((tick, index) => Number.isInteger(tick) && tick >= 0 && tick < frames.length && (!index || tick > surges[index - 1]))) return null
+  let state = createFarm(day), cursor = 0
+  const surgeSet = new Set(surges)
+  for (let tick = 0; tick < frames.length; tick++) {
+    while (state.offered.length) {
+      const choice = choices[cursor++]
+      if (!choice || choice.tick !== state.tick) return null
+      state = chooseTalent(state, choice.id)
+      if (!state) return null
+    }
+    const result = stepFarm(state, frames[tick], surgeSet.has(tick))
+    if (!result) return null
+    state = result.state
+  }
+  if (cursor !== choices.length || state.tick < FRAMES && state.hp > 0) return null
+  return { day, frames, choices, surges, outcome: state.hp > 0 ? 'survived' : 'defeated', hp: state.hp, seconds: state.tick / FPS, score: state.score, maxCombo: state.maxCombo, harvested: state.harvested, bosses: state.bosses, coins: state.coins, xp: state.xp, gear: state.gear, stars: state.score >= 65000 ? 3 : state.score >= 22000 ? 2 : state.score > 0 ? 1 : 0 }
+}

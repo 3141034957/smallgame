@@ -584,7 +584,7 @@ function EchoGarden() {
       params.set('hop', String(relayHop || 1))
       if (sharedDateRef.current) params.set('daily', sharedDateRef.current)
     }
-    url.hash = `#/?${params.toString()}`
+    url.hash = `#/echo?${params.toString()}`
     const message = mode === 'daily'
       ? `月亮邮局 · ${dailyDate} 每日花谱，我种出了 ${scoreDailyGarden(board, dailyDate).score} 分。来挑战同一天的六颗声音：${url}`
       : mode === 'relay' && relayParentBoard

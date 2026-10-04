@@ -4,6 +4,11 @@ import { isIP } from 'net'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { createLeaderboardStore } from './database.mjs'
+import { createMelodyStore, handleMelodyRequest } from './melody.mjs'
+import { handleIslandRequest } from './island.mjs'
+import { handleWaveRequest } from './wave.mjs'
+import { handleBounceRequest } from './bounce.mjs'
+import { handleFarmRequest } from './farm.mjs'
 import {
   createLegacyPlayerId,
   MAX_SCORE,
@@ -13,7 +18,7 @@ import {
 } from './leaderboard.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const DATA_DIR = join(__dirname, 'data')
+const DATA_DIR = process.env.DATA_DIR || join(__dirname, 'data')
 const DATABASE_FILE = join(DATA_DIR, 'game.db')
 const LEGACY_LEADERBOARD_FILE = join(DATA_DIR, 'leaderboard.json')
 const LEGACY_STATS_FILE = join(DATA_DIR, 'stats.json')
@@ -26,6 +31,7 @@ const leaderboardStore = createLeaderboardStore({
   leaderboardPath: LEGACY_LEADERBOARD_FILE,
   statsPath: LEGACY_STATS_FILE,
 })
+const melodyStore = createMelodyStore(DATABASE_FILE)
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -66,6 +72,27 @@ const server = createServer((req, res) => {
   if (method === 'OPTIONS') {
     res.writeHead(204)
     res.end()
+    return
+  }
+
+  if (pathname.startsWith('/api/melody/')) {
+    void handleMelodyRequest(req, res, url, melodyStore)
+    return
+  }
+  if (pathname.startsWith('/api/island/')) {
+    void handleIslandRequest(req, res, url, melodyStore)
+    return
+  }
+  if (pathname.startsWith('/api/wave/')) {
+    void handleWaveRequest(req, res, url, melodyStore)
+    return
+  }
+  if (pathname.startsWith('/api/bounce/')) {
+    void handleBounceRequest(req, res, url, melodyStore)
+    return
+  }
+  if (pathname.startsWith('/api/farm/')) {
+    void handleFarmRequest(req, res, url, melodyStore)
     return
   }
 
@@ -190,6 +217,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
   process.once(signal, () => {
     server.close(() => {
       leaderboardStore.close()
+      melodyStore.close()
       process.exit(0)
     })
   })
