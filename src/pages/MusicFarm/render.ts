@@ -136,9 +136,6 @@ function cropSprite(ctx: CanvasRenderingContext2D, crop: Crop, now: number, tick
     ctx.strokeStyle = '#e06f91'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, 19, 0, Math.PI * 2); ctx.stroke()
   }
   ctx.drawImage(assets.crops[crop.kind], -32, -32, 64, 64)
-  if (crop.maxHp > 1) {
-    for (let pip = 0; pip < crop.maxHp; pip++) ellipse(ctx, (pip - (crop.maxHp - 1) / 2) * 4, 20, 1.2, 1.2, pip < crop.hp ? '#71916b' : '#aab69b66')
-  }
   ctx.restore()
 }
 
