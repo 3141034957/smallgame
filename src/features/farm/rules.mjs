@@ -72,7 +72,7 @@ function placeAtEdge(state, enemy) {
 export function createFarm(day) {
   if (!validDay(day)) throw new Error('Invalid farm date')
   const modifier = farmModifier(day)
-  const state = { day, seed: routeSeed(day, 'farm-v3'), tick: 0, position: [...START], crops: [], loot: [], gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])), xp: 0, level: 0, offered: [], score: 0, coins: 0, harvested: 0, bosses: 0, combo: 0, maxCombo: 0, lastHarvest: -1000, charge: 0, nextId: 100, lastPulse: -8, echoDue: -1, bellRings: 0, modifier: modifier.id, nextBoss: Math.round(16 * FPS * (modifier.boss ?? 1)), nextBass: Math.round(90 * FPS * (modifier.boss ?? 1)), surgeUntil: -1, hp: 100, maxHp: 100, hurtUntil: 32, nextHeal: 0, nextShield: 0, shields: 0, shots: [], dangers: [], nextWave: 32 }
+  const state = { day, seed: routeSeed(day, 'farm-v3'), tick: 0, position: [...START], crops: [], loot: [], gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])), xp: 0, level: 0, offered: [], score: 0, coins: 0, harvested: 0, bosses: 0, elites: 0, blocks: 0, maxShields: 0, combo: 0, maxCombo: 0, lastHarvest: -1000, charge: 0, nextId: 100, lastPulse: -8, echoDue: -1, bellRings: 0, modifier: modifier.id, nextBoss: Math.round(16 * FPS * (modifier.boss ?? 1)), nextBass: Math.round(90 * FPS * (modifier.boss ?? 1)), surgeUntil: -1, hp: 100, maxHp: 100, hurtUntil: 32, nextHeal: 0, nextShield: 0, shields: 0, shots: [], dangers: [], nextWave: 32 }
   for (let id = 0; id < 24; id++) {
     const enemy = { id, x: 0, y: 0, kind: id % 4, hp: 1, maxHp: 1, regrow: -1, boss: false }
     placeAtEdge(state, enemy)
@@ -125,7 +125,7 @@ export function stepFarm(previous, point, useSurge = false) {
   const harvest = (crop, chain = false) => {
     if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) return
     crop.hp = 0; crop.regrow = crop.boss ? Infinity : state.tick + Math.max(28, 60 - Math.floor(state.tick / 150))
-    state.harvested++; state.bosses += crop.boss ? 1 : 0
+    state.harvested++; state.bosses += crop.boss ? 1 : 0; state.elites += crop.elite ? 1 : 0
     state.combo = state.tick - state.lastHarvest <= FPS * 2 ? state.combo + 1 : 1
     state.maxCombo = Math.max(state.maxCombo, state.combo); state.lastHarvest = state.tick
     const multiplier = Math.min(5, 1 + Math.floor(state.combo / 10))
@@ -263,7 +263,7 @@ export function stepFarm(previous, point, useSurge = false) {
     state.hurtUntil = state.tick + FPS
     // A held shield eats the whole hit instead of reducing it.
     if (state.shields > 0) {
-      state.shields--
+      state.shields--; state.blocks++
       events.push({ id: state.nextId++, kind: 'shield', x: point[0], y: point[1], points: amount, lane: 1 })
       return
     }
@@ -338,5 +338,5 @@ export function replayFarm(day, frames, choices, surges = []) {
 // replaying a long run on the render thread; the server still replays inputs.
 export function finishFarm(state, frames, choices, surges) {
   if (state.hp > 0) return null
-  return { day: state.day, frames, choices, surges, outcome: 'defeated', hp: state.hp, seconds: state.tick / FPS, score: state.score, maxCombo: state.maxCombo, harvested: state.harvested, bosses: state.bosses, coins: state.coins, xp: state.xp, gear: state.gear, stars: state.score >= 65000 ? 3 : state.score >= 22000 ? 2 : state.score > 0 ? 1 : 0 }
+  return { day: state.day, frames, choices, surges, outcome: 'defeated', hp: state.hp, seconds: state.tick / FPS, score: state.score, maxCombo: state.maxCombo, harvested: state.harvested, bosses: state.bosses, elites: state.elites, blocks: state.blocks, maxShields: state.maxShields, coins: state.coins, xp: state.xp, gear: state.gear, stars: state.score >= 65000 ? 3 : state.score >= 22000 ? 2 : state.score > 0 ? 1 : 0 }
 }

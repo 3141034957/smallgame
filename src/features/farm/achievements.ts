@@ -27,6 +27,9 @@ export const FARM_ACHIEVEMENTS: FarmAchievement[] = [
   { id: 'all-forms', name: '全编制乐队', icon: '✧', desc: '单局凑齐四组终极形态', unit: 'count', target: 4, metric: (round) => evolved(round.gear).length },
   { id: 'score-100k', name: '十万分贝', icon: '⭐', desc: '单局清怪分数达到 100,000', unit: 'score', target: 100000, metric: (round) => round.score },
   { id: 'rich-5000', name: '满载而归', icon: '🪙', desc: '单局拾取 5,000 金币', unit: 'coins', target: 5000, metric: (round) => round.coins },
+  { id: 'elite-5', name: '金唱片猎人', icon: '♛', desc: '单局击破 5 只金唱片精英', unit: 'count', target: 5, metric: (round) => round.elites ?? 0 },
+  { id: 'guard', name: '音盾护卫', icon: '🛡', desc: '单局用音盾挡下 5 次伤害', unit: 'count', target: 5, metric: (round) => round.blocks ?? 0 },
+  { id: 'stack', name: '三重音盾', icon: '🛡', desc: '单局同时持有 3 层音盾', unit: 'count', target: 3, metric: (round) => round.maxShields ?? 0 },
 ]
 
 export const FARM_ACHIEVEMENT_KEY = 'farm-achievements-v1'

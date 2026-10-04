@@ -4,7 +4,7 @@ import type { FarmRound } from './rules.mjs'
 
 const round = (patch: Partial<FarmRound> = {}): FarmRound => ({
   day: '2026-10-04', frames: [[50, 76]], choices: [], surges: [], outcome: 'defeated', hp: 0, seconds: 30, score: 100,
-  maxCombo: 5, harvested: 10, bosses: 0, coins: 20, xp: 30, stars: 1,
+  maxCombo: 5, harvested: 10, bosses: 0, elites: 0, blocks: 0, maxShields: 0, coins: 20, xp: 30, stars: 1,
   gear: { drum: 0, orbit: 0, magnet: 0, range: 0, tempo: 0, power: 0, echo: 0, lucky: 0, bell: 0, sustain: 0 }, ...patch,
 })
 
@@ -22,8 +22,8 @@ describe('survivor achievements', () => {
     const first = claimFarmAchievements(round())
     expect(first.fresh).toEqual(['encore'])
     expect(Object.keys(first.log.unlocked)).toEqual(['encore'])
-    const big = claimFarmAchievements(round({ seconds: 620, harvested: 1200, bosses: 12, maxCombo: 140, score: 120000, coins: 6000, gear: { ...round().gear, drum: 3, range: 3 } }))
-    expect(big.fresh).toEqual(['survivor-3', 'survivor-10', 'harvest-1000', 'boss-10', 'combo-100', 'final-form', 'score-100k', 'rich-5000'])
+    const big = claimFarmAchievements(round({ seconds: 620, harvested: 1200, bosses: 12, elites: 6, blocks: 5, maxShields: 3, maxCombo: 140, score: 120000, coins: 6000, gear: { ...round().gear, drum: 3, range: 3 } }))
+    expect(big.fresh).toEqual(['survivor-3', 'survivor-10', 'harvest-1000', 'boss-10', 'combo-100', 'final-form', 'score-100k', 'rich-5000', 'elite-5', 'guard', 'stack'])
     expect(big.log.unlocked['all-forms']).toBeUndefined()
     const full = claimFarmAchievements(round({ gear: { drum: 3, range: 3, orbit: 3, tempo: 3, power: 3, magnet: 3, echo: 3, lucky: 3, bell: 3, sustain: 3 } }))
     expect(full.fresh).toEqual(['all-forms'])
