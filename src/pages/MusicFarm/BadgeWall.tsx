@@ -3,6 +3,7 @@ import { farmCareerFavourite, type FarmCareer } from '@/features/farm/stats'
 import { TALENTS } from '@/features/farm/rules.mjs'
 
 export function BadgeWall({ log, career }: { log: FarmAchievementLog; career: FarmCareer }) {
+  const formatDay = (at: number) => { const date = new Date(at); return Number.isNaN(date.getTime()) ? '已解锁' : `已解锁 · ${date.toLocaleDateString('zh-CN')}` }
   const unlocked = FARM_ACHIEVEMENTS.filter((achievement) => log.unlocked[achievement.id] !== undefined)
   const favourite = TALENTS.find((talent) => talent.id === farmCareerFavourite(career))
   return <div className="farm-badges">
@@ -15,7 +16,7 @@ export function BadgeWall({ log, career }: { log: FarmAchievementLog; career: Fa
         <div>
           <strong>{achievement.name}</strong>
           <small>{achievement.desc}</small>
-          <em>{done ? `已解锁 · ${new Date(at).toLocaleDateString('zh-CN')}` : `${formatFarmAchievement(achievement, log.best[achievement.id] ?? 0)} / ${formatFarmAchievement(achievement, achievement.target)}`}</em>
+          <em>{done ? formatDay(at) : `${formatFarmAchievement(achievement, log.best[achievement.id] ?? 0)} / ${formatFarmAchievement(achievement, achievement.target)}`}</em>
           {!done && <i className="farm-badge-bar" aria-hidden="true"><b style={{ width: `${Math.min(100, (log.best[achievement.id] ?? 0) / achievement.target * 100)}%` }} /></i>}
         </div>
       </li>

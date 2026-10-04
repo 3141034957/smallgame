@@ -23,6 +23,7 @@ export function FarmBoard({ day, round }: { day: string; round?: FarmRound | nul
     const controller = new AbortController()
     boardRef.current = controller
     setError('')
+    setBoard(null)
     void melodyRequest<Board>(`leaderboard?${new URLSearchParams({ day: viewDay, playerId: player.id })}`, controller.signal, undefined, 'farm')
       .then((value) => { if (!controller.signal.aborted) setBoard(value) })
       .catch(() => { if (!controller.signal.aborted) setError('生存榜暂时连不上，点刷新再试一次。') })

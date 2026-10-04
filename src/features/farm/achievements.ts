@@ -49,7 +49,8 @@ export function loadFarmAchievements(): FarmAchievementLog {
   const unlocked: Record<string, number> = {}, best: Record<string, number> = {}
   for (const achievement of FARM_ACHIEVEMENTS) {
     const at = (stored?.unlocked ?? {})[achievement.id]
-    if (typeof at === 'number' && Number.isFinite(at)) unlocked[achievement.id] = at
+    // Inside Date's range, otherwise the wall would render "Invalid Date".
+    if (typeof at === 'number' && Number.isFinite(at) && at >= 0 && at < 8.64e15) unlocked[achievement.id] = at
     const value = (stored?.best ?? {})[achievement.id]
     if (typeof value === 'number' && Number.isFinite(value)) best[achievement.id] = Math.max(0, value)
   }

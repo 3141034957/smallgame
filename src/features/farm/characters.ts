@@ -14,7 +14,7 @@ export const FARM_CHARACTERS = CHARACTERS.map((character) => ({ ...character, pr
 export const FARM_DEFAULT_CHARACTER = DEFAULT_CHARACTER_ID
 export const FARM_PROFILE_KEY = 'farm-character-profile-v1'
 export type FarmProfile = { coins: number; owned: string[]; selected: string; rewardedRuns: string[] }
-export type ProfileResult = { profile: FarmProfile; error?: string }
+export type ProfileResult = { profile: FarmProfile; error?: string; paid: boolean }
 const validId = (id: unknown): id is string => typeof id === 'string' && FARM_CHARACTERS.some((character) => character.id === id)
 const ids = (value: unknown): string[] => Array.isArray(value) ? value.filter(validId) : []
 const defaults = (): FarmProfile => ({ coins: 0, owned: [FARM_DEFAULT_CHARACTER], selected: FARM_DEFAULT_CHARACTER, rewardedRuns: [] })
@@ -41,22 +41,23 @@ function saveProfile(profile: FarmProfile, previous: FarmProfile): ProfileResult
   try {
     // Currency, ownership and selection are committed together, never partially.
     localStorage.setItem(FARM_PROFILE_KEY, JSON.stringify(profile))
-    return { profile }
-  } catch { return { profile: previous, error: '暂时无法保存，请允许浏览器存储后重试。' } }
+    return { profile, paid: true }
+  } catch { return { profile: previous, error: '暂时无法保存，请允许浏览器存储后重试。', paid: false } }
 }
 
 export function selectFarmCharacter(id: string): ProfileResult {
   const profile = loadFarmProfile()
   const character = FARM_CHARACTERS.find((item) => item.id === id)
-  if (!character) return { profile, error: '这个角色暂时无法使用。' }
+  if (!character) return { profile, error: '这个角色暂时无法使用。', paid: false }
   const owned = profile.owned.includes(id)
-  if (!owned && profile.coins < character.price) return { profile, error: `还差 ${character.price - profile.coins} 金币，再去战斗一场吧。` }
+  if (!owned && profile.coins < character.price) return { profile, error: `还差 ${character.price - profile.coins} 金币，再去战斗一场吧。`, paid: false }
   return saveProfile({ ...profile, coins: profile.coins - (owned ? 0 : character.price), owned: owned ? profile.owned : [...profile.owned, id], selected: id }, profile)
 }
 
 export function awardFarmCoins(runId: string, amount: number): ProfileResult {
   const profile = loadFarmProfile()
-  if (profile.rewardedRuns.includes(runId)) return { profile }
-  if (!runId || !Number.isSafeInteger(amount) || amount < 0) return { profile, error: '本局金币记录无效。' }
+  // paid=false keeps callers from announcing a reward that never landed.
+  if (profile.rewardedRuns.includes(runId)) return { profile, paid: false }
+  if (!runId || !Number.isSafeInteger(amount) || amount < 0) return { profile, error: '本局金币记录无效。', paid: false }
   return saveProfile({ ...profile, coins: Math.min(Number.MAX_SAFE_INTEGER, profile.coins + amount), rewardedRuns: [...profile.rewardedRuns, runId].slice(-64) }, profile)
 }

@@ -73,6 +73,7 @@ export function applyFarmQuests(day: string, round: FarmRound | null): FarmQuest
     if (claimed.includes(quest.id) || !farmQuestDone(quest, { day, best, total, claimed })) continue
     const paid = awardFarmCoins(`quest:${day}:${quest.id}`, quest.reward)
     if (paid.error) { error = paid.error; continue }
+    if (!paid.paid) continue
     claimed.push(quest.id); completed.push(quest.id)
   }
   const log = { day, best, total, claimed }

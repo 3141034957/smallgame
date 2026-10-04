@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { applyFarmQuests, farmQuestDone, farmQuests, farmQuestProgress, loadFarmQuests, FARM_QUEST_KEY } from './quests'
+import { FARM_PROFILE_KEY } from './characters'
 import { loadFarmProfile } from './characters'
 import type { FarmRound } from './rules.mjs'
 
@@ -45,6 +46,15 @@ describe('daily survivor quests', () => {
     expect(repeat.completed).toEqual([])
     expect(repeat.log.claimed).toEqual(finished.log.claimed)
     expect(loadFarmQuests(day).day).toBe(day)
+  })
+  it('never announces a goal that the wallet did not actually pay', () => {
+    const paid = { coins: 99999, owned: ['steampunk'], selected: 'steampunk', rewardedRuns: ['quest:2026-10-04:harvest', 'quest:2026-10-04:hunt', 'quest:2026-10-04:long', 'quest:2026-10-04:band', 'quest:2026-10-04:combo', 'quest:2026-10-04:score'] }
+    data.set(FARM_PROFILE_KEY, JSON.stringify(paid))
+    const finished = round({ harvested: 9999, bosses: 99, seconds: 9999, maxCombo: 999, score: 999999, gear: { ...round().gear, drum: 3, range: 3, orbit: 3, tempo: 3 } })
+    const result = applyFarmQuests(day, finished)
+    // Already rewarded under those ids, so nothing new may be announced.
+    expect(result.completed).toEqual([])
+    expect(result.error).toBeUndefined()
   })
   it('starts over on a new day and survives corrupt saves', () => {
     applyFarmQuests(day, round({ harvested: 50 }))

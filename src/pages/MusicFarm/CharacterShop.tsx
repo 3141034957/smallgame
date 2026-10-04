@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FARM_CHARACTERS, selectFarmCharacter, type FarmProfile } from '@/features/farm/characters'
 import './CharacterShop.css'
 
 export function CharacterShop({ profile, onChange }: { profile: FarmProfile; onChange: (profile: FarmProfile) => void }) {
   const [previewId, setPreviewId] = useState(profile.selected)
+  // Unlocking a character equips it, so the preview has to follow.
+  useEffect(() => setPreviewId(profile.selected), [profile.selected])
   const [message, setMessage] = useState('')
   const character = FARM_CHARACTERS.find((item) => item.id === previewId) ?? FARM_CHARACTERS[0]
   const owned = profile.owned.includes(character.id)
