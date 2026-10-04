@@ -2,7 +2,7 @@ import { evolved, FPS, orbitPositions, type Crop, type FarmEvent, type FarmState
 import { farmCamera, farmOffscreenMarkers, farmStickRadius, farmVisibleTiles, farmWorldBounds } from '../../features/farm/presentation'
 
 type Effect = { event: FarmEvent; born: number }
-export type FarmPose = { character?: HTMLCanvasElement | null; joystick?: { base: Point; knob: Point }; position: Point; tick: number; previousEnemies?: ReadonlyMap<number, { x: number; y: number }>; previousShots?: ReadonlyMap<number, { x: number; y: number }>; previousLoot?: ReadonlyMap<number, { x: number; y: number }>; alpha: number }
+export type FarmPose = { character?: HTMLCanvasElement | null; joystick?: { base: Point; knob: Point }; simple?: boolean; position: Point; tick: number; previousEnemies?: ReadonlyMap<number, { x: number; y: number }>; previousShots?: ReadonlyMap<number, { x: number; y: number }>; previousLoot?: ReadonlyMap<number, { x: number; y: number }>; alpha: number }
 type Assets = { garden: HTMLCanvasElement[]; crops: HTMLCanvasElement[]; sprout: HTMLCanvasElement; bunny: HTMLCanvasElement[]; loot: HTMLCanvasElement; notes: HTMLCanvasElement[] }
 const cachedAssets = new WeakMap<CanvasRenderingContext2D, Assets>()
 const COLORS = ['#f3a0b0', '#f7ab67', '#ed817c', '#f3cd67']
@@ -415,6 +415,8 @@ export function drawFarm(ctx: CanvasRenderingContext2D, state: FarmState, effect
   const active = effects.filter(({ born }) => now - born >= 0 && now - born < 900)
   // Sample dense drum bursts; every important weapon cast still gets its own visual.
   for (const { event, born } of active) {
+    // Low-effect mode keeps the telegraphs that must be dodged and drops the rest.
+    if (pose?.simple && event.kind !== 'slam' && event.kind !== 'surge') continue
     if (event.kind === 'blast' && event.id % 3 !== 0) continue
     const duration = event.kind === 'pulse' ? 650 : event.kind === 'blast' ? 450 : event.kind === 'shock' ? 700 : 900
     const progress = (now - born) / duration
@@ -457,7 +459,7 @@ export function drawFarm(ctx: CanvasRenderingContext2D, state: FarmState, effect
     else ctx.drawImage(assets.loot, x - 9, y - 9, 18, 18)
   }
   const orbit = orbitPositions(moving), terminalOrbit = evolved(state.gear).includes('orbit')
-  if (orbit.length) {
+  if (orbit.length && !pose?.simple) {
     ctx.save()
     ctx.strokeStyle = terminalOrbit ? '#c4a0d380' : '#b6a1ca40'
     ctx.setLineDash([2, 5])
