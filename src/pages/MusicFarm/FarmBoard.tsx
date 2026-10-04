@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { loadPlayer, melodyRequest, savePlayer } from '@/features/melody/leaderboard'
 import type { Board } from '@/features/melody/leaderboard'
 import { formatFarmTime } from '@/features/farm/presentation'
-import { validDay } from '@/features/farm/rules.mjs'
-import { FPS } from '@/features/farm/rules.mjs'
+import { FPS, validDay } from '@/features/farm/rules.mjs'
 import type { FarmRound } from '@/features/farm/rules.mjs'
 import './FarmBoard.css'
 
 export function FarmBoard({ day, round }: { day: string; round?: FarmRound | null }) {
   const [viewDay, setViewDay] = useState(day)
+  const openedDay = useRef(day)
   const [player, setPlayer] = useState(loadPlayer)
   const [name, setName] = useState(player.name)
   const [board, setBoard] = useState<Board | null>(null)
@@ -34,7 +34,8 @@ export function FarmBoard({ day, round }: { day: string; round?: FarmRound | nul
     return () => submitRef.current?.abort()
   }, [round, day])
 
-  useEffect(() => { if (viewDay !== day && validDay(day)) setViewDay(day) }, [day, viewDay])
+  // Follow the game when the day rolls over, but keep a date the player picked.
+  useEffect(() => { if (openedDay.current !== day && validDay(day)) { openedDay.current = day; setViewDay(day) } }, [day])
 
   const submitted = !!round && submittedRound === round
   return <section className="farm-board" aria-label="今日无限榜">

@@ -32,6 +32,8 @@ export default function MusicFarm() {
   const [params] = useSearchParams()
   const day = validDay(params.get('day')) ? params.get('day')! : todayRoute()
   const [initial] = useState(() => createFarm(day))
+  const dayRef = useRef(day)
+  dayRef.current = day
   const model = useRef(initial)
   const [view, setView] = useState(model.current)
   const [inputMode, setInputMode] = useState<'touch' | 'mouse'>(() => window.matchMedia?.('(pointer: coarse)').matches ? 'touch' : 'mouse')
@@ -93,8 +95,10 @@ export default function MusicFarm() {
   const closePanel = () => { panelRef.current = null; setPanel(null); if (phaseRef.current === 'play') void prepare(); previousFocus.current?.focus({ preventScroll: true }) }
   const start = () => { samples.current = []; setTimeline([]); evolutionMarks.current = []; setEvolutionTicks([]); const random = new Uint32Array(2); crypto.getRandomValues(random); runId.current = `farm_${Date.now()}_${random.join('_')}`; phaseRef.current = 'play'; setPhase('play'); void prepare(); field.current?.focus({ preventScroll: true }) }
   const restart = () => {
-    audio.current?.stop(); audioSerial.current++; model.current = createFarm(day); desired.current = [...model.current.position]; displayPosition.current = [...model.current.position]; controls.current?.reset(); logs.current = { frames: [], choices: [], surges: [] }; effects.current = []; surge.current = false; keys.current.clear(); setView(model.current); setRound(null); setRewardError(''); setFreshBadges([]); setBadgeError(''); setCareerRecords({ score: false, seconds: false, combo: false }); setFreshQuests([]); samples.current = []; setTimeline([]); evolutionMarks.current = []; setEvolutionTicks([]); setCelebration(''); setNotice(''); celebrationUntil.current = 0; noticeUntil.current = 0; panelRef.current = null; setPanel(null); phaseRef.current = 'ready'; setPhase('ready'); page.current?.scrollIntoView({ block: 'start' })
+    audio.current?.stop(); audioSerial.current++; model.current = createFarm(dayRef.current); desired.current = [...model.current.position]; displayPosition.current = [...model.current.position]; controls.current?.reset(); logs.current = { frames: [], choices: [], surges: [] }; effects.current = []; surge.current = false; keys.current.clear(); setView(model.current); setRound(null); setRewardError(''); setFreshBadges([]); setBadgeError(''); setCareerRecords({ score: false, seconds: false, combo: false }); setFreshQuests([]); samples.current = []; setTimeline([]); evolutionMarks.current = []; setEvolutionTicks([]); setCelebration(''); setNotice(''); celebrationUntil.current = 0; noticeUntil.current = 0; panelRef.current = null; setPanel(null); phaseRef.current = 'ready'; setPhase('ready'); page.current?.scrollIntoView({ block: 'start' })
   }
+  const restartRef = useRef(restart)
+  restartRef.current = restart
   const claimReward = () => {
     if (!round) return
     const reward = awardFarmCoins(runId.current, round.coins)
@@ -114,6 +118,15 @@ export default function MusicFarm() {
     try { localStorage.setItem(FARM_HELP_SEEN_KEY, '1') } catch { /* Storage optional. */ }
     openPanel('help')
   }, [])
+  // A hand-edited ?day= must not leave the run on another day's seed: the
+  // leaderboard would reject the score because the replay would not match.
+  useEffect(() => {
+    if (model.current.day === day) return
+    setQuests(loadFarmQuests(day))
+    setFreshQuests([])
+    setBest(() => { try { return Number(localStorage.getItem(`farm-best-v4-endless:${day}`)) || 0 } catch { return 0 } })
+    restartRef.current()
+  }, [day])
   useEffect(() => {
     const sync = (event: StorageEvent) => { if (!event.key || event.key === FARM_PROFILE_KEY || event.key === 'character-unlocks-v1') setProfile(loadFarmProfile()) }
     window.addEventListener('storage', sync)
