@@ -46,3 +46,13 @@
 .farm-recap .farm-recap-mark{fill:#9a7fd0}
 .farm-recap-legend{display:flex;flex-wrap:wrap;gap:9px;margin-top:7px;font-size:9px;color:#9b8da8}
 .farm-recap-legend .is-score{color:#a97c2c}.farm-recap-legend .is-hp{color:#b9597f}
+.farm-quests{list-style:none;margin:9px 0 0;padding:0;display:grid;gap:6px;width:100%;max-width:320px}
+.farm-quests li{display:flex;align-items:center;gap:9px;background:#fffdf7;border:1px solid #ece2f0;border-radius:12px;padding:7px 10px;text-align:left}
+.farm-quests li.is-done{border-color:#d9e6cd;background:#f4f9ee}
+.farm-quests li>span{font-size:15px;width:20px;text-align:center;flex:none}
+.farm-quests strong{display:block;font-size:11px;color:#5f5470}
+.farm-quests small{display:block;font-size:9px;color:#a294b0;line-height:1.4}
+.farm-quests b{margin-left:auto;font-size:10px;color:#8a7794;font-variant-numeric:tabular-nums;white-space:nowrap}
+.farm-quests li.is-done b{color:#6d8a62}
+.farm-quests em{display:block;width:100%;font-size:8px;font-style:normal;color:#b4903f}
+.farm-result .farm-quests{max-width:none;margin-top:11px}
