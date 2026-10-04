@@ -13,6 +13,7 @@ import { awardFarmCoins, FARM_CHARACTERS, FARM_PROFILE_KEY, loadFarmProfile } fr
 import { claimFarmAchievements, FARM_ACHIEVEMENTS, loadFarmAchievements, type FarmAchievementLog } from '@/features/farm/achievements'
 import { loadFarmCareer, recordFarmCareer, type FarmCareer } from '@/features/farm/stats'
 import { farmTimelineSample, FARM_SAMPLE_EVERY, FARM_SAMPLE_LIMIT, type FarmSample } from '@/features/farm/timeline'
+import { FARM_HELP_SEEN_KEY } from '@/features/farm/help'
 import { RunTimeline } from './RunTimeline'
 import { BadgeWall } from './BadgeWall'
 import { QuestList } from './QuestList'
@@ -100,6 +101,14 @@ export default function MusicFarm() {
     void loadFarmCharacterSprite(profile.selected).then((sprite) => { if (!cancelled) heroSprite.current = sprite }).catch(() => { if (!cancelled) setHeroError(true) })
     return () => { cancelled = true }
   }, [profile.selected])
+  // First visit: show the rules straight away instead of hiding them behind "?".
+  useEffect(() => {
+    let seen = true
+    try { seen = localStorage.getItem(FARM_HELP_SEEN_KEY) === '1' } catch { seen = true }
+    if (seen) return
+    try { localStorage.setItem(FARM_HELP_SEEN_KEY, '1') } catch { /* Storage optional. */ }
+    openPanel('help')
+  }, [])
   useEffect(() => {
     const sync = (event: StorageEvent) => { if (!event.key || event.key === FARM_PROFILE_KEY || event.key === 'character-unlocks-v1') setProfile(loadFarmProfile()) }
     window.addEventListener('storage', sync)
