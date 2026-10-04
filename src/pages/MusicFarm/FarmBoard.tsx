@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { loadPlayer, melodyRequest, savePlayer } from '@/features/melody/leaderboard'
 import type { Board } from '@/features/melody/leaderboard'
+import { formatFarmTime } from '@/features/farm/presentation'
+import { FPS } from '@/features/farm/rules.mjs'
 import type { FarmRound } from '@/features/farm/rules.mjs'
 import './FarmBoard.css'
 
@@ -57,10 +59,10 @@ export function FarmBoard({ day, round }: { day: string; round?: FarmRound | nul
     {board && <>
       {board.data.length ? <ol>{board.data.slice(0, 10).map((entry) => <li key={entry.rank} className={entry.isYou ? 'is-you' : ''}>
         <span className="farm-board-rank">{entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : entry.rank}</span>
-        <div><strong>{entry.name}{entry.isYou ? ' · 你' : ''}</strong><small>最高 {entry.maxCombo} 连击 <span aria-label={`${entry.stars} 星`}>{'★'.repeat(entry.stars)}</span></small></div>
+        <div><strong>{entry.name}{entry.isYou ? ' · 你' : ''}</strong><small>生存 {formatFarmTime(entry.seconds * FPS)} · 最高 {entry.maxCombo} 连击 <span aria-label={`${entry.stars} 星`}>{'★'.repeat(entry.stars)}</span></small></div>
         <b>{entry.score.toLocaleString()}<small>战斗分</small></b>
       </li>)}</ol> : <p className="farm-board-empty">今天的首位幸存者，等你来挑战 ♫</p>}
-      {board.own && <p className="farm-board-own">你的最佳 {board.own.score.toLocaleString()} 分 · 第 {board.own.rank} / {board.total} 名</p>}
+      {board.own && <p className="farm-board-own">你的最佳 {board.own.score.toLocaleString()} 分 · 生存 {formatFarmTime(board.own.seconds * FPS)} · 第 {board.own.rank} / {board.total} 名</p>}
     </>}
     <p className="farm-board-note">当前浏览器记住你的昵称和上榜身份</p>
   </section>

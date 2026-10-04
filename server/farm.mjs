@@ -8,7 +8,7 @@ export function verifyFarm(input) {
   if (!playerId || !name) return null
   const round = replayFarm(input.day, input.frames, input.choices, input.surges)
   if (!round || !Number.isInteger(input.score) || input.score !== round.score || !round.score) return null
-  return { playerId, name, songId: farmKey(round.day), difficulty: 'farm', score: round.score, accuracy: Math.min(10000, round.bosses * 1000 + round.harvested), maxCombo: round.maxCombo, stars: round.stars }
+  return { playerId, name, songId: farmKey(round.day), difficulty: 'farm', score: round.score, accuracy: Math.min(10000, round.bosses * 1000 + round.harvested), maxCombo: round.maxCombo, stars: round.stars, seconds: Math.round(round.seconds) }
 }
 export async function handleFarmRequest(req, res, url, store) {
   const send = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)) }

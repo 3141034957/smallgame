@@ -61,8 +61,9 @@ describe('replay-verified daily farm leaderboard', () => {
     expect(round.score).toBeGreaterThan(0)
     expect(verifyFarm({ ...input, maxCombo: 999999, bosses: 999999, stars: 999, harvested: 999999, gear: { drum: 99 } })).toEqual({
       playerId: input.playerId, name: input.name, songId: farmKey(day), difficulty: 'farm', score: round.score,
-      accuracy: Math.min(10000, round.bosses * 1000 + round.harvested), maxCombo: round.maxCombo, stars: round.stars,
+      accuracy: Math.min(10000, round.bosses * 1000 + round.harvested), maxCombo: round.maxCombo, stars: round.stars, seconds: Math.round(round.seconds),
     })
+    expect(Math.round(round.seconds)).toBeGreaterThan(60)
   })
 
   it('accepts a replay-verified defeat, but rejects truncation and frames after death', () => {
