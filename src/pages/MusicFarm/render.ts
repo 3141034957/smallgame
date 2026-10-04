@@ -442,6 +442,20 @@ export function drawFarm(ctx: CanvasRenderingContext2D, state: FarmState, effect
     const x = X(before ? before.x + (shot.x - before.x) * alpha : shot.x), y = Y(before ? before.y + (shot.y - before.y) * alpha : shot.y)
     ellipse(ctx, x, y, 6, 6, '#fff7e8'); ellipse(ctx, x, y, 4.5, 4.5, '#db6289'); ellipse(ctx, x - 1, y - 1, 1.5, 1.5, '#ffc5c0')
   }
+  // Echo whistle leaves delayed notes behind: draw them on the stage floor.
+  for (const trail of state.trails) {
+    if (!visibleAt(trail.x, trail.y)) continue
+    const left = Math.max(0, trail.expires - moving.tick)
+    const alpha = Math.min(1, left / 16)
+    ctx.save()
+    ctx.globalAlpha = alpha * (0.35 + Math.sin(now / 220 + trail.id) * .15)
+    ellipse(ctx, X(trail.x), Y(trail.y) + 6, 11, 4, '#9ac6b455')
+    ctx.restore()
+    ctx.save()
+    ctx.globalAlpha = alpha * .9
+    ctx.drawImage(assets.notes[0], X(trail.x) - 13, Y(trail.y) - 15, 26, 26)
+    ctx.restore()
+  }
   for (const drop of state.loot) {
     if (!visibleAt(drop.x, drop.y)) continue
     const previous = pose?.previousLoot?.get(drop.id)

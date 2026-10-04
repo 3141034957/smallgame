@@ -15,7 +15,7 @@ export const MOVE_STEP: number
 export const START: Point
 export const THRESHOLDS: number[]
 export type Point = [number, number]
-export type TalentId = 'drum' | 'orbit' | 'magnet' | 'range' | 'tempo' | 'power' | 'echo' | 'lucky' | 'bell' | 'sustain'
+export type TalentId = 'drum' | 'orbit' | 'magnet' | 'range' | 'tempo' | 'power' | 'echo' | 'lucky' | 'bell' | 'sustain' | 'whistle' | 'delay'
 export const TALENTS: { id: TalentId; kind: 'weapon' | 'chip'; partner: TalentId; name: string; icon: string; color: string; description: string; tag: string }[]
 export const RECIPES: { weapon: TalentId; chip: TalentId; name: string; icon: string; description: string }[]
 export function evolved(gear: Gear): TalentId[]
@@ -25,7 +25,8 @@ export type Loot = { id: number; x: number; y: number; xp: number; coins: number
 export type FarmEvent = { id: number; kind: 'harvest' | 'boss' | 'blast' | 'pulse' | 'echo' | 'surge' | 'arrival' | 'hit' | 'collect' | 'rain' | 'beam' | 'blackhole' | 'hurt' | 'heal' | 'slam' | 'shield' | 'shock'; x: number; y: number; lane: Lane; midi?: number; points?: number; radius?: number; chain?: boolean; fromX?: number; fromY?: number; bass?: boolean }
 export type Shot = { id: number; x: number; y: number; dx: number; dy: number; expires: number }
 export type Danger = { id: number; x: number; y: number; radius: number; due: number }
-export type FarmState = { day: string; seed: number; tick: number; position: Point; crops: Crop[]; loot: Loot[]; gear: Gear; xp: number; level: number; offered: TalentId[]; score: number; coins: number; harvested: number; bosses: number; elites: number; blocks: number; maxShields: number; combo: number; maxCombo: number; lastHarvest: number; charge: number; nextId: number; lastPulse: number; echoDue: number; bellRings: number; nextBoss: number; nextBass: number; modifier: string; surgeUntil: number; hp: number; maxHp: number; hurtUntil: number; nextHeal: number; nextShield: number; shields: number; shots: Shot[]; dangers: Danger[]; nextWave: number }
+export type Trail = { id: number; x: number; y: number; damage: number; expires: number }
+export type FarmState = { day: string; seed: number; tick: number; position: Point; crops: Crop[]; loot: Loot[]; gear: Gear; xp: number; level: number; offered: TalentId[]; score: number; coins: number; harvested: number; bosses: number; elites: number; blocks: number; maxShields: number; combo: number; maxCombo: number; lastHarvest: number; charge: number; nextId: number; lastPulse: number; echoDue: number; bellRings: number; nextBoss: number; nextBass: number; modifier: string; surgeUntil: number; hp: number; maxHp: number; hurtUntil: number; nextHeal: number; nextShield: number; shields: number; shots: Shot[]; dangers: Danger[]; trails: Trail[]; nextWave: number }
 export type Choice = { tick: number; id: TalentId }
 export type FarmRound = { outcome: 'defeated'; hp: number; seconds: number; day: string; frames: Point[]; choices: Choice[]; surges: number[]; score: number; maxCombo: number; harvested: number; bosses: number; elites: number; blocks: number; maxShields: number; coins: number; xp: number; gear: Gear; stars: number }
 export function clampPoint(previous: Point, desired: Point): Point

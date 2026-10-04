@@ -184,6 +184,28 @@ describe('survivor combat', () => {
     expect(hot.radius).toBeGreaterThan(warm.radius)
     expect(warm.radius).toBe(calm.radius)
   })
+  it('leaves echo-whistle notes behind that keep hurting, then expire and stay capped', () => {
+    const note = (id, x, y, expires = 9999) => ({ id, x, y, damage: 2, expires })
+    const walk = (gear, trails = [], tick = 120) => {
+      const s = arena([{ id: 1, kind: 0, x: 58, y: 50, hp: 60, maxHp: 60, regrow: -1, boss: false }], tick)
+      Object.assign(s.gear, gear)
+      s.trails = trails; s.nextWave = Infinity; s.nextBoss = Infinity; s.nextBass = Infinity; s.lastPulse = tick
+      return step(s).state
+    }
+    const clean = walk({ whistle: 0 })
+    expect(clean.trails).toHaveLength(0)
+    // The note lands on the player and damages the monster standing next to it.
+    const dropped = walk({ whistle: 2 }, [], 130)
+    expect(dropped.trails).toHaveLength(1)
+    expect(dropped.trails[0].x).toBe(50)
+    const bitten = walk({ whistle: 2 }, [note(8, 50, 50)], 132)
+    expect(bitten.crops[0].hp).toBeLessThan(60)
+    const faded = walk({ whistle: 2 }, [note(9, 50, 50, 100)], 130)
+    expect(faded.trails).toHaveLength(1)
+    expect(faded.trails[0].id).not.toBe(9)
+    const many = walk({ whistle: 1 }, Array.from({ length: 40 }, (_, index) => note(index, 50, 50, 9999)), 120)
+    expect(many.trails.length).toBeLessThanOrEqual(30)
+  })
   it('ends immediately at zero health without upgrades or further moves', () => {
     const s=arena([enemy(0,0,50,50)]);s.hp=10;s.xp=100
     const r=step(s).state

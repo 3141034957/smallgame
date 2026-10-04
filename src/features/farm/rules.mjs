@@ -4,7 +4,7 @@ export const FPS = 16
 export const MOVE_STEP = 3
 export const START = [50, 76]
 export const THRESHOLDS = [20, 65, 140, 250, 400, 600, 850, 1150, 1500, 1900, 2350, 2850,
-  ...Array.from({ length: 18 }, (_, index) => 2850 + (index + 1) * 550 + index * (index + 1) * 25)]
+  ...Array.from({ length: 24 }, (_, index) => 2850 + (index + 1) * 550 + index * (index + 1) * 25)]
 export const MAX_BOSSES = 4
 // Healing drops are limited: at most one pack on the field, one every
 // HEAL_COOLDOWN, and each pack vanishes after HEAL_TTL. Without this the
@@ -27,6 +27,8 @@ export const TALENTS = [
   { id: 'lucky', kind: 'chip', partner: 'echo', name: '丰收芯片', icon: '★', color: '#dbbb6b', description: '增加暴击、金币和经验，配竖琴进化。', tag: '暴击与收益' },
   { id: 'bell', kind: 'weapon', partner: 'sustain', name: '星光铃鼓', icon: '✵', color: '#8fb7d9', description: '每隔几秒向外扩散一圈星浪，推开并伤害身边怪群。', tag: '环形冲击' },
   { id: 'sustain', kind: 'chip', partner: 'bell', name: '延音芯片', icon: '◐', color: '#7fa8c4', description: '星浪更快更广，配铃鼓进化。', tag: '冲击强化' },
+  { id: 'whistle', kind: 'weapon', partner: 'delay', name: '回声电哨', icon: '⌇', color: '#9ac6b4', description: '走过的地方留下延迟音符，踩到的怪物持续受伤。', tag: '残留音阵' },
+  { id: 'delay', kind: 'chip', partner: 'whistle', name: '延迟芯片', icon: '◑', color: '#84b3a2', description: '残留音符更久更密，配电哨进化。', tag: '残留强化' },
 ]
 export const RECIPES = [
   { weapon: 'drum', chip: 'range', name: '雷霆节拍机', icon: '🥁', description: '爆破范围大幅扩张，连锁伤害翻倍' },
@@ -34,6 +36,7 @@ export const RECIPES = [
   { weapon: 'power', chip: 'magnet', name: '黑洞低音炮', icon: '◉', description: '黑洞大范围收割，全场经验涌向你' },
   { weapon: 'echo', chip: 'lucky', name: '星雨竖琴', icon: '♧', description: '一次追击八只怪，全场降下暴击音雨' },
   { weapon: 'bell', chip: 'sustain', name: '银河铃鼓阵', icon: '✵', description: '星浪连发三圈，范围与伤害大幅提升' },
+  { weapon: 'whistle', chip: 'delay', name: '回音迷阵', icon: '⌇', description: '残留音符更长更痛，整片舞台都是你的音阵' },
 ]
 // Every calendar day plays under one modifier, drawn from the day seed so all
 // players on that day share it and the leaderboard stays comparable.
@@ -72,7 +75,7 @@ function placeAtEdge(state, enemy) {
 export function createFarm(day) {
   if (!validDay(day)) throw new Error('Invalid farm date')
   const modifier = farmModifier(day)
-  const state = { day, seed: routeSeed(day, 'farm-v3'), tick: 0, position: [...START], crops: [], loot: [], gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])), xp: 0, level: 0, offered: [], score: 0, coins: 0, harvested: 0, bosses: 0, elites: 0, blocks: 0, maxShields: 0, combo: 0, maxCombo: 0, lastHarvest: -1000, charge: 0, nextId: 100, lastPulse: -8, echoDue: -1, bellRings: 0, modifier: modifier.id, nextBoss: Math.round(16 * FPS * (modifier.boss ?? 1)), nextBass: Math.round(90 * FPS * (modifier.boss ?? 1)), surgeUntil: -1, hp: 100, maxHp: 100, hurtUntil: 32, nextHeal: 0, nextShield: 0, shields: 0, shots: [], dangers: [], nextWave: 32 }
+  const state = { day, seed: routeSeed(day, 'farm-v3'), tick: 0, position: [...START], crops: [], loot: [], gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])), xp: 0, level: 0, offered: [], score: 0, coins: 0, harvested: 0, bosses: 0, elites: 0, blocks: 0, maxShields: 0, combo: 0, maxCombo: 0, lastHarvest: -1000, charge: 0, nextId: 100, lastPulse: -8, echoDue: -1, bellRings: 0, modifier: modifier.id, nextBoss: Math.round(16 * FPS * (modifier.boss ?? 1)), nextBass: Math.round(90 * FPS * (modifier.boss ?? 1)), surgeUntil: -1, hp: 100, maxHp: 100, hurtUntil: 32, nextHeal: 0, nextShield: 0, shields: 0, shots: [], dangers: [], trails: [], nextWave: 32 }
   for (let id = 0; id < 24; id++) {
     const enemy = { id, x: 0, y: 0, kind: id % 4, hp: 1, maxHp: 1, regrow: -1, boss: false }
     placeAtEdge(state, enemy)
@@ -226,6 +229,24 @@ export function stepFarm(previous, point, useSurge = false) {
     } else {
       events.push({ id: state.nextId++, kind: 'beam', x: point[0], y: point[1], radius: 4 + gear.power * 2, lane: 2 })
       for (const crop of state.crops) if (crop.hp > 0 && Math.abs(crop.x - point[0]) <= 4 + gear.power * 2 && Math.abs(crop.y - point[1]) <= 120) damage(crop, gear.power + 1)
+    }
+  }
+  // Echo whistle: leave delayed notes on the floor that keep hurting whatever
+  // walks into them. Capped and expired so a long run cannot pile them up.
+  if (gear.whistle) {
+    const every = Math.max(10, 26 - gear.delay * 4)
+    if (state.tick % every === 0) {
+      state.trails.push({ id: state.nextId++, x: point[0], y: point[1], damage: gear.whistle + (forms.includes('whistle') ? 2 : 0), expires: state.tick + FPS * (3 + gear.delay) })
+      if (state.trails.length > 30) state.trails.shift()
+    }
+  }
+  state.trails = state.trails.filter((trail) => state.tick < trail.expires).slice(-30)
+  for (const trail of state.trails) {
+    if ((state.tick + trail.id) % 4) continue
+    const radius = 10 + gear.delay * 2 + (forms.includes('whistle') ? 6 : 0)
+    for (const crop of state.crops) {
+      if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
+      if (distance([crop.x, crop.y], [trail.x, trail.y]) <= radius) damage(crop, trail.damage)
     }
   }
   // Star tambourine: a slow, wide ring that also pushes monsters away, so it

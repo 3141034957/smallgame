@@ -5,7 +5,7 @@ import type { FarmRound } from './rules.mjs'
 const round = (patch: Partial<FarmRound> = {}): FarmRound => ({
   day: '2026-10-04', frames: [[50, 76]], choices: [], surges: [], outcome: 'defeated', hp: 0, seconds: 185, score: 12345,
   maxCombo: 40, harvested: 820, bosses: 5, elites: 2, blocks: 3, maxShields: 2, coins: 900, xp: 40, stars: 2,
-  gear: { drum: 3, orbit: 0, magnet: 0, range: 3, tempo: 0, power: 0, echo: 0, lucky: 0, bell: 0, sustain: 0 }, ...patch,
+  gear: { drum: 3, orbit: 0, magnet: 0, range: 3, tempo: 0, power: 0, echo: 0, lucky: 0, bell: 0, sustain: 0, whistle: 0, delay: 0 }, ...patch,
 })
 
 describe('result share text', () => {
@@ -27,6 +27,6 @@ describe('result share text', () => {
     expect(text).not.toContain('精英')
     expect(text).not.toContain('音盾')
     expect(farmShareText(null, '2026-10-05')).toContain('2026-10-05')
-    expect(farmShareText(round({ gear: { drum: 0, orbit: 0, magnet: 0, range: 0, tempo: 0, power: 0, echo: 0, lucky: 0, bell: 0, sustain: 0 } }), '2026-10-04')).not.toContain('终极')
+    expect(farmShareText(round({ gear: { drum: 0, orbit: 0, magnet: 0, range: 0, tempo: 0, power: 0, echo: 0, lucky: 0, bell: 0, sustain: 0, whistle: 0, delay: 0 } }), '2026-10-04')).not.toContain('终极')
   })
 })
