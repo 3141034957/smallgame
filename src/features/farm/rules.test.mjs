@@ -228,6 +228,30 @@ describe('music roguelite farming', () => {
     expect(days.size).toBeGreaterThan(1)
     for (const id of days) expect(FARM_MODIFIERS.some((item) => item.id === id)).toBe(true)
   })
+  it('lets elites, shields and bosses actually show up during a wandering run', () => {
+    // Regression guard: these mechanics are gated by timers and by the monster
+    // pool, so a small refactor can silently make them never fire.
+    let state = createFarm(day)
+    const dodge = (current) => {
+      let closest = null, nearest = Infinity
+      for (const crop of current.crops) {
+        if (crop.hp <= 0) continue
+        const distance = Math.hypot((crop.x - current.position[0]) * .84, crop.y - current.position[1])
+        if (distance < nearest) { nearest = distance; closest = crop }
+      }
+      return closest && nearest < 26 ? [current.position[0] + (current.position[0] - closest.x) * 2, current.position[1] + (current.position[1] - closest.y) * 2] : [50 + 30 * Math.sin(current.tick / 50), 50 + 25 * Math.cos(current.tick / 75)]
+    }
+    for (let tick = 0; tick < FPS * 120 && state.hp > 0; tick++) {
+      state.hp = state.maxHp
+      while (state.offered.length) state = chooseTalent(state, state.offered[0])
+      state = stepFarm(state, clampPoint(state.position, dodge(state))).state
+    }
+    expect(state.tick).toBeGreaterThan(FPS * 119)
+    expect(state.elites).toBeGreaterThan(0)
+    expect(state.maxShields).toBeGreaterThan(0)
+    expect(state.blocks).toBeGreaterThan(0)
+    expect(state.bosses).toBeGreaterThan(0)
+  })
   it('lets a focused build evolve early on every daily modifier and preserves exact full-run replay', () => {
     for (const [focus, routeDay] of [['drum', '2026-10-01'], ['orbit', '2026-10-04'], ['power', '2026-10-02'], ['echo', '2026-10-01']]) {
       const round = run(focus, routeDay)
