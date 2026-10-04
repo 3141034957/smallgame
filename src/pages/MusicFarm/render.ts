@@ -1,5 +1,5 @@
 import { evolved, FPS, orbitPositions, type Crop, type FarmEvent, type FarmState, type Point } from '../../features/farm/rules.mjs'
-import { farmCamera, farmStickRadius, farmVisibleTiles, farmWorldBounds } from '../../features/farm/presentation'
+import { farmCamera, farmOffscreenMarkers, farmStickRadius, farmVisibleTiles, farmWorldBounds } from '../../features/farm/presentation'
 
 type Effect = { event: FarmEvent; born: number }
 export type FarmPose = { character?: HTMLCanvasElement | null; joystick?: { base: Point; knob: Point }; position: Point; tick: number; previousEnemies?: ReadonlyMap<number, { x: number; y: number }>; previousShots?: ReadonlyMap<number, { x: number; y: number }>; previousLoot?: ReadonlyMap<number, { x: number; y: number }>; alpha: number }
@@ -426,6 +426,20 @@ export function drawFarm(ctx: CanvasRenderingContext2D, state: FarmState, effect
   }
   const recentHurt = active.find(({ event, born }) => event.kind === 'hurt' && now - born < 220)
   if (recentHurt) { ctx.strokeStyle = `rgba(218,73,112,${(1 - (now - recentHurt.born) / 220) * .7})`; ctx.lineWidth = 12; ctx.strokeRect(0, 0, width, height) }
+  for (const marker of farmOffscreenMarkers(moving.position, state.crops.filter((crop) => crop.boss), width, height)) {
+    ctx.save()
+    ctx.translate(marker.x, marker.y)
+    ctx.rotate(marker.angle)
+    ctx.globalAlpha = .5 + Math.sin(now / 180) * .2
+    ctx.fillStyle = '#cf456f'
+    ctx.beginPath(); ctx.moveTo(11, 0); ctx.lineTo(-7, 7); ctx.lineTo(-7, -7); ctx.closePath(); ctx.fill()
+    ctx.restore()
+    ctx.save()
+    ctx.globalAlpha = .75
+    ctx.fillStyle = '#cf456f'; ctx.font = '700 9px system-ui, sans-serif'; ctx.textAlign = 'center'
+    ctx.fillText('巨兽', marker.x, marker.y + 20)
+    ctx.restore()
+  }
   const stick = pose?.joystick
   if (stick) {
     // The phone stick is drawn in screen space: base at the press point, knob

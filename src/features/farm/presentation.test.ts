@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { advanceFarmPosition, farmPointerTarget, farmStickRadius, farmStickVector, farmCamera, farmVisibleTiles, formatFarmTime, FARM_STICK_DEAD_ZONE } from './presentation'
+import { advanceFarmPosition, farmPointerTarget, farmStickRadius, farmStickVector, farmCamera, farmOffscreenMarkers, farmVisibleTiles, formatFarmTime, FARM_STICK_DEAD_ZONE } from './presentation'
 import { clampPoint, FPS, MOVE_STEP, type Point } from './rules.mjs'
 
 describe('farm display motion', () => {
@@ -64,6 +64,25 @@ describe('endless world camera', () => {
     expect(diagonal[0]).toBeLessThan(0); expect(diagonal[1]).toBeGreaterThan(0)
     expect(Math.hypot(...diagonal)).toBeCloseTo(MOVE_STEP)
     expect(farmStickVector(10, 10, 0, 430, radius)).toBeNull()
+  })
+  it('points at bosses that are still outside the view and ignores the ones already visible', () => {
+    const position: Point = [50, 76]
+    const far = [{ x: 50, y: 76 - 120, hp: 40 }, { x: 50 - 130, y: 76, hp: 40 }]
+    const markers = farmOffscreenMarkers(position, far, 375, 500)
+    expect(markers).toHaveLength(2)
+    expect(markers[0].y).toBeLessThan(250)
+    expect(markers[0].x).toBeCloseTo(187.5)
+    expect(markers[0].angle).toBeCloseTo(-Math.PI / 2)
+    expect(markers[1].x).toBeLessThan(187.5)
+    expect(markers[1].angle).toBeCloseTo(Math.PI)
+    for (const marker of markers) {
+      expect(marker.x).toBeGreaterThanOrEqual(0); expect(marker.x).toBeLessThanOrEqual(375)
+      expect(marker.y).toBeGreaterThanOrEqual(0); expect(marker.y).toBeLessThanOrEqual(500)
+      expect(marker.distance).toBeGreaterThan(0)
+    }
+    expect(farmOffscreenMarkers(position, [{ x: 50, y: 80, hp: 40 }], 375, 500)).toHaveLength(0)
+    expect(farmOffscreenMarkers(position, [{ x: 50, y: 76 - 120, hp: 0 }], 375, 500)).toHaveLength(0)
+    expect(farmOffscreenMarkers(position, [], 375, 0)).toHaveLength(0)
   })
   it('keeps a held pointer direction moving as the player passes the original arena', () => {
     let position: Point = [50, 76]

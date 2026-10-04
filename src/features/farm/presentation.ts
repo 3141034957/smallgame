@@ -68,6 +68,27 @@ export function farmVisibleTiles(camera: ReturnType<typeof farmCamera>) {
   return tiles
 }
 
+// Bosses spawn outside the view on an endless map. Point at them from the
+// screen edge so the player knows which way the threat is coming from.
+export function farmOffscreenMarkers(position: Point, bosses: { x: number; y: number; hp: number }[], width: number, height: number, margin = 24) {
+  if (width <= 0 || height <= 0) return []
+  const camera = farmCamera(position, width, height)
+  const centerX = width / 2, centerY = height / 2
+  const markers: { x: number; y: number; angle: number; distance: number }[] = []
+  for (const boss of bosses) {
+    if (!(boss.hp > 0) || !Number.isFinite(boss.x) || !Number.isFinite(boss.y)) continue
+    const sx = boss.x * 3.6 * camera.scale + camera.x, sy = boss.y * 4.3 * camera.scale + camera.y
+    if (sx >= margin && sx <= width - margin && sy >= margin && sy <= height - margin) continue
+    const dx = sx - centerX, dy = sy - centerY
+    const spanX = dx ? (width / 2 - margin) / Math.abs(dx) : Infinity
+    const spanY = dy ? (height / 2 - margin) / Math.abs(dy) : Infinity
+    const reach = Math.min(spanX, spanY)
+    if (!Number.isFinite(reach) || reach <= 0) continue
+    markers.push({ x: centerX + dx * reach, y: centerY + dy * reach, angle: Math.atan2(dy, dx), distance: Math.hypot((boss.x - position[0]) * .84, boss.y - position[1]) })
+  }
+  return markers
+}
+
 export function formatFarmTime(ticks: number) {
   const seconds = Math.floor(ticks / FPS)
   const hours = Math.floor(seconds / 3600)
