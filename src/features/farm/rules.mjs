@@ -115,7 +115,7 @@ export function chooseTalent(previous, id) {
 }
 export function stepFarm(previous, point, useSurge = false) {
   if (previous.offered.length || previous.hp <= 0 || !Array.isArray(point) || point.length !== 2 || point.some((value) => !Number.isSafeInteger(value)) || Math.hypot(point[0] - previous.position[0], point[1] - previous.position[1]) > MOVE_STEP + Math.SQRT1_2 || useSurge && previous.charge < 100) return null
-  const state = { ...previous, position: [...point], crops: previous.crops.filter((crop) => !crop.boss || crop.hp > 0).map((crop) => ({ ...crop })), loot: previous.loot.map((drop) => ({ ...drop })), shots: previous.shots.map((shot) => ({ ...shot })), dangers: previous.dangers.map((danger) => ({ ...danger })), offered: [] }
+  const state = { ...previous, position: [...point], crops: previous.crops.filter((crop) => !crop.boss || crop.hp > 0).map((crop) => ({ ...crop })), loot: previous.loot.map((drop) => ({ ...drop })), shots: previous.shots.map((shot) => ({ ...shot })), dangers: previous.dangers.map((danger) => ({ ...danger })), trails: previous.trails.map((trail) => ({ ...trail })), offered: [] }
   const events = []
   const gear = state.gear
   const modifier = FARM_MODIFIERS.find((item) => item.id === state.modifier)
@@ -286,11 +286,12 @@ export function stepFarm(previous, point, useSurge = false) {
     if (state.shields > 0) {
       state.shields--; state.blocks++
       events.push({ id: state.nextId++, kind: 'shield', x: point[0], y: point[1], points: amount, lane: 1 })
-      return
+    } else {
+      state.hp = Math.max(0, state.hp - amount)
+      events.push({ id: state.nextId++, kind: 'hurt', x: point[0], y: point[1], points: amount, lane: 0 })
     }
-    state.hp = Math.max(0, state.hp - amount)
-    events.push({ id: state.nextId++, kind: 'hurt', x: point[0], y: point[1], points: amount, lane: 0 })
-    // A short invulnerability window and knockback prevent crowd contact from melting health.
+    // A short invulnerability window and knockback prevent crowd contact from
+    // melting health — or from draining every shield in one second.
     for (const enemy of state.crops) {
       const dist = distance([enemy.x, enemy.y], point)
       if (enemy.hp > 0 && dist < 15) { const factor = 7 / Math.max(1, dist); enemy.x += (enemy.x - point[0] || 1) * factor; enemy.y += (enemy.y - point[1] || 1) * factor }

@@ -161,6 +161,8 @@ describe('survivor combat', () => {
     expect(absorbed.state.hp).toBe(100)
     expect(absorbed.state.shields).toBe(0)
     expect(absorbed.events.some((event) => event.kind === 'shield')).toBe(true)
+    // A blocked hit still clears the crowd around the player.
+    expect(Math.hypot(absorbed.state.crops[0].x - 50, absorbed.state.crops[0].y - 50)).toBeGreaterThan(5)
     const exposed = { ...absorbed.state, tick: absorbed.state.hurtUntil, crops: [{ ...enemy(1, 0, 50, 50) }] }
     expect(step(exposed).state.hp).toBe(88)
     // Shields come from the same harvest cadence, on their own slower timer.

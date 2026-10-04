@@ -67,6 +67,20 @@ describe('music roguelite farming', () => {
     expect(chooseTalent(state, 'not-a-weapon')).toBeNull()
   })
 
+  it('never mutates the state it was given, even with lingering trails', () => {
+    let state = arena({ whistle: 3, delay: 3 }, [], 100)
+    state.nextWave = 100
+    let previous = structuredClone(state)
+    for (let tick = 0; tick < 40; tick++) {
+      const result = stepFarm(state, clampPoint(state.position, [50 + Math.sin(tick / 3) * 3, 50 + Math.cos(tick / 3) * 3]))
+      expect(result).not.toBeNull()
+      expect(state).toEqual(previous)
+      state = result.state
+      previous = structuredClone(state)
+    }
+    expect(state.trails.length).toBeGreaterThan(0)
+    expect(state.trails.length).toBeLessThanOrEqual(30)
+  })
   it('limits movement and refuses malformed moves, empty charge and finished rounds', () => {
     const state = createFarm(day)
     expect(clampPoint([50, 50], [1000, -1000])).toEqual([52, 48])
