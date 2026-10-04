@@ -17,26 +17,26 @@ export const SHIELD_EVERY = 40
 export const SHIELD_COOLDOWN = 20 * FPS
 export const SHIELD_LIMIT = 3
 export const TALENTS = [
-  { id: 'drum', kind: 'weapon', partner: 'range', name: '爆米花鼓', icon: '🥁', color: '#edaa8e', description: '击败怪物，鼓点引爆周围怪群。', tag: '连锁爆破' },
-  { id: 'orbit', kind: 'weapon', partner: 'tempo', name: '回旋吉他', icon: '♫', color: '#b7a0dd', description: '旋转音符绕着你飞，碰到怪物就造成伤害。', tag: '旋转音刃' },
-  { id: 'power', kind: 'weapon', partner: 'magnet', name: '低音大提琴', icon: '♬', color: '#a5b7d1', description: '奏出低音光柱，击穿同列敌人。', tag: '贯穿攻击' },
-  { id: 'echo', kind: 'weapon', partner: 'lucky', name: '雨落竖琴', icon: '♧', color: '#df9bb1', description: '追击附近的敌人，降下音符箭雨。', tag: '自动追踪' },
-  { id: 'range', kind: 'chip', partner: 'drum', name: '共鸣芯片', icon: '◉', color: '#9ebf86', description: '扩大收割音浪，让身边更多小怪一起爆开。', tag: '收割范围' },
-  { id: 'tempo', kind: 'chip', partner: 'orbit', name: '节拍芯片', icon: '⚡', color: '#d9bb74', description: '音浪发射更快，配吉他进化。', tag: '攻击速度' },
-  { id: 'magnet', kind: 'chip', partner: 'power', name: '引力芯片', icon: '🧲', color: '#91baac', description: '经验和金币从远处飞来，配大提琴进化。', tag: '掉落磁吸' },
-  { id: 'lucky', kind: 'chip', partner: 'echo', name: '丰收芯片', icon: '★', color: '#dbbb6b', description: '增加暴击、金币和经验，配竖琴进化。', tag: '暴击与收益' },
-  { id: 'bell', kind: 'weapon', partner: 'sustain', name: '星光铃鼓', icon: '✵', color: '#8fb7d9', description: '每隔几秒向外扩散一圈星浪，推开并伤害身边怪群。', tag: '环形冲击' },
-  { id: 'sustain', kind: 'chip', partner: 'bell', name: '延音芯片', icon: '◐', color: '#7fa8c4', description: '星浪更快更广，配铃鼓进化。', tag: '冲击强化' },
-  { id: 'whistle', kind: 'weapon', partner: 'delay', name: '回声电哨', icon: '⌇', color: '#9ac6b4', description: '走过的地方留下延迟音符，踩到的怪物持续受伤。', tag: '残留音阵' },
-  { id: 'delay', kind: 'chip', partner: 'whistle', name: '延迟芯片', icon: '◑', color: '#84b3a2', description: '残留音符更久更密，配电哨进化。', tag: '残留强化' },
+  { id: 'drum', kind: 'weapon', partner: 'range', name: '鼓手咚咚', icon: '🥁', color: '#edaa8e', description: '击败怪物，鼓点引爆周围怪群。', tag: '连锁爆破' },
+  { id: 'orbit', kind: 'weapon', partner: 'tempo', name: '吉他手弦弦', icon: '🎸', color: '#b7a0dd', description: '旋转音符绕着你飞，碰到怪物就造成伤害。', tag: '旋转音刃' },
+  { id: 'power', kind: 'weapon', partner: 'magnet', name: '贝斯手阿低', icon: '🎻', color: '#a5b7d1', description: '奏出低音光柱，击穿同列敌人。', tag: '贯穿攻击' },
+  { id: 'echo', kind: 'weapon', partner: 'lucky', name: '主唱麦麦', icon: '🎤', color: '#df9bb1', description: '追着怪物唱出高音箭雨，自动命中。', tag: '自动追踪' },
+  { id: 'range', kind: 'chip', partner: 'drum', name: '共鸣音箱', icon: '◉', color: '#9ebf86', description: '扩大收割音浪，让身边更多小怪一起爆开。', tag: '收割范围' },
+  { id: 'tempo', kind: 'chip', partner: 'orbit', name: '节拍器', icon: '⚡', color: '#d9bb74', description: '音浪发射更快，配吉他手进化。', tag: '攻击速度' },
+  { id: 'magnet', kind: 'chip', partner: 'power', name: '拾音器', icon: '🧲', color: '#91baac', description: '经验和金币从远处飞来，配贝斯手进化。', tag: '掉落磁吸' },
+  { id: 'lucky', kind: 'chip', partner: 'echo', name: '安可徽章', icon: '★', color: '#dbbb6b', description: '增加暴击、金币和经验，配主唱进化。', tag: '暴击与收益' },
+  { id: 'bell', kind: 'weapon', partner: 'sustain', name: '键盘手叮当', icon: '🎹', color: '#8fb7d9', description: '每隔几秒向外扩散一圈星浪，推开并伤害身边怪群。', tag: '环形冲击' },
+  { id: 'sustain', kind: 'chip', partner: 'bell', name: '延音踏板', icon: '◐', color: '#7fa8c4', description: '星浪更快更广，配键盘手进化。', tag: '冲击强化' },
+  { id: 'whistle', kind: 'weapon', partner: 'delay', name: '口琴手呼呼', icon: '🎷', color: '#9ac6b4', description: '走过的地方留下延迟音符，踩到的怪物持续受伤。', tag: '残留音阵' },
+  { id: 'delay', kind: 'chip', partner: 'whistle', name: '延迟效果器', icon: '◑', color: '#84b3a2', description: '残留音符更久更密，配口琴手进化。', tag: '残留强化' },
 ]
 export const RECIPES = [
-  { weapon: 'drum', chip: 'range', name: '雷霆节拍机', icon: '🥁', description: '爆破范围大幅扩张，连锁伤害翻倍' },
-  { weapon: 'orbit', chip: 'tempo', name: '星环电吉他', icon: '✦', description: '六道音刃环绕，触碰伤害翻倍' },
-  { weapon: 'power', chip: 'magnet', name: '黑洞低音炮', icon: '◉', description: '黑洞大范围收割，全场经验涌向你' },
-  { weapon: 'echo', chip: 'lucky', name: '星雨竖琴', icon: '♧', description: '一次追击八只怪，全场降下暴击音雨' },
-  { weapon: 'bell', chip: 'sustain', name: '银河铃鼓阵', icon: '✵', description: '星浪连发三圈，范围与伤害大幅提升' },
-  { weapon: 'whistle', chip: 'delay', name: '回音迷阵', icon: '⌇', description: '残留音符更长更痛，整片舞台都是你的音阵' },
+  { weapon: 'drum', chip: 'range', name: '雷霆鼓组', icon: '🥁', description: '爆破范围大幅扩张，连锁伤害翻倍' },
+  { weapon: 'orbit', chip: 'tempo', name: '星环电吉他', icon: '🎸', description: '六道音刃环绕，触碰伤害翻倍' },
+  { weapon: 'power', chip: 'magnet', name: '黑洞贝斯', icon: '🎻', description: '黑洞大范围收割，全场经验涌向你' },
+  { weapon: 'echo', chip: 'lucky', name: '星雨麦克风', icon: '🎤', description: '一次追击八只怪，全场降下暴击音雨' },
+  { weapon: 'bell', chip: 'sustain', name: '银河键盘', icon: '🎹', description: '星浪连发三圈，范围与伤害大幅提升' },
+  { weapon: 'whistle', chip: 'delay', name: '回音口琴阵', icon: '🎷', description: '残留音符更长更痛，整片舞台都是你的音阵' },
 ]
 // Every calendar day plays under one modifier, drawn from the day seed so all
 // players on that day share it and the leaderboard stays comparable.

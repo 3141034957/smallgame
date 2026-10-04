@@ -11,15 +11,15 @@ const round = (patch: Partial<FarmRound> = {}): FarmRound => ({
 describe('result share text', () => {
   it('summarises the verified round in one line', () => {
     const text = farmShareText(round(), '2026-10-04')
-    expect(text).toContain('节拍幸存者 · 2026-10-04')
+    expect(text).toContain('怪潮乐队历险记 · 2026-10-04')
     expect(text).toContain('生存 3:05')
     expect(text).toContain('12,345 分')
     expect(text).toContain('击败 820')
     expect(text).toContain('巨兽 5')
     expect(text).toContain('精英 2')
     expect(text).toContain('音盾挡下 3 次')
-    expect(text).toContain('主奏 爆米花鼓 Lv.3')
-    expect(text).toContain('终极 雷霆节拍机')
+    expect(text).toContain('主力 鼓手咚咚 Lv.3')
+    expect(text).toContain('终极 雷霆鼓组')
     expect(text.length).toBeLessThan(200)
   })
   it('omits empty counters and works before the first run', () => {
