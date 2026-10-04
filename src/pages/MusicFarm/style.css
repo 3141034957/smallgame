@@ -68,3 +68,4 @@
 .farm-build small{display:block;font-size:9px;color:#a294b0}
 .farm-build b{margin-left:auto;font-size:9px;color:#9b8da8;font-variant-numeric:tabular-nums}
 .farm-build li.is-evolved b{color:#a97c2c}
+.farm-shield-count{font-style:normal;background:#e7f7fb;border:1px solid #bfe6ef;color:#2f8ba5;border-radius:20px;padding:2px 7px;font-size:9px;font-weight:800;white-space:nowrap}

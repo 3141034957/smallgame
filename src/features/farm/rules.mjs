@@ -12,6 +12,10 @@ export const MAX_BOSSES = 4
 export const HEAL_COOLDOWN = 15 * FPS
 export const HEAL_TTL = 10 * FPS
 export const HEAL_WOUNDED = 0.8
+// Shield pickups are rarer than healing: they absorb one hit each.
+export const SHIELD_EVERY = 40
+export const SHIELD_COOLDOWN = 20 * FPS
+export const SHIELD_LIMIT = 3
 export const TALENTS = [
   { id: 'drum', kind: 'weapon', partner: 'range', name: '爆米花鼓', icon: '🥁', color: '#edaa8e', description: '击败怪物，鼓点引爆周围怪群。', tag: '连锁爆破' },
   { id: 'orbit', kind: 'weapon', partner: 'tempo', name: '回旋吉他', icon: '♫', color: '#b7a0dd', description: '旋转音符绕着你飞，碰到怪物就造成伤害。', tag: '旋转音刃' },
@@ -68,7 +72,7 @@ function placeAtEdge(state, enemy) {
 export function createFarm(day) {
   if (!validDay(day)) throw new Error('Invalid farm date')
   const modifier = farmModifier(day)
-  const state = { day, seed: routeSeed(day, 'farm-v3'), tick: 0, position: [...START], crops: [], loot: [], gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])), xp: 0, level: 0, offered: [], score: 0, coins: 0, harvested: 0, bosses: 0, combo: 0, maxCombo: 0, lastHarvest: -1000, charge: 0, nextId: 100, lastPulse: -8, echoDue: -1, bellRings: 0, modifier: modifier.id, nextBoss: Math.round(16 * FPS * (modifier.boss ?? 1)), nextBass: Math.round(90 * FPS * (modifier.boss ?? 1)), surgeUntil: -1, hp: 100, maxHp: 100, hurtUntil: 32, nextHeal: 0, shots: [], dangers: [], nextWave: 32 }
+  const state = { day, seed: routeSeed(day, 'farm-v3'), tick: 0, position: [...START], crops: [], loot: [], gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])), xp: 0, level: 0, offered: [], score: 0, coins: 0, harvested: 0, bosses: 0, combo: 0, maxCombo: 0, lastHarvest: -1000, charge: 0, nextId: 100, lastPulse: -8, echoDue: -1, bellRings: 0, modifier: modifier.id, nextBoss: Math.round(16 * FPS * (modifier.boss ?? 1)), nextBass: Math.round(90 * FPS * (modifier.boss ?? 1)), surgeUntil: -1, hp: 100, maxHp: 100, hurtUntil: 32, nextHeal: 0, nextShield: 0, shields: 0, shots: [], dangers: [], nextWave: 32 }
   for (let id = 0; id < 24; id++) {
     const enemy = { id, x: 0, y: 0, kind: id % 4, hp: 1, maxHp: 1, regrow: -1, boss: false }
     placeAtEdge(state, enemy)
@@ -134,6 +138,10 @@ export function stepFarm(previous, point, useSurge = false) {
     if (state.tick >= state.nextHeal && !state.loot.some((drop) => drop.heal) && (crop.boss && state.hp < state.maxHp || state.harvested % 16 === 0 && wounded)) {
       state.loot.push({ id: state.nextId++, x: crop.x, y: crop.y, xp: 0, coins: 0, heal: crop.bass ? 35 : crop.boss ? 30 : 18, expires: state.tick + HEAL_TTL })
       state.nextHeal = state.tick + HEAL_COOLDOWN
+    }
+    if (state.tick >= state.nextShield && state.harvested % SHIELD_EVERY === 0 && !state.loot.some((drop) => drop.shield)) {
+      state.loot.push({ id: state.nextId++, x: crop.x, y: crop.y, xp: 0, coins: 0, shield: 1 })
+      state.nextShield = state.tick + SHIELD_COOLDOWN
     }
     events.push({ id: state.nextId++, kind: crop.boss ? 'boss' : 'harvest', x: crop.x, y: crop.y, points, lane: crop.kind, midi: PITCHES[crop.id % PITCHES.length], chain })
     if (gear.drum) {
@@ -244,12 +252,19 @@ export function stepFarm(previous, point, useSurge = false) {
       const amount = Math.min(1, (3 + gear.magnet * 1.5) / Math.max(.01, dist))
       drop.x += (point[0] - drop.x) * amount; drop.y += (point[1] - drop.y) * amount
     }
-    if (distance([drop.x, drop.y], point) <= 4) { state.xp += drop.xp; state.coins += drop.coins; if (drop.heal) { const healed = Math.min(drop.heal, state.maxHp - state.hp); state.hp += healed; if (healed) events.push({ id: state.nextId++, kind: 'heal', x: point[0], y: point[1], points: healed, lane: 1 }) } drop.collected = true; events.push({ id: state.nextId++, kind: 'collect', x: point[0], y: point[1], lane: 2 }) }
+    if (distance([drop.x, drop.y], point) <= 4) { state.xp += drop.xp; state.coins += drop.coins; if (drop.shield) state.shields = Math.min(SHIELD_LIMIT, state.shields + drop.shield); if (drop.heal) { const healed = Math.min(drop.heal, state.maxHp - state.hp); state.hp += healed; if (healed) events.push({ id: state.nextId++, kind: 'heal', x: point[0], y: point[1], points: healed, lane: 1 }) } drop.collected = true; events.push({ id: state.nextId++, kind: 'collect', x: point[0], y: point[1], lane: 2 }) }
   }
   state.loot = state.loot.filter((drop) => !drop.collected && !(drop.expires && state.tick >= drop.expires) && distance([drop.x, drop.y], point) <= 240).slice(-600)
   const hurt = (amount) => {
     if (state.tick < state.hurtUntil || state.hp <= 0) return
-    state.hp = Math.max(0, state.hp - amount); state.hurtUntil = state.tick + FPS
+    state.hurtUntil = state.tick + FPS
+    // A held shield eats the whole hit instead of reducing it.
+    if (state.shields > 0) {
+      state.shields--
+      events.push({ id: state.nextId++, kind: 'shield', x: point[0], y: point[1], points: amount, lane: 1 })
+      return
+    }
+    state.hp = Math.max(0, state.hp - amount)
     events.push({ id: state.nextId++, kind: 'hurt', x: point[0], y: point[1], points: amount, lane: 0 })
     // A short invulnerability window and knockback prevent crowd contact from melting health.
     for (const enemy of state.crops) {

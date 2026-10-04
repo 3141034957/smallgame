@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createFarm, stepFarm, FPS, HEAL_COOLDOWN, HEAL_TTL } from './rules.mjs'
+import { createFarm, stepFarm, FPS, HEAL_COOLDOWN, HEAL_TTL, SHIELD_COOLDOWN, SHIELD_LIMIT } from './rules.mjs'
 const enemy = (id, kind, x, y, boss = false) => ({ id, kind, x, y, hp: 100, maxHp: 100, boss, regrow: -1 })
 const arena = (enemies, tick = 100) => ({ ...createFarm('2026-10-04'), position: [50,50], crops: enemies, tick, nextBoss: Infinity, nextWave: Infinity, lastPulse: tick, hurtUntil: 0 })
 const step = (s, surge = false) => stepFarm(s, s.position, surge)
@@ -147,6 +147,29 @@ describe('survivor combat', () => {
       return step(s).state
     }
     expect(earned(elite).score).toBeGreaterThan(earned({ id: 8, kind: 3, x: 38, y: 50, hp: 1, maxHp: 1, regrow: -1, boss: false }).score)
+  })
+  it('drops rare shields that swallow a whole hit and stack up to three', () => {
+    const pick = (loot) => {
+      const s = arena([], 128); s.hp = 60; s.lastPulse = 108; s.loot = loot
+      return step(s).state
+    }
+    expect(pick([{ id: 1, x: 50, y: 52, xp: 0, coins: 0, shield: 1 }]).shields).toBe(1)
+    expect(pick([{ id: 1, x: 50, y: 52, xp: 0, coins: 0, shield: 1 }, { id: 2, x: 50, y: 53, xp: 0, coins: 0, shield: 1 }, { id: 3, x: 50, y: 54, xp: 0, coins: 0, shield: 1 }, { id: 4, x: 50, y: 55, xp: 0, coins: 0, shield: 1 }]).shields).toBe(SHIELD_LIMIT)
+    const guarded = arena([enemy(0, 0, 50, 50)], 128)
+    guarded.shields = 1
+    const absorbed = step(guarded)
+    expect(absorbed.state.hp).toBe(100)
+    expect(absorbed.state.shields).toBe(0)
+    expect(absorbed.events.some((event) => event.kind === 'shield')).toBe(true)
+    const exposed = { ...absorbed.state, tick: absorbed.state.hurtUntil, crops: [{ ...enemy(1, 0, 50, 50) }] }
+    expect(step(exposed).state.hp).toBe(88)
+    // Shields come from the same harvest cadence, on their own slower timer.
+    const spawned = arena([], 128)
+    spawned.harvested = 39; spawned.nextShield = 0; spawned.lastPulse = 108
+    spawned.crops = [{ id: 1, kind: 0, x: 62, y: 50, hp: 1, maxHp: 1, regrow: -1, boss: false }]
+    const wave = step(spawned).state
+    expect(wave.loot.some((drop) => drop.shield)).toBe(true)
+    expect(wave.nextShield).toBe(128 + SHIELD_COOLDOWN)
   })
   it('ends immediately at zero health without upgrades or further moves', () => {
     const s=arena([enemy(0,0,50,50)]);s.hp=10;s.xp=100

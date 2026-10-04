@@ -175,6 +175,13 @@ function bunny(ctx: CanvasRenderingContext2D, state: FarmState, now: number, ass
     }
   }
   if (state.tick < state.hurtUntil && state.tick > 32) ctx.globalAlpha = Math.floor(now / 80) % 2 ? .45 : 1
+  if (state.shields > 0) {
+    ctx.strokeStyle = '#7fd4e8'
+    ctx.lineWidth = 2
+    ctx.globalAlpha = .55 + Math.sin(now / 160) * .25
+    ctx.beginPath(); ctx.arc(0, 0, 27, 0, Math.PI * 2); ctx.stroke()
+    ctx.globalAlpha = 1
+  }
   if (character) {
     ellipse(ctx, 0, 17, 16, 5, '#70608030')
     ctx.drawImage(character, -40, -52, 80, 80)
@@ -335,6 +342,15 @@ function groundEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress:
 function airEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress: number) {
   const x = X(event.x), y = Y(event.y), color = COLORS[event.lane]
   ctx.save()
+  if (event.kind === 'shield') {
+    ctx.globalAlpha = Math.max(0, 1 - progress) * .9
+    ctx.strokeStyle = '#7fd4e8'; ctx.lineWidth = 4
+    ctx.beginPath(); ctx.arc(x, y, 22 + progress * 30, 0, Math.PI * 2); ctx.stroke()
+    ctx.fillStyle = '#3f9db8'; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'
+    ctx.fillText('🛡', x, y + 4)
+    ctx.globalAlpha = 1
+    return
+  }
   if (event.kind === 'hurt' || event.kind === 'heal') {
     ctx.globalAlpha = 1 - progress; ctx.font = '800 17px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = event.kind === 'hurt' ? '#cf476d' : '#3c9c7c'; ctx.strokeStyle = '#fffaf4'; ctx.lineWidth = 3
     const text = `${event.kind === 'hurt' ? '−' : '+'}${event.points}`; ctx.strokeText(text, x, y - 30 - progress * 30); ctx.fillText(text, x, y - 30 - progress * 30)
@@ -429,6 +445,7 @@ export function drawFarm(ctx: CanvasRenderingContext2D, state: FarmState, effect
       ellipse(ctx, x, y, 9, 9, '#fff7ed'); ctx.fillStyle = '#e8759e'; ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center'; ctx.fillText('♥', x, y + 6)
       ctx.globalAlpha = 1
     }
+    else if (drop.shield) { ellipse(ctx, x, y, 9, 9, '#e7f7fb'); ctx.fillStyle = '#3f9db8'; ctx.font = 'bold 15px system-ui'; ctx.textAlign = 'center'; ctx.fillText('🛡', x, y + 6) }
     else ctx.drawImage(assets.loot, x - 9, y - 9, 18, 18)
   }
   const orbit = orbitPositions(moving), terminalOrbit = evolved(state.gear).includes('orbit')
