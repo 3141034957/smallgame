@@ -71,3 +71,5 @@
 .farm-shield-count{font-style:normal;background:#e7f7fb;border:1px solid #bfe6ef;color:#2f8ba5;border-radius:20px;padding:2px 7px;font-size:9px;font-weight:800;white-space:nowrap}
 .farm-combo.is-frenzy-1 b{color:#c98b2c}.farm-combo.is-frenzy-1 small{color:#c08a3a}
 .farm-combo.is-frenzy-2 b{color:#c2593a}.farm-combo.is-frenzy-2 small{color:#bf5a3c}
+.farm-choices button{position:relative}.farm-choice-key{position:absolute;top:7px;left:8px;min-width:15px;height:15px;line-height:15px;border-radius:8px;background:#e9e0f2;color:#6f5f85;font-size:9px;font-weight:800;font-style:normal;text-align:center}
+@media(max-width:520px){.farm-choice-key{display:none}}
