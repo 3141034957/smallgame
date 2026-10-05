@@ -11,6 +11,26 @@ const INK = '#405446'
 const X = (value: number) => value * 3.6
 const Y = (value: number) => value * 4.3
 
+// Juice helpers: everything stays stateless so a frame can be redrawn anywhere.
+const easeOut = (t: number) => 1 - (1 - t) ** 3
+// Stable pseudo-random per effect and particle: no state, no allocations.
+const noise = (a: number, b: number) => { const x = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return x - Math.floor(x) }
+function sparks(ctx: CanvasRenderingContext2D, x: number, y: number, progress: number, seed: number, count: number, color: string, spread: number, size: number) {
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+  ctx.fillStyle = color
+  for (let i = 0; i < count; i++) {
+    const angle = noise(seed, i) * Math.PI * 2
+    const speed = (.35 + noise(seed, i + 11) * .85) * spread
+    const t = easeOut(Math.min(1, progress * 1.5))
+    const px = x + Math.cos(angle) * speed * t
+    const py = y + Math.sin(angle) * speed * t + t * t * spread * .35
+    ctx.globalAlpha = Math.max(0, 1 - progress) * .95
+    ctx.beginPath(); ctx.arc(px, py, Math.max(.4, size * (1 - progress * .55)), 0, Math.PI * 2); ctx.fill()
+  }
+  ctx.restore()
+}
+
 // Keep the canvas playable in older embedded mobile browsers too.
 function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
   const r = Math.min(radius, width / 2, height / 2)
@@ -85,6 +105,7 @@ function cropSprite(ctx: CanvasRenderingContext2D, crop: Crop, now: number, tick
   const wobble = hit ? Math.sin(now / 18) * 2 : 0
   ctx.save()
   ctx.translate(x + wobble, y + bob)
+  if (hit) { ctx.shadowColor = '#fff6e2'; ctx.shadowBlur = 18 }
   if (crop.boss) {
     const bass = crop.bass === true
     ellipse(ctx, 0, 19, bass ? 32 : 28, 6, '#5e775b35')
@@ -266,7 +287,7 @@ function groundEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress:
   ctx.save()
   if (event.kind === 'shock') {
     // Star tambourine rings push outwards twice as wide as a pulse.
-    const expanding = radius * (.2 + Math.min(1, progress * 1.2) * .8)
+    const expanding = radius * (.2 + easeOut(Math.min(1, progress * 1.2)) * .8)
     ctx.globalAlpha = (1 - progress) * .85
     ctx.strokeStyle = '#8fb7d9'
     ctx.lineWidth = 3
@@ -282,9 +303,10 @@ function groundEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress:
       const angle = now / 240 + i * Math.PI * 2 / 5
       ctx.fillText('✦', x + Math.cos(angle) * expanding * .85, y + Math.sin(angle) * expanding * .85 + 4)
     }
+    sparks(ctx, x, y, progress, event.id, 6, '#e8f6ff', expanding, 2)
   } else if (event.kind === 'blast') {
     // Drum: a struck skin — thick ring with the beat flying outwards.
-    const expanding = radius * (.2 + Math.min(1, progress * 1.5) * .8)
+    const expanding = radius * (.2 + easeOut(Math.min(1, progress * 1.5)) * .8)
     ctx.globalAlpha = (1 - progress) * .9
     ctx.strokeStyle = '#e0954f'
     ctx.lineWidth = 3
@@ -301,11 +323,12 @@ function groundEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress:
       ctx.lineTo(x + Math.cos(angle) * expanding * 1.3, y + Math.sin(angle) * expanding * 1.3)
       ctx.stroke()
     }
+    sparks(ctx, x, y, progress, event.id, 8, '#ffcf8a', expanding * 1.1, 2.6)
     ctx.fillStyle = '#b9762f'; ctx.font = 'bold 15px system-ui'; ctx.textAlign = 'center'
     ctx.fillText('♬', x, y + 5)
   } else if (['pulse', 'surge', 'echo', 'slam'].includes(event.kind)) {
     const color = event.kind === 'slam' ? '#e45e87' : event.kind === 'surge' ? '#efc561' : '#94b0d7'
-    const expanding = radius * (.18 + Math.min(1, progress * 1.5) * .82)
+    const expanding = radius * (.18 + easeOut(Math.min(1, progress * 1.5)) * .82)
     ctx.globalAlpha = (1 - progress) * (event.kind === 'pulse' ? .5 : .8)
     ctx.strokeStyle = color
     ctx.lineWidth = event.kind === 'surge' ? 5 : 1.8
@@ -367,6 +390,10 @@ function groundEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress:
       ctx.arc(0, 0, reach * (.32 * i), -.52, .52)
       ctx.stroke()
     }
+    ctx.restore()
+    sparks(ctx, x, y, progress, event.id, 8, '#ffd79a', reach * .9, 2.4)
+    ctx.restore()
+    return
   } else if (event.kind === 'fan') {
     const angle = event.angle ?? 0, spread = event.spread ?? .45
     const reach = X(event.radius ?? 34) * (.4 + Math.min(1, progress * 1.8) * .6)
@@ -397,6 +424,10 @@ function groundEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress:
     }
     ctx.fillStyle = '#5f8a63'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'
     ctx.fillText('⌁', reach * .5, 4)
+    ctx.restore()
+    sparks(ctx, x, y, progress, event.id, 7, '#d8f0c4', reach * .8, 2.2)
+    ctx.restore()
+    return
   } else if (event.kind === 'mine') {
     ctx.globalAlpha = (1 - progress) * .85
     ctx.strokeStyle = '#b795e0'
@@ -409,6 +440,7 @@ function groundEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress:
     ctx.fillText('✸', x, y + 6)
     // Vinyl shards fly out of the sample.
     const burst = radius * (.25 + progress * .9)
+    sparks(ctx, x, y, progress, event.id, 9, '#c9a6f5', burst * 1.2, 2.4)
     ctx.strokeStyle = '#8f6fc0'
     ctx.lineWidth = 2
     for (let i = 0; i < 6; i++) {
@@ -535,6 +567,19 @@ export function drawFarm(ctx: CanvasRenderingContext2D, state: FarmState, effect
   for (const tile of farmVisibleTiles(camera)) ctx.drawImage(assets.garden[tile.variant], tile.x, tile.y, 360, 430)
   const visibleAt = (x: number, y: number, margin = 48) => X(x) >= camera.left - margin && X(x) <= camera.right + margin && Y(y) >= camera.top - margin && Y(y) <= camera.bottom + margin
   const active = effects.filter(({ born }) => now - born >= 0 && now - born < 900)
+
+  // Boss kills, damage taken and the surge shake the stage for a few frames.
+  let shakeX = 0, shakeY = 0
+  for (const { event, born } of active) {
+    const age = now - born
+    if (age > 260) continue
+    const power = event.kind === 'boss' ? 7 : event.kind === 'hurt' ? 6 : event.kind === 'surge' ? 4 : 0
+    if (!power) continue
+    const decay = (1 - age / 260) ** 2
+    shakeX += (noise(event.id, 3) - .5) * power * decay
+    shakeY += (noise(event.id, 9) - .5) * power * decay
+  }
+  if (shakeX || shakeY) ctx.translate(shakeX, shakeY)
   // Sample dense drum bursts; every important weapon cast still gets its own visual.
   for (const { event, born } of active) {
     // Low-effect mode keeps the telegraphs that must be dodged and drops the rest.
