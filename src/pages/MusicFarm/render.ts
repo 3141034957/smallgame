@@ -362,14 +362,15 @@ function airEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress: nu
       const angle = i * 2.4 + event.id * .5, travel = 8 + progress * (event.kind === 'boss' ? 44 : 22)
       sparkle(ctx, x + Math.cos(angle) * travel, y + Math.sin(angle) * travel - progress * 16, 3 * (1 - progress) + 1, i % 2 ? '#fff5cf' : color)
     }
-    if (!event.chain || event.id % 4 === 0 || event.kind === 'boss') {
-      ctx.font = `800 ${event.kind === 'boss' ? 17 : 11}px system-ui, sans-serif`
+    // Regular kills just feed the score readout; only a boss is worth a number.
+    if (event.kind === 'boss') {
+      ctx.font = '800 17px system-ui, sans-serif'
       ctx.textAlign = 'center'
       ctx.lineWidth = 3
       ctx.strokeStyle = '#fffaf0'
       const text = `+${event.points ?? 0}`, lift = y - 15 - progress * 25
       ctx.strokeText(text, x, lift)
-      ctx.fillStyle = event.kind === 'boss' ? '#b58028' : '#688656'
+      ctx.fillStyle = '#b58028'
       ctx.fillText(text, x, lift)
     }
   } else if (event.kind === 'rain') {
