@@ -501,22 +501,18 @@ function airEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress: nu
       ctx.fillText(text, x, lift)
     }
   } else if (event.kind === 'rain') {
-    // Vocal: the high note arcs out of the mic into the monster.
-    const t = Math.min(1, progress * 1.7)
-    const sx = X(event.fromX ?? event.x), sy = Y(event.fromY ?? event.y) - 26
-    ctx.globalAlpha = (1 - progress) * .75
-    ctx.strokeStyle = '#e6adc4'
-    ctx.lineWidth = 1.6
-    ctx.beginPath()
-    ctx.moveTo(sx, sy)
-    ctx.quadraticCurveTo((sx + x) / 2, Math.min(sy, y) - Y(30), x, y)
-    ctx.stroke()
+    const t = Math.min(1, progress * 2), startY = y - 70
     ctx.globalAlpha = 1 - progress
-    const px = sx + (x - sx) * t, py = sy + (y - sy) * t - Math.sin(t * Math.PI) * Y(30)
+    ctx.strokeStyle = '#d89cb4'
+    ctx.lineWidth = 1.4
+    ctx.beginPath()
+    ctx.moveTo(x + 15 * (1 - t), startY + t * 70 - 18)
+    ctx.lineTo(x + 15 * (1 - t), startY + t * 70)
+    ctx.stroke()
     ctx.fillStyle = '#bf7399'
     ctx.font = '800 18px serif'
     ctx.textAlign = 'center'
-    ctx.fillText('♪', px, py)
+    ctx.fillText('♪', x + 15 * (1 - t), startY + t * 70)
     if (t === 1) sparkle(ctx, x, y, 8 * (1 - progress), '#e8bdd2')
   } else if (event.kind === 'collect') {
     ctx.globalAlpha = (1 - progress) * .7
