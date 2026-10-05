@@ -7,12 +7,18 @@ export const MOVE_STEP = 3
 export const MAX_GEAR_LEVEL = 5
 // How many instruments the opening deal offers.
 export const STARTER_CHOICES = 3
+// A run carries at most this many instruments and this many chips: once a kind
+// is full the offers only deepen what you already carry.
+export const MAX_EQUIPPED = 5
 export const START = [50, 76]
 // Keep the first recipe attainable, then grow the cost of each additional
 // upgrade. XP is cumulative; picking a talent never discards overflow.
 // Five levels per item means more picks before a form evolves, so each step
 // costs less than before: the first evolution still lands inside a normal run.
-export const UPGRADE_XP = Array.from({ length: 100 }, (_, index) => Math.round(20 + 20 * index + 0.55 * index ** 2))
+// A loadout of five instruments and five chips at five levels each is the
+// longest possible run, so the table only needs that many steps.
+export const UPGRADE_STEPS = MAX_EQUIPPED * 2 * MAX_GEAR_LEVEL
+export const UPGRADE_XP = Array.from({ length: UPGRADE_STEPS }, (_, index) => Math.round(20 + 20 * index + 0.55 * index ** 2))
 export const THRESHOLDS = UPGRADE_XP.map((_, index) => UPGRADE_XP.slice(0, index + 1).reduce((sum, cost) => sum + cost, 0))
 export const EXPERIENCE_STAGES = [
   { seconds: 0, multiplier: 1 },
@@ -135,10 +141,16 @@ function offer(state) {
     state.offered = starters
     return
   }
-  const available = TALENTS.filter((talent) => state.gear[talent.id] < MAX_GEAR_LEVEL).map((talent) => talent.id)
+  const carried = (kind) => TALENTS.filter((talent) => talent.kind === kind && state.gear[talent.id] > 0).length
+  const fits = (id) => {
+    const talent = TALENTS.find((item) => item.id === id)
+    if (state.gear[id] >= MAX_GEAR_LEVEL) return false
+    return state.gear[id] > 0 || carried(talent.kind) < MAX_EQUIPPED
+  }
+  const available = TALENTS.filter((talent) => fits(talent.id)).map((talent) => talent.id)
   const choices = []
   const focus = TALENTS.filter((talent) => talent.kind === 'weapon' && state.gear[talent.id] > 0 && !(state.gear[talent.id] >= MAX_GEAR_LEVEL && state.gear[talent.partner] >= MAX_GEAR_LEVEL)).sort((a, b) => state.gear[b.id] - state.gear[a.id])[0]
-  if (focus) { const needed = state.gear[focus.id] < MAX_GEAR_LEVEL ? focus.id : focus.partner; choices.push(needed); available.splice(available.indexOf(needed), 1) }
+  if (focus) { const needed = state.gear[focus.id] < MAX_GEAR_LEVEL ? focus.id : focus.partner; if (fits(needed)) { choices.push(needed); available.splice(available.indexOf(needed), 1) } }
   // Ten instruments would otherwise scatter every build: one offer deepens what
   // the player already has, the last one keeps the pool open.
   const owned = available.filter((id) => state.gear[id] > 0)

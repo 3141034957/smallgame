@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EXPERIENCE_STAGES, FPS, MAX_GEAR_LEVEL, RECIPES, TALENTS, THRESHOLDS, UPGRADE_XP, chooseTalent, createFarm, stepFarm } from './rules.mjs'
+import { EXPERIENCE_STAGES, FPS, RECIPES, THRESHOLDS, UPGRADE_STEPS, UPGRADE_XP, chooseTalent, createFarm, stepFarm } from './rules.mjs'
 import { modifierDays, simulateFarm } from '../../../scripts/check-farm-balance.mjs'
 
 const arena = (tick = 0) => ({ ...createFarm('2026-10-04'), tick, crops: [], position: [50, 50], nextWave: Infinity, nextBoss: Infinity, nextBass: Infinity, lastPulse: tick, modifier: 'none' })
@@ -18,8 +18,8 @@ function reward(enemy, tick, lucky = 0, modifier = 'none') {
 }
 
 describe('farm experience progression', () => {
-  it('increases every upgrade cost, with cumulative thresholds for every choice', () => {
-    expect(UPGRADE_XP).toHaveLength(TALENTS.length * MAX_GEAR_LEVEL)
+  it('increases every upgrade cost, with cumulative thresholds for a full loadout', () => {
+    expect(UPGRADE_XP).toHaveLength(UPGRADE_STEPS)
     expect(UPGRADE_XP.slice(0, 6)).toEqual([20, 41, 62, 85, 109, 134])
     for (let index = 0; index < UPGRADE_XP.length; index++) {
       expect(Number.isSafeInteger(UPGRADE_XP[index])).toBe(true)

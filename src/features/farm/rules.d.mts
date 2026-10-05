@@ -7,6 +7,8 @@ export function farmModifier(day: string): FarmModifier
 export const MAX_BOSSES: number
 export const MAX_GEAR_LEVEL: number
 export const STARTER_CHOICES: number
+export const MAX_EQUIPPED: number
+export const UPGRADE_STEPS: number
 export const HEAL_COOLDOWN: number
 export const HEAL_TTL: number
 export const HEAL_WOUNDED: number

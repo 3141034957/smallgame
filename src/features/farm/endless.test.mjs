@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FPS, MAX_BOSSES, MAX_GEAR_LEVEL, RECIPES, TALENTS, THRESHOLDS, chooseTalent, createFarm, evolved, finishFarm, orbitPositions, stepFarm } from './rules.mjs'
+import { FPS, MAX_BOSSES, MAX_GEAR_LEVEL, THRESHOLDS, UPGRADE_STEPS, chooseTalent, createFarm, evolved, finishFarm, orbitPositions, stepFarm } from './rules.mjs'
 
 const day = '2026-10-04'
 const arena = (tick) => ({ ...createFarm(day), tick, crops: [], nextWave: Infinity, nextBoss: Infinity, lastPulse: tick })
@@ -15,18 +15,19 @@ describe('endless survival', () => {
     }
   })
 
-  it('allows every final form after the old time limit, without over-leveling or empty upgrade locks', () => {
+  it('fills a whole loadout after the old time limit, without over-leveling or empty upgrade locks', () => {
     let state = arena(2 * 60 * FPS)
     state.xp = THRESHOLDS.at(-1)
     state = stepFarm(state, state.position).state
-    for (let index = 0; index < TALENTS.length * MAX_GEAR_LEVEL; index++) {
+    // Five instruments and five chips at five levels is the longest possible run.
+    for (let index = 0; index < UPGRADE_STEPS; index++) {
       expect(state.offered.length).toBeGreaterThan(0)
       expect(state.offered.every((id) => state.gear[id] < MAX_GEAR_LEVEL)).toBe(true)
       state = chooseTalent(state, state.offered[0])
     }
-    expect(state.level).toBe(TALENTS.length * MAX_GEAR_LEVEL)
-    expect(evolved(state.gear)).toHaveLength(RECIPES.length)
+    expect(state.level).toBe(UPGRADE_STEPS)
     expect(state.offered).toEqual([])
+    expect(evolved(state.gear).length).toBeGreaterThan(0)
     expect(stepFarm(state, state.position)?.state.tick).toBe(state.tick + 1)
   })
 

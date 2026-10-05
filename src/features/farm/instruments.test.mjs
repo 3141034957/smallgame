@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FPS, MAX_GEAR_LEVEL, createFarm, evolved, stepFarm } from './rules.mjs'
+import { FPS, MAX_EQUIPPED, MAX_GEAR_LEVEL, TALENTS, createFarm, evolved, stepFarm } from './rules.mjs'
 
 const day = '2026-10-04'
 const crop = (id, x, y, hp = 20) => ({ id, x, y, hp, maxHp: hp, kind: id % 4, regrow: -1, boss: false })
@@ -73,5 +73,35 @@ describe('the four new instruments', () => {
     const terminal = arena({ synth: MAX_GEAR_LEVEL, arp: MAX_GEAR_LEVEL }, [crop(0, 70, 50)], 8)
     expect(evolved(terminal.gear)).toContain('synth')
     expect(stepFarm(terminal, terminal.position).events.filter((event) => event.kind === 'fan')).toHaveLength(3)
+  })
+})
+
+describe('loadout slots', () => {
+  it('stops dealing new instruments and chips once the five slots of a kind are full', () => {
+    const state = createFarm(day)
+    const weapons = TALENTS.filter((talent) => talent.kind === 'weapon').slice(0, MAX_EQUIPPED).map((talent) => talent.id)
+    const chips = TALENTS.filter((talent) => talent.kind === 'chip').slice(0, MAX_EQUIPPED).map((talent) => talent.id)
+    for (const id of [...weapons, ...chips]) state.gear[id] = 1
+    state.level = weapons.length + chips.length
+    state.xp = 1e9
+    const offered = stepFarm(state, state.position).state.offered
+    expect(offered.length).toBeGreaterThan(0)
+    for (const id of offered) expect(state.gear[id]).toBeGreaterThan(0)
+    // A fresh instrument cannot appear while every slot of its kind is taken.
+    const fresh = TALENTS.filter((talent) => state.gear[talent.id] === 0).map((talent) => talent.id)
+    for (const id of offered) expect(fresh).not.toContain(id)
+  })
+
+  it('still deals a new instrument while a slot is open', () => {
+    const state = createFarm(day)
+    state.gear[TALENTS[0].id] = 1
+    state.level = 1
+    state.xp = 1e9
+    let sawNewcomer = false
+    for (let index = 0; index < 400 && !sawNewcomer; index++) {
+      const offered = stepFarm({ ...state, tick: index }, state.position).state.offered
+      sawNewcomer = offered.some((id) => state.gear[id] === 0)
+    }
+    expect(sawNewcomer).toBe(true)
   })
 })
