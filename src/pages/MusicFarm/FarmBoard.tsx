@@ -37,8 +37,8 @@ export function FarmBoard({ round, compact = false }: { round?: FarmRound | null
 
   const submitted = !!round && submittedRound === round
   return <section className={`farm-board${compact ? ' is-compact' : ''}`} aria-label="无限总榜">
-    <div className="farm-board-heading"><div><span>SURVIVOR CLUB</span><h2>🏆 无限总榜</h2></div><button type="button" aria-label="刷新生存榜" disabled={busy} onClick={() => setRevision((value) => value + 1)}>↻</button></div>
-    {!compact && <p className="farm-board-caption">无限生存 · 历史总排名 · 每人保留最高分</p>}
+    <div className="farm-board-heading"><div><span>SURVIVOR CLUB</span><h2>🏆 无限总榜</h2></div>{compact ? <button type="button" aria-label="刷新生存榜" onClick={() => setRevision((value) => value + 1)}>↻</button> : <em>TOP {board?.total || 100}</em>}</div>
+    {!compact && <p className="farm-board-caption">历史总排名 · 每位乐手只保留最高分</p>}
     {!compact && round && round.score > 0 && (submitted ? <p role="status" className="farm-board-success">上榜啦！{board?.own && `总榜第 ${board.own.rank} 名`}，下次冲得更高 ♡</p> : <form onSubmit={(event) => {
       event.preventDefault()
       if (busy) return
@@ -60,13 +60,13 @@ export function FarmBoard({ round, compact = false }: { round?: FarmRound | null
     {error && <p role="alert" className="farm-board-error">{error}</p>}
     {!board && !error && <p role="status" className="farm-board-empty">乐手们的成绩正在赶来…</p>}
     {board && <>
-      {board.data.length ? <ol className="farm-board-list">{board.data.slice(0, 10).map((entry) => <li key={entry.rank} className={entry.isYou ? 'is-you' : ''}>
+      <div className="farm-board-columns" aria-hidden="true"><span>名次</span><span>玩家</span><span>分数</span></div>
+      <ol className="farm-board-list">{board.data.length ? board.data.slice(0, 10).map((entry) => <li key={entry.rank} className={entry.isYou ? 'is-you' : ''}>
         <span className="farm-board-rank">{entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : entry.rank}</span>
-        <div><strong>{entry.name}{entry.isYou ? ' · 你' : ''}</strong><small>生存 {formatFarmTime(entry.seconds * FPS)} · 最高 {entry.maxCombo} 连击 <span aria-label={`${entry.stars} 星`}>{'★'.repeat(entry.stars)}</span></small></div>
-        <b>{entry.score.toLocaleString()}<small>战斗分</small></b>
-      </li>)}</ol> : <p className="farm-board-empty">总榜首位幸存者，等你来挑战 ♫</p>}
-      {board.own && <p className="farm-board-own">你的历史最佳 {board.own.score.toLocaleString()} 分 · 生存 {formatFarmTime(board.own.seconds * FPS)} · 第 {board.own.rank} / {board.total} 名</p>}
+        <div><strong>{entry.name}</strong><small>生存 {formatFarmTime(entry.seconds * FPS)} · {entry.maxCombo} 连击 <span aria-label={`${entry.stars} 星`}>{'★'.repeat(entry.stars)}</span></small></div>
+        <b>{entry.score.toLocaleString()}</b>
+      </li>) : <li className="farm-board-empty">总榜首位幸存者，等你来挑战 ♫</li>}</ol>
+      {board.own && <p className="farm-board-own">你的历史最佳 {board.own.score.toLocaleString()} 分 · 第 {board.own.rank} / {board.total} 名</p>}
     </>}
-    {!compact && <p className="farm-board-note">当前浏览器记住你的昵称和上榜身份</p>}
   </section>
 }
