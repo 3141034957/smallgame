@@ -1,12 +1,15 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom'
-import Home from '@/pages/Home'
-import Shop from '@/pages/Shop'
-import EchoGarden from '@/pages/EchoGarden'
-import MochiMelody from '@/pages/MochiMelody'
-import SoundIsland from '@/pages/SoundIsland'
-import MochiBounce from '@/pages/MochiBounce'
-import SoundWave from '@/pages/SoundWave'
+// Only the game that greets players ships in the first bundle; the rest of the
+// arcade is fetched when someone actually opens it.
 import MusicFarm from '@/pages/MusicFarm'
+const Home = lazy(() => import('@/pages/Home'))
+const Shop = lazy(() => import('@/pages/Shop'))
+const EchoGarden = lazy(() => import('@/pages/EchoGarden'))
+const MochiMelody = lazy(() => import('@/pages/MochiMelody'))
+const SoundIsland = lazy(() => import('@/pages/SoundIsland'))
+const MochiBounce = lazy(() => import('@/pages/MochiBounce'))
+const SoundWave = lazy(() => import('@/pages/SoundWave'))
 import { decodeBoard } from '@/features/echo/engine'
 import { decodePattern, SONGS } from '@/features/melody/engine'
 import '@/styles/device-frame.css'
@@ -60,6 +63,7 @@ function App() {
   return (
     <div className={`pc-mobile-wrapper${usePcFrame ? ' is-pc' : ''}`}>
       <main className="mobile-body">
+        <Suspense fallback={<div className="app-boot" role="status">加载中 ♫</div>}>
         <Routes>
           <Route path="/" element={<GameHome />} />
           <Route path="/farm" element={<FarmHome />} />
@@ -72,6 +76,7 @@ function App() {
           <Route path="/shop" element={<Shop />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </main>
     </div>
   )

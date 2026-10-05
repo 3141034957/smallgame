@@ -50,3 +50,13 @@
 .pc-mobile-wrapper.is-pc:has(.echo-page) .mobile-body {
   box-shadow: 9px 10px 0 #59665d, 0 0 0 1px #25312f;
 }
+
+/* Shown while a lazily loaded game chunk is on its way. */
+.app-boot {
+  display: grid;
+  place-items: center;
+  min-height: 60dvh;
+  color: #7e8b6d;
+  font: 800 14px/1.6 ui-rounded, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  letter-spacing: 2px;
+}

@@ -1,5 +1,6 @@
 import { createServer } from 'http'
-import { readFileSync } from 'fs'
+import { readFileSync, statSync } from 'fs'
+import { brotliCompressSync, constants as zlibConstants, gzipSync } from 'zlib'
 import { isIP } from 'net'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -43,6 +44,73 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon',
   '.json': 'application/json',
   '.woff2': 'font/woff2',
+}
+
+// Mobile networks are slow: hashed build files never change, so they are sent
+// once with a long cache, and every text response is compressed and remembered.
+const COMPRESSIBLE = new Set(['.html', '.js', '.css', '.json', '.svg', '.ico', '.txt', '.xml'])
+const MIN_COMPRESS_BYTES = 1024
+const encodedCache = new Map()
+
+function pickEncoding(header) {
+  const accepted = String(header || '')
+  if (accepted.includes('br')) return 'br'
+  if (accepted.includes('gzip')) return 'gzip'
+  return null
+}
+
+function encode(key, content, encoding) {
+  const cached = encodedCache.get(key)
+  if (cached) return cached
+  const encoded = encoding === 'br'
+    ? brotliCompressSync(content, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 5 } })
+    : gzipSync(content, { level: 6 })
+  if (encodedCache.size > 64) encodedCache.clear()
+  encodedCache.set(key, encoded)
+  return encoded
+}
+
+function sendStatic(req, res, pathname) {
+  const filePath = join(CLIENT_DIR, pathname === '/' ? 'index.html' : pathname)
+  if (!filePath.startsWith(CLIENT_DIR)) {
+    res.writeHead(403)
+    res.end('Forbidden')
+    return
+  }
+  const isIndex = filePath === join(CLIENT_DIR, 'index.html')
+  let content
+  let mtimeMs = 0
+  try {
+    const stat = statSync(filePath)
+    mtimeMs = stat.mtimeMs
+    content = readFileSync(filePath)
+  } catch {
+    // fallback to index.html for SPA routing
+    try {
+      const stat = statSync(join(CLIENT_DIR, 'index.html'))
+      mtimeMs = stat.mtimeMs
+      content = readFileSync(join(CLIENT_DIR, 'index.html'))
+    } catch {
+      res.writeHead(404)
+      res.end('Not found')
+      return
+    }
+  }
+  const ext = filePath.slice(filePath.lastIndexOf('.'))
+  const headers = {
+    'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
+    // Hashed assets are immutable; the html entry point must always revalidate.
+    'Cache-Control': isIndex ? 'no-cache' : ext === '.html' ? 'no-cache' : `public, max-age=${filePath.includes('/assets/') ? 31536000 : 3600}${filePath.includes('/assets/') ? ', immutable' : ''}`,
+  }
+  const encoding = COMPRESSIBLE.has(ext) && content.length >= MIN_COMPRESS_BYTES ? pickEncoding(req.headers['accept-encoding']) : null
+  const body = encoding ? encode(`${filePath}:${mtimeMs}:${encoding}`, content, encoding) : content
+  if (encoding) {
+    headers['Content-Encoding'] = encoding
+    headers['Vary'] = 'Accept-Encoding'
+  }
+  headers['Content-Length'] = body.length
+  res.writeHead(200, headers)
+  res.end(req.method === 'HEAD' ? undefined : body)
 }
 
 function normalizeIp(value) {
@@ -183,24 +251,7 @@ const server = createServer((req, res) => {
   }
 
   // ── Serve static files (production) ──
-  let filePath = join(CLIENT_DIR, pathname === '/' ? 'index.html' : pathname)
-  try {
-    const ext = filePath.slice(filePath.lastIndexOf('.'))
-    const contentType = MIME_TYPES[ext] || 'application/octet-stream'
-    const content = readFileSync(filePath)
-    res.writeHead(200, { 'Content-Type': contentType })
-    res.end(content)
-  } catch {
-    // fallback to index.html for SPA routing
-    try {
-      const content = readFileSync(join(CLIENT_DIR, 'index.html'))
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-      res.end(content)
-    } catch {
-      res.writeHead(404)
-      res.end('Not found')
-    }
-  }
+  sendStatic(req, res, pathname)
 })
 
 server.listen(PORT, () => {

@@ -70,7 +70,8 @@ export function synergies(gear) {
   return RECIPES.filter((recipe) => gear[recipe.weapon] >= 3 && gear[recipe.chip] >= 3).map((recipe) => recipe.name)
 }
 const random = (state) => { state.seed = (Math.imul(state.seed, 1664525) + 1013904223) >>> 0; return state.seed / 4294967296 }
-const distance = (a, b) => Math.hypot((a[0] - b[0]) * .84, a[1] - b[1])
+// Allocation-free: the arena is wider than tall, so x keeps its horizontal scale.
+const distance = (ax, ay, bx, by) => Math.sqrt((ax - bx) * (ax - bx) * .7056 + (ay - by) * (ay - by))
 // Keep the opening minute familiar, then increase pressure without spawning
 // unbounded entities or letting movement speed grow past controllable levels.
 const enemyHealth = (tick, kind) => 1 + Math.floor(tick / 240)
@@ -151,7 +152,7 @@ export function stepFarm(previous, point, useSurge = false) {
     const reward = modifier?.reward ?? 1
     const xpMultiplier = EXPERIENCE_STAGES[crop.xpStage ?? 0].multiplier
     const dropXp = Math.round((crop.bass ? 110 : crop.boss ? 60 : crop.elite ? 30 : 5 + gear.lucky) * xpMultiplier * reward), dropCoins = Math.round((crop.bass ? 340 : crop.boss ? 200 : crop.elite ? 60 : 8 + crop.kind * 2 + gear.lucky * 5) * reward)
-    const existingDrop = state.loot.find((drop) => !drop.heal && distance([drop.x, drop.y], [crop.x, crop.y]) < 3)
+    const existingDrop = state.loot.find((drop) => !drop.heal && distance(drop.x, drop.y, crop.x, crop.y) < 3)
     if (existingDrop) { existingDrop.xp += dropXp; existingDrop.coins += dropCoins }
     else state.loot.push({ id: state.nextId++, x: crop.x, y: crop.y, xp: dropXp, coins: dropCoins })
     // One healing pack at a time, only while wounded, and on a long cooldown.
@@ -168,7 +169,7 @@ export function stepFarm(previous, point, useSurge = false) {
     if (gear.drum) {
       const radius = 7 + gear.drum * 2 + (boomFlow ? 3 : 0) + (forms.includes('drum') ? 12 : 0)
       events.push({ id: state.nextId++, kind: 'blast', x: crop.x, y: crop.y, radius, lane: 0 })
-      for (const other of state.crops) if (other.hp > 0 && distance([other.x, other.y], [crop.x, crop.y]) <= radius) damage(other, (gear.drum + (boomFlow ? 1 : 0)) * (forms.includes('drum') ? 2 : 1), true)
+      for (const other of state.crops) if (other.hp > 0 && distance(other.x, other.y, crop.x, crop.y) <= radius) damage(other, (gear.drum + (boomFlow ? 1 : 0)) * (forms.includes('drum') ? 2 : 1), true)
     }
     if (crop.boss) for (const drop of state.loot) { drop.x = state.position[0]; drop.y = state.position[1] }
   }
@@ -181,7 +182,7 @@ export function stepFarm(previous, point, useSurge = false) {
   }
   const pulse = (radius, amount, kind = 'pulse') => {
     events.push({ id: state.nextId++, kind, x: point[0], y: point[1], radius, lane: 1 })
-    for (const crop of state.crops) if (crop.hp > 0 && distance([crop.x, crop.y], point) <= radius) damage(crop, amount)
+    for (const crop of state.crops) if (crop.hp > 0 && distance(crop.x, crop.y, point[0], point[1]) <= radius) damage(crop, amount)
   }
   for (const crop of state.crops) if (!crop.boss && crop.hp <= 0 && state.tick >= crop.regrow) {
     crop.kind = (crop.id + Math.floor(state.tick / 160)) % 4
@@ -242,7 +243,7 @@ export function stepFarm(previous, point, useSurge = false) {
   const interval = Math.max(3, 8 - gear.tempo - (state.tick < state.surgeUntil ? 2 : 0))
   if (state.tick - state.lastPulse >= interval) { pulse((15 + gear.range * 4) * (frenzy === 2 ? 1.3 : 1), pulseDamage); state.lastPulse = state.tick; if (gear.echo) state.echoDue = state.tick + Math.max(1, 4 - gear.echo) }
   if (state.tick === rainDue) {
-    const targets = state.crops.filter((crop) => crop.hp > 0 && state.tick >= (crop.spawnAt ?? 0) && (forms.includes('echo') || distance([crop.x, crop.y], point) <= 38)).sort((a, b) => distance([a.x, a.y], point) - distance([b.x, b.y], point)).slice(0, forms.includes('echo') ? 8 : gear.echo + 1)
+    const targets = state.crops.filter((crop) => crop.hp > 0 && state.tick >= (crop.spawnAt ?? 0) && (forms.includes('echo') || distance(crop.x, crop.y, point[0], point[1]) <= 38)).sort((a, b) => distance(a.x, a.y, point[0], point[1]) - distance(b.x, b.y, point[0], point[1])).slice(0, forms.includes('echo') ? 8 : gear.echo + 1)
     for (const crop of targets) { events.push({ id: state.nextId++, kind: 'rain', x: crop.x, y: crop.y, fromX: point[0], fromY: point[1], lane: 3 }); damage(crop, gear.echo * (forms.includes('echo') ? 2 : 1)) }
     // A fast sound wave can schedule the next rain on the same tick. Keep it
     // without cancelling the rain that was already due.
@@ -272,7 +273,7 @@ export function stepFarm(previous, point, useSurge = false) {
     const radius = 10 + gear.delay * 2 + (forms.includes('whistle') ? 6 : 0)
     for (const crop of state.crops) {
       if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
-      if (distance([crop.x, crop.y], [trail.x, trail.y]) <= radius) damage(crop, trail.damage)
+      if (distance(crop.x, crop.y, trail.x, trail.y) <= radius) damage(crop, trail.damage)
     }
   }
   // Star tambourine: a slow, wide ring that also pushes monsters away, so it
@@ -286,7 +287,7 @@ export function stepFarm(previous, point, useSurge = false) {
       events.push({ id: state.nextId++, kind: 'shock', x: point[0], y: point[1], radius, lane: 2 })
       for (const crop of state.crops) {
         if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
-        const dist = distance([crop.x, crop.y], point)
+        const dist = distance(crop.x, crop.y, point[0], point[1])
         if (dist > radius) continue
         damage(crop, gear.bell + (forms.includes('bell') ? 2 : 0))
         const factor = 6 / Math.max(1, dist)
@@ -294,17 +295,17 @@ export function stepFarm(previous, point, useSurge = false) {
       }
     }
   }
-  if (state.tick % 2 === 0) for (const orb of orbitPositions(state)) for (const crop of state.crops) if (crop.hp > 0 && distance([crop.x, crop.y], orb) <= 6) damage(crop, (gear.orbit + (boomFlow ? 1 : 0)) * (forms.includes('orbit') ? 2 : 1))
+  if (state.tick % 2 === 0) for (const orb of orbitPositions(state)) for (const crop of state.crops) if (crop.hp > 0 && distance(crop.x, crop.y, orb[0], orb[1]) <= 6) damage(crop, (gear.orbit + (boomFlow ? 1 : 0)) * (forms.includes('orbit') ? 2 : 1))
   const attraction = 15 + gear.magnet * 15
   for (const drop of state.loot) {
-    const dist = distance([drop.x, drop.y], point)
+    const dist = distance(drop.x, drop.y, point[0], point[1])
     if (dist <= attraction || state.tick < state.surgeUntil) {
       const amount = Math.min(1, (3 + gear.magnet * 1.5) / Math.max(.01, dist))
       drop.x += (point[0] - drop.x) * amount; drop.y += (point[1] - drop.y) * amount
     }
-    if (distance([drop.x, drop.y], point) <= 4) { state.xp += drop.xp; state.coins += drop.coins; if (drop.shield) { state.shields = Math.min(SHIELD_LIMIT, state.shields + drop.shield); state.maxShields = Math.max(state.maxShields, state.shields) } if (drop.heal) { const healed = Math.min(drop.heal, state.maxHp - state.hp); state.hp += healed; if (healed) events.push({ id: state.nextId++, kind: 'heal', x: point[0], y: point[1], points: healed, lane: 1 }) } drop.collected = true; events.push({ id: state.nextId++, kind: 'collect', x: point[0], y: point[1], lane: 2 }) }
+    if (distance(drop.x, drop.y, point[0], point[1]) <= 4) { state.xp += drop.xp; state.coins += drop.coins; if (drop.shield) { state.shields = Math.min(SHIELD_LIMIT, state.shields + drop.shield); state.maxShields = Math.max(state.maxShields, state.shields) } if (drop.heal) { const healed = Math.min(drop.heal, state.maxHp - state.hp); state.hp += healed; if (healed) events.push({ id: state.nextId++, kind: 'heal', x: point[0], y: point[1], points: healed, lane: 1 }) } drop.collected = true; events.push({ id: state.nextId++, kind: 'collect', x: point[0], y: point[1], lane: 2 }) }
   }
-  state.loot = state.loot.filter((drop) => !drop.collected && !(drop.expires && state.tick >= drop.expires) && distance([drop.x, drop.y], point) <= 240).slice(-600)
+  state.loot = state.loot.filter((drop) => !drop.collected && !(drop.expires && state.tick >= drop.expires) && distance(drop.x, drop.y, point[0], point[1]) <= 240).slice(-600)
   const hurt = (amount) => {
     if (state.tick < state.hurtUntil || state.hp <= 0) return
     state.hurtUntil = state.tick + FPS
@@ -319,15 +320,15 @@ export function stepFarm(previous, point, useSurge = false) {
     // A short invulnerability window and knockback prevent crowd contact from
     // melting health — or from draining every shield in one second.
     for (const enemy of state.crops) {
-      const dist = distance([enemy.x, enemy.y], point)
+      const dist = distance(enemy.x, enemy.y, point[0], point[1])
       if (enemy.hp > 0 && dist < 15) { const factor = 7 / Math.max(1, dist); enemy.x += (enemy.x - point[0] || 1) * factor; enemy.y += (enemy.y - point[1] || 1) * factor }
     }
   }
   for (const enemy of state.crops) {
     if (enemy.hp <= 0) continue
-    if (distance([enemy.x, enemy.y], point) > 160) { placeAtEdge(state, enemy); continue }
+    if (distance(enemy.x, enemy.y, point[0], point[1]) > 160) { placeAtEdge(state, enemy); continue }
     if (state.tick < (enemy.spawnAt ?? 0)) continue
-    const dx = point[0] - enemy.x, dy = point[1] - enemy.y, dist = Math.max(.01, distance([enemy.x, enemy.y], point))
+    const dx = point[0] - enemy.x, dy = point[1] - enemy.y, dist = Math.max(.01, distance(enemy.x, enemy.y, point[0], point[1]))
     if (enemy.elite && (state.tick + enemy.id) % 80 === 0) enemy.dashUntil = state.tick + 8
     const speed = (enemy.elite ? (state.tick < (enemy.dashUntil ?? -1) ? 1.7 : .42) : enemy.bass ? .2 : enemy.boss ? .38 : [.48, .85, .34, .3][enemy.kind]) * (1 + Math.min(1.5, state.tick / (FPS * 60) * .55)) * (modifier?.speed ?? 1)
     const approach = enemy.kind === 2 && !enemy.boss && dist < 28 ? (dist < 20 ? -.5 : 0) : 1
@@ -346,24 +347,24 @@ export function stepFarm(previous, point, useSurge = false) {
     } else if (!enemy.boss && enemy.kind === 2 && state.tick > 5 * FPS && (state.tick + enemy.id) % 64 === 0 && dist < 65 && state.shots.length < 60) {
       state.shots.push({ id: state.nextId++, x: enemy.x, y: enemy.y, dx: dx / dist * 1.1, dy: dy / dist * 1.1, expires: state.tick + FPS * 5 })
     }
-    if (distance([enemy.x, enemy.y], point) < (enemy.bass ? 10 : enemy.boss ? 9 : enemy.elite ? 7 : 5)) hurt(enemy.bass ? 20 : enemy.boss ? 24 : enemy.elite ? 20 : enemy.kind === 3 ? 18 : 12)
+    if (distance(enemy.x, enemy.y, point[0], point[1]) < (enemy.bass ? 10 : enemy.boss ? 9 : enemy.elite ? 7 : 5)) hurt(enemy.bass ? 20 : enemy.boss ? 24 : enemy.elite ? 20 : enemy.kind === 3 ? 18 : 12)
   }
   // The guitarist's orbiting notes swat ranged shots out of the air.
   const orbs = gear.orbit ? orbitPositions(state) : null
   state.shots = state.shots.filter((shot) => {
     shot.x += shot.dx; shot.y += shot.dy
-    if (orbs?.some((orb) => distance([shot.x, shot.y], orb) <= 6)) {
+    if (orbs?.some((orb) => distance(shot.x, shot.y, orb[0], orb[1]) <= 6)) {
       state.blocks++
       events.push({ id: state.nextId++, kind: 'block', x: shot.x, y: shot.y, lane: 3 })
       return false
     }
-    if (distance([shot.x, shot.y], point) < 3.5) { hurt(14); return false }
-    return shot.expires > state.tick && distance([shot.x, shot.y], point) < 180
+    if (distance(shot.x, shot.y, point[0], point[1]) < 3.5) { hurt(14); return false }
+    return shot.expires > state.tick && distance(shot.x, shot.y, point[0], point[1]) < 180
   })
   state.dangers = state.dangers.filter((danger) => {
     if (state.tick < danger.due) return true
     events.push({ id: state.nextId++, kind: 'slam', x: danger.x, y: danger.y, radius: danger.radius, lane: 0 })
-    if (distance([danger.x, danger.y], point) < danger.radius) hurt(26)
+    if (distance(danger.x, danger.y, point[0], point[1]) < danger.radius) hurt(26)
     return false
   })
   state.tick++

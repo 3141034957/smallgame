@@ -209,7 +209,9 @@ export default function MusicFarm() {
           const result = stepFarm(state, point, useSurge)
           if (!result) break
           logs.current.frames.push(point); if (useSurge) logs.current.surges.push(state.tick)
-          if (state.tick % FARM_SAMPLE_EVERY === 0 && samples.current.length < FARM_SAMPLE_LIMIT) { samples.current = [...samples.current, farmTimelineSample(state)]; setTimeline(samples.current) }
+          // The recap only renders after the run, so the samples stay in a ref
+          // instead of re-rendering the whole page twice a second.
+          if (state.tick % FARM_SAMPLE_EVERY === 0 && samples.current.length < FARM_SAMPLE_LIMIT) samples.current.push(farmTimelineSample(state))
           if (state.tick % 8 === 0) {
             const beat = state.tick / 8; audio.current?.accompany(beat, 0, 0)
             if (state.gear.drum) audio.current?.playLane(0)
@@ -237,7 +239,7 @@ export default function MusicFarm() {
           state = result.state; model.current = state
           if (state.hp <= 0) {
             const finished = finishFarm(state, logs.current.frames, logs.current.choices, logs.current.surges)
-            setRound(finished); phaseRef.current = 'result'; setPhase('result'); audio.current?.stop(); setView(state)
+            setRound(finished); phaseRef.current = 'result'; setPhase('result'); audio.current?.stop(); setView(state); setTimeline(samples.current)
             if (finished) {
               const reward = awardFarmCoins(runId.current, finished.coins)
               setProfile(reward.profile); setRewardError(reward.error ?? '')
