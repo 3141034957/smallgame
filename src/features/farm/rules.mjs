@@ -3,8 +3,19 @@ export { todayRoute, validDay }
 export const FPS = 16
 export const MOVE_STEP = 3
 export const START = [50, 76]
-export const THRESHOLDS = [20, 65, 140, 250, 400, 600, 850, 1150, 1500, 1900, 2350, 2850,
-  ...Array.from({ length: 24 }, (_, index) => 2850 + (index + 1) * 550 + index * (index + 1) * 25)]
+// Keep the first recipe attainable, then grow the cost of each additional
+// upgrade. XP is cumulative; picking a talent never discards overflow.
+export const UPGRADE_XP = [20, 45, 75, 110, 150, 200,
+  ...Array.from({ length: 30 }, (_, index) => { const level = index + 1; return 200 + 50 * level + 2 * level ** 2 })]
+export const THRESHOLDS = UPGRADE_XP.map((_, index) => UPGRADE_XP.slice(0, index + 1).reduce((sum, cost) => sum + cost, 0))
+export const EXPERIENCE_STAGES = [
+  { seconds: 0, multiplier: 1 },
+  { seconds: 30, multiplier: 1.25 },
+  { seconds: 60, multiplier: 1.6 },
+  { seconds: 120, multiplier: 2 },
+  { seconds: 180, multiplier: 2.5 },
+  { seconds: 300, multiplier: 3 },
+]
 export const MAX_BOSSES = 4
 // Healing drops are limited: at most one pack on the field, one every
 // HEAL_COOLDOWN, and each pack vanishes after HEAL_TTL. Without this the
@@ -66,7 +77,10 @@ const enemyHealth = (tick, kind) => 1 + Math.floor(tick / 240)
   + Math.floor(Math.max(0, tick - FPS * 60) / (FPS * 30)) ** 2 + (kind === 3 ? 2 : 0)
 // World coordinates have no arena walls. A short portal warning makes arrivals
 // fair even when a wide desktop camera can see the surrounding spawn ring.
-function placeAtEdge(state, enemy) {
+function placeAtEdge(state, enemy, respawn = false) {
+  // Rewards belong to the monster's birth stage. Kiting it across a stage
+  // boundary (or relocating it back into view) must not inflate its drop.
+  if (respawn || enemy.xpStage === undefined) enemy.xpStage = EXPERIENCE_STAGES.findLastIndex((stage) => state.tick >= stage.seconds * FPS)
   const angle = random(state) * Math.PI * 2, radius = 52 + random(state) * 16
   enemy.x = state.position[0] + Math.cos(angle) * radius / .84
   enemy.y = state.position[1] + Math.sin(angle) * radius
@@ -82,7 +96,7 @@ export function createFarm(day) {
     state.crops.push(enemy)
   }
   // Keep a ready-to-harvest patch within the first sound wave.
-  for (const [id, x, y] of [[64, 45, 72], [65, 55, 74], [66, 48, 83]]) state.crops.push({ id, x, y, kind: 0, hp: 1, maxHp: 1, regrow: -1, boss: false })
+  for (const [id, x, y] of [[64, 45, 72], [65, 55, 74], [66, 48, 83]]) state.crops.push({ id, x, y, kind: 0, hp: 1, maxHp: 1, regrow: -1, boss: false, xpStage: 0 })
   return state
 }
 export function orbitPositions(state) {
@@ -135,7 +149,8 @@ export function stepFarm(previous, point, useSurge = false) {
     const points = (crop.bass ? 2400 : crop.boss ? 1200 : crop.elite ? 320 : 40 + crop.kind * 10) * multiplier
     state.score += points; state.charge = Math.min(100, state.charge + (crop.bass ? 60 : crop.boss ? 40 : crop.elite ? 12 : 4))
     const reward = modifier?.reward ?? 1
-    const dropXp = Math.round((crop.bass ? 110 : crop.boss ? 60 : crop.elite ? 30 : 5 + gear.lucky) * reward), dropCoins = Math.round((crop.bass ? 340 : crop.boss ? 200 : crop.elite ? 60 : 8 + crop.kind * 2 + gear.lucky * 5) * reward)
+    const xpMultiplier = EXPERIENCE_STAGES[crop.xpStage ?? 0].multiplier
+    const dropXp = Math.round((crop.bass ? 110 : crop.boss ? 60 : crop.elite ? 30 : 5 + gear.lucky) * xpMultiplier * reward), dropCoins = Math.round((crop.bass ? 340 : crop.boss ? 200 : crop.elite ? 60 : 8 + crop.kind * 2 + gear.lucky * 5) * reward)
     const existingDrop = state.loot.find((drop) => !drop.heal && distance([drop.x, drop.y], [crop.x, crop.y]) < 3)
     if (existingDrop) { existingDrop.xp += dropXp; existingDrop.coins += dropCoins }
     else state.loot.push({ id: state.nextId++, x: crop.x, y: crop.y, xp: dropXp, coins: dropCoins })
@@ -174,7 +189,7 @@ export function stepFarm(previous, point, useSurge = false) {
     // died in it — otherwise the crown and the elite rewards would stick.
     crop.elite = false; crop.dashUntil = -1
     crop.hp = enemyHealth(state.tick, crop.kind) + (modifier?.health ?? 0); crop.maxHp = crop.hp
-    placeAtEdge(state, crop)
+    placeAtEdge(state, crop, true)
   }
   if (state.tick >= state.nextWave) {
     const count = Math.max(1, Math.round((3 + Math.floor(state.tick / 240)) * (modifier?.wave ?? 1)))
@@ -194,7 +209,7 @@ export function stepFarm(previous, point, useSurge = false) {
   if (state.tick >= 45 * FPS && state.tick % 72 === 0 && state.crops.filter((crop) => crop.elite && crop.hp > 0).length < 5) {
     const hp = (enemyHealth(state.tick, 3) + (modifier?.health ?? 0)) * 6 + 8
     const slot = state.crops.find((crop) => !crop.boss && crop.hp <= 0)
-    if (slot) { slot.kind = 3; slot.hp = hp; slot.maxHp = hp; slot.elite = true; slot.dashUntil = -1; placeAtEdge(state, slot) }
+    if (slot) { slot.kind = 3; slot.hp = hp; slot.maxHp = hp; slot.elite = true; slot.dashUntil = -1; placeAtEdge(state, slot, true) }
     else if (state.crops.filter((crop) => !crop.boss).length < 100) {
       const elite = { id: state.nextId++, x: 0, y: 0, kind: 3, hp, maxHp: hp, regrow: -1, boss: false, elite: true, dashUntil: -1 }
       placeAtEdge(state, elite); state.crops.push(elite)

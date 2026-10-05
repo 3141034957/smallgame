@@ -14,13 +14,15 @@ export const SHIELD_LIMIT: number
 export const MOVE_STEP: number
 export const START: Point
 export const THRESHOLDS: number[]
+export const UPGRADE_XP: number[]
+export const EXPERIENCE_STAGES: { seconds: number; multiplier: number }[]
 export type Point = [number, number]
 export type TalentId = 'drum' | 'orbit' | 'magnet' | 'range' | 'tempo' | 'power' | 'echo' | 'lucky' | 'bell' | 'sustain' | 'whistle' | 'delay'
 export const TALENTS: { id: TalentId; kind: 'weapon' | 'chip'; partner: TalentId; name: string; icon: string; color: string; description: string; tag: string }[]
 export const RECIPES: { weapon: TalentId; chip: TalentId; name: string; icon: string; description: string }[]
 export function evolved(gear: Gear): TalentId[]
 export type Gear = Record<TalentId, number>
-export type Crop = { id: number; x: number; y: number; kind: Lane; hp: number; maxHp: number; regrow: number; boss: boolean; bass?: boolean; elite?: boolean; dashUntil?: number; spawnAt?: number }
+export type Crop = { id: number; x: number; y: number; kind: Lane; hp: number; maxHp: number; regrow: number; boss: boolean; bass?: boolean; elite?: boolean; dashUntil?: number; spawnAt?: number; xpStage?: number }
 export type Loot = { id: number; x: number; y: number; xp: number; coins: number; heal?: number; shield?: number; expires?: number }
 export type FarmEvent = { id: number; kind: 'harvest' | 'boss' | 'blast' | 'pulse' | 'echo' | 'surge' | 'arrival' | 'hit' | 'collect' | 'rain' | 'beam' | 'blackhole' | 'hurt' | 'heal' | 'slam' | 'shield' | 'shock'; x: number; y: number; lane: Lane; midi?: number; points?: number; radius?: number; chain?: boolean; fromX?: number; fromY?: number; bass?: boolean }
 export type Shot = { id: number; x: number; y: number; dx: number; dy: number; expires: number }

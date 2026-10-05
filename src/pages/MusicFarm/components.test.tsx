@@ -35,6 +35,7 @@ describe('farm screens render', () => {
     expect(html).toContain('带上你的乐队')
     expect(html).toContain('今日词缀')
     expect(html).toContain('今日目标')
+    expect(html).toContain('0 / 20 经验')
   })
   it('renders the badge wall, quest list, build summary and recap', () => {
     const log = loadFarmAchievements()
