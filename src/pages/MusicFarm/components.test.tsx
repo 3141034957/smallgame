@@ -29,15 +29,15 @@ beforeAll(() => {
 const day = '2026-10-04'
 
 describe('farm screens render', () => {
-  it('renders the ready screen with the daily goals and modifier', () => {
+  it('renders the ready screen with just the leaderboard and the start button', () => {
     const html = renderToStaticMarkup(<MemoryRouter initialEntries={[`/farm?day=${day}`]}><MusicFarm /></MemoryRouter>)
     expect(html).toContain('怪潮乐队历险记')
     expect(html).toContain('带上你的乐队')
-    expect(html).toContain('今日词缀')
-    expect(html).toContain('今日目标')
     expect(html).toContain('0 / 20 经验')
-    // The start screen opens straight onto the all-time leaderboard.
+    // The start screen stays focused: leaderboard and start button, nothing else.
     expect(html).toContain('无限总榜')
+    expect(html).not.toContain('今日词缀')
+    expect(html).not.toContain('今日目标')
   })
   it('renders the badge wall, quest list, build summary and recap', () => {
     const log = loadFarmAchievements()
