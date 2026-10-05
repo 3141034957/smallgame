@@ -1,5 +1,6 @@
 import { evolved, FPS, orbitPositions, type Crop, type FarmEvent, type FarmState, type Point } from '../../features/farm/rules.mjs'
 import { farmCamera, farmOffscreenMarkers, farmStickRadius, farmVisibleTiles, farmWorldBounds } from '../../features/farm/presentation'
+import { FARM_GROUND_COLOR, paintFarmGround } from './background'
 
 type Effect = { event: FarmEvent; born: number }
 export type FarmPose = { character?: HTMLCanvasElement | null; joystick?: { base: Point; knob: Point }; simple?: boolean; position: Point; tick: number; previousEnemies?: ReadonlyMap<number, { x: number; y: number }>; previousShots?: ReadonlyMap<number, { x: number; y: number }>; previousLoot?: ReadonlyMap<number, { x: number; y: number }>; alpha: number }
@@ -69,24 +70,6 @@ function sparkle(ctx: CanvasRenderingContext2D, x: number, y: number, size: numb
   ctx.quadraticCurveTo(x - size * .2, y + size * .2, x - size, y)
   ctx.quadraticCurveTo(x - size * .2, y - size * .2, x, y - size)
   ctx.fill()
-}
-
-function garden(ctx: CanvasRenderingContext2D, variant: number) {
-  ctx.fillStyle = '#e6e8f5'
-  ctx.fillRect(0, 0, 360, 430)
-  // A softly lit concert floor, with room to read incoming enemies.
-  ctx.strokeStyle = '#beb8d633'; ctx.lineWidth = 1
-  for (let x = 0; x <= 360; x += 45) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 430); ctx.stroke() }
-  for (let y = 0; y <= 430; y += 43) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(360, y); ctx.stroke() }
-  for (const r of [55, 105, 155]) { ctx.beginPath(); ctx.arc(180, 215, r, 0, Math.PI * 2); ctx.stroke() }
-  ctx.font = 'bold 76px serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#a79fc21c'; ctx.fillText(['♫', '✦', '♪', '♬'][variant], 180, 242)
-  for (let i = 0; i < 12; i++) sparkle(ctx, (i * 79 + 13) % 355, (i * 113 + 25) % 425, 2, '#fffaf3a0')
-  // Fixed landmarks belong to world tiles, making travel easy to perceive.
-  const color = ['#c1b1d9', '#b8c8d5', '#d5bbc8', '#c5cba9'][variant]
-  for (const [x, y] of [[28, 54], [326, 358]]) {
-    ctx.fillStyle = '#faf8f078'; ctx.beginPath(); roundedRect(ctx, x - 13, y - 19, 26, 38, 7); ctx.fill()
-    ellipse(ctx, x, y + 5, 8, 8, color); ellipse(ctx, x, y + 5, 3, 3, '#faf8f0'); ellipse(ctx, x, y - 10, 3, 3, color)
-  }
 }
 
 function cropSprite(ctx: CanvasRenderingContext2D, crop: Crop, now: number, tick: number, hit: boolean, assets: Assets) {
@@ -267,7 +250,7 @@ function assetsFor(ctx: CanvasRenderingContext2D): Assets {
   if (cached) return cached
   const owner = ctx.canvas.ownerDocument
   const assets: Assets = {
-    garden: Array.from({ length: 4 }, (_, variant) => sprite(owner, 360, 430, (ctx) => garden(ctx, variant))),
+    garden: Array.from({ length: 4 }, (_, variant) => sprite(owner, 360, 430, (ctx) => paintFarmGround(ctx, variant))),
     crops: Array.from({ length: 4 }, (_, kind) => sprite(owner, 64, 64, (ctx) => { ctx.translate(32, 32); cropBody(ctx, kind) })),
     sprout: sprite(owner, 24, 24, (ctx) => { ctx.translate(12, 9); ellipse(ctx, 0, 8, 8, 2, '#7c96652b'); leaf(ctx, 0, 6, -.7, 7, '#91b383'); leaf(ctx, 0, 6, .7, 7, '#a6c493') }),
     bunny: [false, true].map((happy) => sprite(owner, 80, 80, (ctx) => { ctx.translate(40, 40); bunnyBody(ctx, happy) })),
@@ -407,7 +390,7 @@ export function drawFarm(ctx: CanvasRenderingContext2D, state: FarmState, effect
   const moving = pose ? { ...state, position: pose.position, tick: pose.tick } : state
   const camera = farmCamera(moving.position, width, height)
   ctx.save()
-  ctx.fillStyle = '#e6e8f5'
+  ctx.fillStyle = FARM_GROUND_COLOR
   ctx.fillRect(0, 0, width, height)
   ctx.translate(camera.x, camera.y)
   ctx.scale(camera.scale, camera.scale)
