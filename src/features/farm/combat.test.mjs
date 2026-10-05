@@ -115,16 +115,16 @@ describe('survivor combat', () => {
     expect(struck.state.crops[0].x).toBeGreaterThan(56)
     expect(struck.events.find((event) => event.kind === 'shock').radius).toBe(30)
     // The final form fires three rings in a row instead of one.
-    const first = ring({ bell: MAX_GEAR_LEVEL, sustain: MAX_GEAR_LEVEL }, 108)
+    const first = ring({ bell: MAX_GEAR_LEVEL, sustain: MAX_GEAR_LEVEL }, 120)
     expect(first.events.filter((event) => event.kind === 'shock')).toHaveLength(1)
     expect(first.state.bellRings).toBe(2)
-    const second = step({ ...first.state, tick: 112, lastPulse: 112 })
-    const third = step({ ...second.state, tick: 116, lastPulse: 116 })
+    const second = step({ ...first.state, tick: 124, lastPulse: 124 })
+    const third = step({ ...second.state, tick: 128, lastPulse: 128 })
     expect(second.events.filter((event) => event.kind === 'shock')).toHaveLength(1)
     expect(third.events.filter((event) => event.kind === 'shock')).toHaveLength(1)
     expect(third.state.bellRings).toBe(0)
     // The ring cadence shortens with the top-level chip, so the quiet tick moves too.
-    expect(step({ ...third.state, tick: 124, lastPulse: 124 }).events.filter((event) => event.kind === 'shock')).toHaveLength(0)
+    expect(step({ ...third.state, tick: 132, lastPulse: 132 }).events.filter((event) => event.kind === 'shock')).toHaveLength(0)
   })
   it('sends gold-record elites after 45 seconds: tougher, dashing and worth more', () => {
     const wave = (tick) => {

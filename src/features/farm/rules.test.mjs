@@ -40,6 +40,13 @@ function run(focus = 'drum', routeDay = day) {
     frames.push(point)
     state = stepFarm(state, point, surge).state
   }
+  // A finished loadout can outlive the dodging route; stand still until the run
+  // really ends so the replay has a death to verify.
+  while (state.hp > 0 && frames.length < FPS * 60 * 12) {
+    while (state.offered.length) state = chooseTalent(state, state.offered[0])
+    frames.push([...state.position])
+    state = stepFarm(state, state.position).state
+  }
   return { state, frames, choices, surges, firstOffer, firstUpgrade, terminalAt }
 }
 

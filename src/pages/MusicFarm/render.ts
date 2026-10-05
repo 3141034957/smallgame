@@ -275,12 +275,40 @@ function groundEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress:
     ctx.strokeStyle = '#e8f2ff'
     ctx.lineWidth = 1
     ctx.beginPath(); ctx.arc(x, y, expanding * .72, 0, Math.PI * 2); ctx.stroke()
-  } else if (['pulse', 'blast', 'surge', 'echo', 'slam'].includes(event.kind)) {
-    const color = event.kind === 'slam' ? '#e45e87' : event.kind === 'blast' ? '#eda578' : event.kind === 'surge' ? '#efc561' : '#94b0d7'
+    // Keyboard: stars ride the wave outwards.
+    ctx.globalAlpha = (1 - progress) * .9
+    ctx.fillStyle = '#dcefff'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'
+    for (let i = 0; i < 5; i++) {
+      const angle = now / 240 + i * Math.PI * 2 / 5
+      ctx.fillText('✦', x + Math.cos(angle) * expanding * .85, y + Math.sin(angle) * expanding * .85 + 4)
+    }
+  } else if (event.kind === 'blast') {
+    // Drum: a struck skin — thick ring with the beat flying outwards.
+    const expanding = radius * (.2 + Math.min(1, progress * 1.5) * .8)
+    ctx.globalAlpha = (1 - progress) * .9
+    ctx.strokeStyle = '#e0954f'
+    ctx.lineWidth = 3
+    ctx.beginPath(); ctx.arc(x, y, expanding, 0, Math.PI * 2); ctx.stroke()
+    ctx.globalAlpha = (1 - progress) * .3
+    ellipse(ctx, x, y, expanding, expanding, '#eda578')
+    ctx.globalAlpha = (1 - progress) * .8
+    ctx.strokeStyle = '#f8d19a'
+    ctx.lineWidth = 2
+    for (let i = 0; i < 6; i++) {
+      const angle = i * Math.PI / 3 + progress * .7
+      ctx.beginPath()
+      ctx.moveTo(x + Math.cos(angle) * expanding * .5, y + Math.sin(angle) * expanding * .5)
+      ctx.lineTo(x + Math.cos(angle) * expanding * 1.3, y + Math.sin(angle) * expanding * 1.3)
+      ctx.stroke()
+    }
+    ctx.fillStyle = '#b9762f'; ctx.font = 'bold 15px system-ui'; ctx.textAlign = 'center'
+    ctx.fillText('♬', x, y + 5)
+  } else if (['pulse', 'surge', 'echo', 'slam'].includes(event.kind)) {
+    const color = event.kind === 'slam' ? '#e45e87' : event.kind === 'surge' ? '#efc561' : '#94b0d7'
     const expanding = radius * (.18 + Math.min(1, progress * 1.5) * .82)
     ctx.globalAlpha = (1 - progress) * (event.kind === 'pulse' ? .5 : .8)
     ctx.strokeStyle = color
-    ctx.lineWidth = event.kind === 'surge' ? 5 : event.kind === 'blast' ? 2 : 1.8
+    ctx.lineWidth = event.kind === 'surge' ? 5 : 1.8
     ctx.beginPath()
     ctx.arc(x, y, expanding, 0, Math.PI * 2)
     ctx.stroke()
@@ -303,6 +331,17 @@ function groundEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress:
     ctx.moveTo(x, y - Y(120))
     ctx.lineTo(x, y + Y(120))
     ctx.stroke()
+    // Bass: slow low-frequency waves rolling down the column.
+    ctx.globalAlpha = (1 - progress) * .55
+    ctx.strokeStyle = '#dbe4ff'
+    ctx.lineWidth = 1.4
+    for (let i = 0; i < 7; i++) {
+      const wave = y - Y(110) + i * Y(34) + progress * Y(70)
+      ctx.beginPath()
+      ctx.moveTo(x - beamWidth * .85, wave)
+      ctx.quadraticCurveTo(x, wave - 9, x + beamWidth * .85, wave)
+      ctx.stroke()
+    }
   } else if (event.kind === 'horn') {
     // Sax blast: a widening wedge down the aim, brightest right after the call.
     const heading = Math.atan2(event.fromY ?? 0, (event.fromX ?? 1) * .84)
@@ -320,6 +359,14 @@ function groundEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress:
     ctx.strokeStyle = '#fff3d8'
     ctx.lineWidth = 2
     ctx.stroke()
+    // Brass: three arcs riding out of the bell.
+    ctx.globalAlpha = (1 - progress) * .6
+    ctx.lineWidth = 1.5
+    for (let i = 1; i <= 3; i++) {
+      ctx.beginPath()
+      ctx.arc(0, 0, reach * (.32 * i), -.52, .52)
+      ctx.stroke()
+    }
   } else if (event.kind === 'fan') {
     const angle = event.angle ?? 0, spread = event.spread ?? .45
     const reach = X(event.radius ?? 34) * (.4 + Math.min(1, progress * 1.8) * .6)
@@ -336,6 +383,20 @@ function groundEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress:
     ctx.strokeStyle = '#f2fff0'
     ctx.lineWidth = 1.5
     ctx.stroke()
+    // Prism: thin coloured rays split the fan.
+    ctx.globalAlpha = (1 - progress) * .85
+    ctx.lineWidth = 1.8
+    const rays = ['#8fd6a6', '#b9e8a8', '#e6f2a8', '#c8ead2', '#a8dcc0']
+    for (let i = 0; i < 5; i++) {
+      const a = -spread + spread * 2 * (i / 4)
+      ctx.strokeStyle = rays[i]
+      ctx.beginPath()
+      ctx.moveTo(0, 0)
+      ctx.lineTo(Math.cos(a) * reach, Math.sin(a) * reach)
+      ctx.stroke()
+    }
+    ctx.fillStyle = '#5f8a63'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'
+    ctx.fillText('⌁', reach * .5, 4)
   } else if (event.kind === 'mine') {
     ctx.globalAlpha = (1 - progress) * .85
     ctx.strokeStyle = '#b795e0'
@@ -346,6 +407,17 @@ function groundEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress:
     ctx.globalAlpha = (1 - progress)
     ctx.fillStyle = '#7a5aa8'; ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center'
     ctx.fillText('✸', x, y + 6)
+    // Vinyl shards fly out of the sample.
+    const burst = radius * (.25 + progress * .9)
+    ctx.strokeStyle = '#8f6fc0'
+    ctx.lineWidth = 2
+    for (let i = 0; i < 6; i++) {
+      const angle = i * Math.PI / 3 + progress * .9
+      ctx.beginPath()
+      ctx.moveTo(x + Math.cos(angle) * burst * .55, y + Math.sin(angle) * burst * .55)
+      ctx.lineTo(x + Math.cos(angle) * burst * 1.25, y + Math.sin(angle) * burst * 1.25)
+      ctx.stroke()
+    }
   } else if (event.kind === 'blackhole') {
     ctx.translate(x, y)
     ctx.globalAlpha = (1 - progress) * .55
@@ -429,18 +501,22 @@ function airEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress: nu
       ctx.fillText(text, x, lift)
     }
   } else if (event.kind === 'rain') {
-    const t = Math.min(1, progress * 2), startY = y - 70
-    ctx.globalAlpha = 1 - progress
-    ctx.strokeStyle = '#d89cb4'
-    ctx.lineWidth = 1.4
+    // Vocal: the high note arcs out of the mic into the monster.
+    const t = Math.min(1, progress * 1.7)
+    const sx = X(event.fromX ?? event.x), sy = Y(event.fromY ?? event.y) - 26
+    ctx.globalAlpha = (1 - progress) * .75
+    ctx.strokeStyle = '#e6adc4'
+    ctx.lineWidth = 1.6
     ctx.beginPath()
-    ctx.moveTo(x + 15 * (1 - t), startY + t * 70 - 18)
-    ctx.lineTo(x + 15 * (1 - t), startY + t * 70)
+    ctx.moveTo(sx, sy)
+    ctx.quadraticCurveTo((sx + x) / 2, Math.min(sy, y) - Y(30), x, y)
     ctx.stroke()
+    ctx.globalAlpha = 1 - progress
+    const px = sx + (x - sx) * t, py = sy + (y - sy) * t - Math.sin(t * Math.PI) * Y(30)
     ctx.fillStyle = '#bf7399'
     ctx.font = '800 18px serif'
     ctx.textAlign = 'center'
-    ctx.fillText('♪', x + 15 * (1 - t), startY + t * 70)
+    ctx.fillText('♪', px, py)
     if (t === 1) sparkle(ctx, x, y, 8 * (1 - progress), '#e8bdd2')
   } else if (event.kind === 'collect') {
     ctx.globalAlpha = (1 - progress) * .7

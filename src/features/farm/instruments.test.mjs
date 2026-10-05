@@ -21,15 +21,15 @@ describe('the four new instruments', () => {
     expect(result.state.crops[0].slowUntil).toBeGreaterThan(state.tick)
     expect(result.state.crops[0].x).toBeGreaterThan(58)
     // The final form reaches further, so a monster far down the row is hit too.
-    const ordinary = arena({ sax: MAX_GEAR_LEVEL, mute: MAX_GEAR_LEVEL - 1 }, [crop(0, 112, 50)], 28)
-    const terminal = arena({ sax: MAX_GEAR_LEVEL, mute: MAX_GEAR_LEVEL }, [crop(0, 112, 50)], 22)
+    const ordinary = arena({ sax: MAX_GEAR_LEVEL, mute: MAX_GEAR_LEVEL - 1 }, [crop(0, 122, 50)], 28)
+    const terminal = arena({ sax: MAX_GEAR_LEVEL, mute: MAX_GEAR_LEVEL }, [crop(0, 122, 50)], 22)
     expect(evolved(terminal.gear)).toContain('sax')
     expect(stepFarm(ordinary, ordinary.position).state.crops[0].hp).toBe(20)
     expect(stepFarm(terminal, terminal.position).state.crops[0].hp).toBeLessThan(20)
   })
 
   it('arms a sampler beat on the floor and blows it up a second later', () => {
-    const state = arena({ sampler: 2, trigger: 2 }, [crop(0, 52, 52)], 20)
+    const state = arena({ sampler: 2, trigger: 2 }, [crop(0, 52, 52)], 18)
     const planted = stepFarm(state, state.position).state
     expect(planted.mines).toHaveLength(1)
     expect(planted.crops[0].hp).toBe(20)
@@ -70,7 +70,7 @@ describe('the four new instruments', () => {
     expect(result.state.crops[0].hp).toBeLessThan(20)
     expect(result.state.crops[1].hp).toBe(20)
     // The final form fires three fans at once.
-    const terminal = arena({ synth: MAX_GEAR_LEVEL, arp: MAX_GEAR_LEVEL }, [crop(0, 70, 50)], 8)
+    const terminal = arena({ synth: MAX_GEAR_LEVEL, arp: MAX_GEAR_LEVEL }, [crop(0, 70, 50)], 9)
     expect(evolved(terminal.gear)).toContain('synth')
     expect(stepFarm(terminal, terminal.position).events.filter((event) => event.kind === 'fan')).toHaveLength(3)
   })
@@ -103,5 +103,27 @@ describe('loadout slots', () => {
       sawNewcomer = offered.some((id) => state.gear[id] === 0)
     }
     expect(sawNewcomer).toBe(true)
+  })
+})
+
+describe('chips are universal stats', () => {
+  it('lets a chip from another pair raise an unrelated instrument', () => {
+    // Needle (the DJ chip) is flat damage for every attack.
+    const plain = arena({ synth: 2 }, [crop(0, 70, 50)], 12)
+    const boosted = arena({ synth: 2, needle: 3 }, [crop(0, 70, 50)], 12)
+    expect(stepFarm(boosted, boosted.position).state.crops[0].hp).toBeLessThan(stepFarm(plain, plain.position).state.crops[0].hp)
+    // Resonator (the drum chip) widens every attack's reach.
+    const narrow = arena({ synth: 2 }, [crop(0, 90, 50)], 12)
+    const wide = arena({ synth: 2, range: MAX_EQUIPPED }, [crop(0, 90, 50)], 12)
+    const narrowFan = stepFarm(narrow, narrow.position).events.find((event) => event.kind === 'fan')
+    const wideFan = stepFarm(wide, wide.position).events.find((event) => event.kind === 'fan')
+    expect(wideFan.radius).toBeGreaterThan(narrowFan.radius)
+  })
+
+  it('lets duration chips lengthen the effects of another instrument', () => {
+    const brief = arena({ sax: 3 }, [crop(0, 58, 50)], 26)
+    const long = arena({ sax: 3, sustain: 3 }, [crop(0, 58, 50)], 26)
+    expect(stepFarm(long, long.position).state.crops[0].slowUntil)
+      .toBeGreaterThan(stepFarm(brief, brief.position).state.crops[0].slowUntil)
   })
 })
