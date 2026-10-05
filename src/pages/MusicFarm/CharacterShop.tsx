@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { FARM_CHARACTERS, selectFarmCharacter, type FarmProfile } from '@/features/farm/characters'
 import './CharacterShop.css'
 
-export function CharacterShop({ profile, onChange }: { profile: FarmProfile; onChange: (profile: FarmProfile) => void }) {
+export function CharacterShop({ profile, onChange, onClose }: { profile: FarmProfile; onChange: (profile: FarmProfile) => void; onClose?: () => void }) {
   const [previewId, setPreviewId] = useState(profile.selected)
   // Unlocking a character equips it, so the preview has to follow.
   useEffect(() => setPreviewId(profile.selected), [profile.selected])
@@ -11,29 +11,48 @@ export function CharacterShop({ profile, onChange }: { profile: FarmProfile; onC
   const owned = profile.owned.includes(character.id)
   const equipped = profile.selected === character.id
   const affordable = profile.coins >= character.price
+  const missing = Math.max(0, character.price - profile.coins)
 
   return <div className="farm-shop">
-    <header className="farm-shop-heading"><div><small>MEET YOUR NEXT STAR</small><h2>角色商店</h2></div><div className="farm-shop-wallet"><small>我的金币</small><strong>✦ {profile.coins.toLocaleString()}</strong></div></header>
-    <div className="farm-shop-showcase">
-      <div className="farm-shop-portrait" style={{ '--character-glow': character.colors.glow } as React.CSSProperties}><span aria-hidden="true">✦</span><img key={character.id} src={character.image} alt={character.name} /><span aria-hidden="true">♪</span></div>
-      <div className="farm-shop-detail"><small>{equipped ? '正在上场' : owned ? '已经拥有' : '等待加入你的乐队'}</small><h3>{character.name}</h3><p>{character.desc}</p><span>角色外观 · 自由搭配乐器</span></div>
-    </div>
-    <div className="farm-shop-collection"><strong>你的舞台，你的主角</strong><span>{profile.owned.length} / {FARM_CHARACTERS.length} 已拥有</span></div>
-    <div className="farm-shop-grid" aria-label="角色列表">{FARM_CHARACTERS.map((item) => {
-      const unlocked = profile.owned.includes(item.id), active = profile.selected === item.id
-      return <button type="button" key={item.id} aria-label={`预览${item.name}`} aria-pressed={item.id === previewId} className={item.id === previewId ? 'is-preview' : ''} onClick={() => { setPreviewId(item.id); setMessage('') }}>
-        <small className={active ? 'is-equipped' : ''}>{active ? '使用中' : unlocked ? '已拥有' : `✦ ${item.price.toLocaleString()}`}</small>
-        <img src={item.image} alt="" loading="lazy" /><strong>{item.name}</strong>
-      </button>
-    })}</div>
-    <div className="farm-shop-action">
-      <p role="status">{message || (!owned && !affordable ? `还差 ${(character.price - profile.coins).toLocaleString()} 金币，战斗结算即可获得` : '击败怪物、拾取金币，结算后用来解锁新角色')}</p>
-      <button className="farm-primary" type="button" disabled={equipped || (!owned && !affordable)} onClick={() => {
-        const result = selectFarmCharacter(character.id)
-        onChange(result.profile)
-        setMessage(result.error ?? `${owned ? '已切换为' : '解锁成功！'} ${character.name}，上场吧！`)
-      }}>{equipped ? '✓ 当前角色' : owned ? '使用角色 ↗' : `解锁并使用 · ✦ ${character.price.toLocaleString()}`}</button>
-      <small>角色与金币保存在当前浏览器</small>
-    </div>
+    <header className="farm-shop-bar">
+      <button className="farm-shop-back" type="button" aria-label="返回游戏" onClick={() => onClose?.()}><span aria-hidden="true">‹</span></button>
+      <div className="farm-shop-title"><small>BAND BACKSTAGE</small><h2>角色商店</h2></div>
+      <span className="farm-shop-wallet"><i aria-hidden="true">✦</i><span><small>金币</small><strong>{profile.coins.toLocaleString()}</strong></span></span>
+    </header>
+    {message && <p className="farm-shop-toast" role="status">{message}</p>}
+    <main className="farm-shop-showcase">
+      <div className="farm-shop-status"><span>{equipped ? '当前装备' : owned ? '已拥有' : '待解锁角色'}</span><strong>{owned ? character.name : `✦ ${character.price.toLocaleString()}`}</strong></div>
+      <section className="farm-shop-stage">
+        <div className="farm-shop-window" aria-hidden="true"><i /><i /><i /></div>
+        <div className="farm-shop-preview" style={{ '--character-glow': character.colors.glow } as React.CSSProperties}>
+          <div className="farm-shop-halo" aria-hidden="true" />
+          <img key={character.id} src={character.image} alt={character.name} />
+        </div>
+        <div className="farm-shop-platform" aria-hidden="true"><span /></div>
+      </section>
+      <section className="farm-shop-detail">
+        <div>
+          <small>NO. {String(FARM_CHARACTERS.indexOf(character) + 1).padStart(2, '0')}</small>
+          <h3>{character.name}</h3>
+          <p>{owned ? character.desc : `还差 ${missing.toLocaleString()} 金币，打完这局就能带走`}</p>
+        </div>
+        <button type="button" className={`farm-shop-action${equipped ? ' is-active' : ''}${!owned ? ' is-buy' : ''}`} disabled={equipped || (!owned && !affordable)} onClick={() => {
+          const result = selectFarmCharacter(character.id)
+          onChange(result.profile)
+          setMessage(result.error ?? `${owned ? '已切换为' : '解锁成功！'} ${character.name}，上场吧！`)
+        }}>{equipped ? '使用中' : owned ? '使用角色' : `解锁 · ✦${character.price.toLocaleString()}`}</button>
+      </section>
+    </main>
+    <section className="farm-shop-picker" aria-label="可选角色">
+      <header className="farm-shop-picker-head"><div><small>CHARACTER COLLECTION</small><strong>选择角色</strong></div><span><b>{profile.owned.length}</b> / {FARM_CHARACTERS.length}</span></header>
+      <div className="farm-shop-list">{FARM_CHARACTERS.map((item) => {
+        const unlocked = profile.owned.includes(item.id), active = profile.selected === item.id
+        return <button type="button" key={item.id} aria-label={`预览${item.name}`} aria-pressed={item.id === previewId} className={`${item.id === previewId ? 'is-focused ' : ''}${active ? 'is-active ' : ''}${unlocked ? 'is-owned' : ''}`} onClick={() => setPreviewId(item.id)}>
+          <small className="farm-shop-badge">{active ? '使用中' : unlocked ? '已拥有' : `✦${item.price.toLocaleString()}`}</small>
+          <span className="farm-shop-thumb"><img src={item.image} alt="" loading="lazy" /></span>
+          <strong>{item.name}</strong>
+        </button>
+      })}</div>
+    </section>
   </div>
 }
