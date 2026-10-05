@@ -2,13 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { loadPlayer, melodyRequest, savePlayer } from '@/features/melody/leaderboard'
 import type { Board } from '@/features/melody/leaderboard'
 import { formatFarmTime } from '@/features/farm/presentation'
-import { FPS, validDay } from '@/features/farm/rules.mjs'
+import { FPS } from '@/features/farm/rules.mjs'
 import type { FarmRound } from '@/features/farm/rules.mjs'
 import './FarmBoard.css'
 
-export function FarmBoard({ day, round }: { day: string; round?: FarmRound | null }) {
-  const [viewDay, setViewDay] = useState(day)
-  const openedDay = useRef(day)
+export function FarmBoard({ round }: { round?: FarmRound | null }) {
   const [player, setPlayer] = useState(loadPlayer)
   const [name, setName] = useState(player.name)
   const [board, setBoard] = useState<Board | null>(null)
@@ -24,27 +22,22 @@ export function FarmBoard({ day, round }: { day: string; round?: FarmRound | nul
     boardRef.current = controller
     setError('')
     setBoard(null)
-    void melodyRequest<Board>(`leaderboard?${new URLSearchParams({ day: viewDay, playerId: player.id })}`, controller.signal, undefined, 'farm')
+    void melodyRequest<Board>(`leaderboard?${new URLSearchParams({ playerId: player.id })}`, controller.signal, undefined, 'farm')
       .then((value) => { if (!controller.signal.aborted) setBoard(value) })
       .catch(() => { if (!controller.signal.aborted) setError('生存榜暂时连不上，点刷新再试一次。') })
     return () => controller.abort()
-  }, [viewDay, player.id, revision])
+  }, [player.id, revision])
 
   useEffect(() => {
     setBusy(false)
     return () => submitRef.current?.abort()
-  }, [round, day])
-
-  // Follow the game when the day rolls over, but keep a date the player picked.
-  useEffect(() => { if (openedDay.current !== day && validDay(day)) { openedDay.current = day; setViewDay(day) } }, [day])
+  }, [round])
 
   const submitted = !!round && submittedRound === round
-  return <section className="farm-board" aria-label="今日无限榜">
-    <div className="farm-board-heading"><div><span>SURVIVOR CLUB</span><h2>🏆 今日无限榜</h2></div><button type="button" aria-label="刷新生存榜" disabled={busy} onClick={() => setRevision((value) => value + 1)}>↻</button></div>
-    <p className="farm-board-caption">每日同一怪潮 · 无限生存 · 每人保留最高分</p>
-    <p className="farm-board-day"><label htmlFor="farm-board-day">查看日期</label><input id="farm-board-day" type="date" value={viewDay} max={day} onChange={(event) => { const next = event.target.value; if (!validDay(next)) { setError('请选择有效日期。'); return } setError(''); setViewDay(next) }} />{viewDay !== day && <button type="button" onClick={() => setViewDay(day)}>回到今天</button>}</p>
-    {viewDay !== day && !error && <p role="status" className="farm-board-empty">正在查看 {viewDay} 的榜单，上榜只对今天的成绩开放。</p>}
-    {viewDay === day && round && round.score > 0 && (submitted ? <p role="status" className="farm-board-success">上榜啦！{board?.own && `今天第 ${board.own.rank} 名`}，下次冲得更高 ♡</p> : <form onSubmit={(event) => {
+  return <section className="farm-board" aria-label="无限总榜">
+    <div className="farm-board-heading"><div><span>SURVIVOR CLUB</span><h2>🏆 无限总榜</h2></div><button type="button" aria-label="刷新生存榜" disabled={busy} onClick={() => setRevision((value) => value + 1)}>↻</button></div>
+    <p className="farm-board-caption">无限生存 · 历史总排名 · 每人保留最高分</p>
+    {round && round.score > 0 && (submitted ? <p role="status" className="farm-board-success">上榜啦！{board?.own && `总榜第 ${board.own.rank} 名`}，下次冲得更高 ♡</p> : <form onSubmit={(event) => {
       event.preventDefault()
       if (busy) return
       if (!name.trim()) { setError('给你的乐手取个昵称吧。'); return }
@@ -69,8 +62,8 @@ export function FarmBoard({ day, round }: { day: string; round?: FarmRound | nul
         <span className="farm-board-rank">{entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : entry.rank}</span>
         <div><strong>{entry.name}{entry.isYou ? ' · 你' : ''}</strong><small>生存 {formatFarmTime(entry.seconds * FPS)} · 最高 {entry.maxCombo} 连击 <span aria-label={`${entry.stars} 星`}>{'★'.repeat(entry.stars)}</span></small></div>
         <b>{entry.score.toLocaleString()}<small>战斗分</small></b>
-      </li>)}</ol> : <p className="farm-board-empty">今天的首位幸存者，等你来挑战 ♫</p>}
-      {board.own && <p className="farm-board-own">你的最佳 {board.own.score.toLocaleString()} 分 · 生存 {formatFarmTime(board.own.seconds * FPS)} · 第 {board.own.rank} / {board.total} 名</p>}
+      </li>)}</ol> : <p className="farm-board-empty">总榜首位幸存者，等你来挑战 ♫</p>}
+      {board.own && <p className="farm-board-own">你的历史最佳 {board.own.score.toLocaleString()} 分 · 生存 {formatFarmTime(board.own.seconds * FPS)} · 第 {board.own.rank} / {board.total} 名</p>}
     </>}
     <p className="farm-board-note">当前浏览器记住你的昵称和上榜身份</p>
   </section>

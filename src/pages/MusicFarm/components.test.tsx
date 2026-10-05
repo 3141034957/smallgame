@@ -57,7 +57,7 @@ describe('farm screens render', () => {
     const round = { day, frames: [[50, 76]], choices: [], surges: [], outcome: 'defeated', hp: 0, seconds: 42, score: 4321,
       maxCombo: 12, harvested: 90, bosses: 1, elites: 0, blocks: 0, maxShields: 0, coins: 200, xp: 30, stars: 1,
       gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])) }
-    const html = renderToStaticMarkup(<FarmBoard day={day} round={round as never} />)
+    const html = renderToStaticMarkup(<FarmBoard round={round as never} />)
     expect(html).toContain('上榜')
     expect(html).toContain('留下这一局的战绩')
     const stats = renderToStaticMarkup(<MemoryRouter initialEntries={[`/farm?day=${day}&stats=1`]}><MusicFarm /></MemoryRouter>)
@@ -68,9 +68,10 @@ describe('farm screens render', () => {
     const shop = renderToStaticMarkup(<CharacterShop profile={profile as never} onChange={() => {}} />)
     expect(shop).toContain('角色商店')
     expect(shop).toContain('500')
-    const board = renderToStaticMarkup(<FarmBoard day={day} round={null} />)
-    expect(board).toContain('今日无限榜')
-    expect(board).toContain('查看日期')
+    const board = renderToStaticMarkup(<FarmBoard round={null} />)
+    expect(board).toContain('无限总榜')
+    expect(board).not.toContain('查看日期')
+    expect(board).not.toContain('type="date"')
     expect(createFarm(day).day).toBe(day)
   })
 })

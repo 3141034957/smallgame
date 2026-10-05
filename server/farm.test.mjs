@@ -54,7 +54,7 @@ function createRequest(store) {
   }
 }
 
-describe('replay-verified daily farm leaderboard', () => {
+describe('replay-verified all-time farm leaderboard', () => {
   it('derives the ranking from a completed endless run, ignoring client-provided rewards', () => {
     expect(round.frames.length).toBeGreaterThan(FPS * 60)
     expect(round.outcome).toBe('defeated')
@@ -98,7 +98,7 @@ describe('replay-verified daily farm leaderboard', () => {
     ]) expect(verifyFarm(bad)).toBeNull()
   })
 
-  it('submits, ranks two farmers, preserves each best score and isolates dates and games', async () => {
+  it('submits, ranks two farmers, preserves each best score across dates and isolates games', async () => {
     const store = createMelodyStore(':memory:')
     const request = createRequest(store)
     try {
@@ -113,13 +113,73 @@ describe('replay-verified daily farm leaderboard', () => {
       const retry = await request('POST', '/api/farm/score', JSON.stringify({ ...lowerRound, playerId: input.playerId, name: '丰收小兔' }))
       expect(retry.data.own.score).toBe(round.score)
       expect(retry.data.total).toBe(2)
-      const board = await request('GET', `/api/farm/leaderboard?day=${day}&playerId=${input.playerId}`)
+      const board = await request('GET', `/api/farm/leaderboard?playerId=${input.playerId}`)
       expect(board.data.data.map((entry) => entry.score)).toEqual([round.score, lowerRound.score])
       expect(board.data.own.rank).toBe(1)
-      expect((await request('GET', '/api/farm/leaderboard?day=2026-10-05')).data.total).toBe(0)
+      expect((await request('GET', '/api/farm/leaderboard?day=2026-10-05')).data.total).toBe(2)
       expect(store.board(`wave:v1:${day}`, 'wave').total).toBe(0)
       expect(store.board(`farm:v3:${day}`, 'farm').total).toBe(0)
       expect(store.board(`island:v1:${day}`, 'island').total).toBe(0)
+    } finally { store.close() }
+  })
+
+  it('includes existing daily records, deduplicates players and returns the all-time best after submission', async () => {
+    const store = createMelodyStore(':memory:')
+    const request = createRequest(store)
+    const record = verifyFarm(input)
+    try {
+      store.submit({ ...record, songId: farmKey('2026-10-01'), score: round.score + 100, seconds: 200 }, 100)
+      store.submit({ ...record, songId: farmKey('2026-10-02'), score: round.score - 1 }, 200)
+      store.submit({ ...record, playerId: 'farm_historical_player', songId: farmKey('2026-09-30'), score: round.score + 200 }, 50)
+      for (const [songId, difficulty] of [[`farm:v3:${day}`, 'farm'], [`wave:v1:${day}`, 'wave'], [farmKey(day), 'melody']]) {
+        store.submit({ ...record, playerId: 'other_game_player', songId, difficulty, score: 999999 })
+      }
+      const before = await request('GET', `/api/farm/leaderboard?playerId=${input.playerId}`)
+      expect(before.data.total).toBe(2)
+      expect(before.data.data.map((entry) => entry.score)).toEqual([round.score + 200, round.score + 100])
+      expect(before.data.own).toMatchObject({ rank: 2, score: round.score + 100, seconds: 200, isYou: true })
+      const submitted = await request('POST', '/api/farm/score', JSON.stringify(input))
+      expect(submitted.data).toMatchObject({ acceptedScore: round.score, total: 2, own: { rank: 2, score: round.score + 100, seconds: 200 } })
+      expect(store.board(farmKey('2026-10-01'), 'farm').total).toBe(1)
+      expect(store.board(farmKey(day), 'farm', input.playerId).own.score).toBe(round.score)
+    } finally { store.close() }
+  })
+
+  it('breaks cross-day ties consistently and updates the personal best when a later day improves it', async () => {
+    const store = createMelodyStore(':memory:')
+    const request = createRequest(store)
+    const record = { ...verifyFarm(input), score: 1000, accuracy: 100, maxCombo: 10 }
+    try {
+      store.submit({ ...record, songId: farmKey('2026-10-01'), seconds: 50 }, 100)
+      store.submit({ ...record, songId: farmKey('2026-10-02'), seconds: 60 }, 200)
+      let board = (await request('GET', `/api/farm/leaderboard?playerId=${input.playerId}`)).data
+      expect(board.own.seconds).toBe(50)
+      store.submit({ ...record, songId: farmKey('2026-10-03'), accuracy: 101, maxCombo: 1, seconds: 70 }, 300)
+      store.submit({ ...record, songId: farmKey('2026-10-04'), accuracy: 101, maxCombo: 2, seconds: 80 }, 400)
+      board = (await request('GET', `/api/farm/leaderboard?playerId=${input.playerId}`)).data
+      expect(board.own).toMatchObject({ seconds: 80, accuracy: 1.01, maxCombo: 2 })
+      store.submit({ ...record, songId: farmKey('2026-10-05'), score: 1001, seconds: 90 }, 500)
+      board = (await request('GET', `/api/farm/leaderboard?playerId=${input.playerId}`)).data
+      expect(board).toMatchObject({ total: 1, own: { score: 1001, seconds: 90, rank: 1 } })
+    } finally { store.close() }
+  })
+
+  it('counts unique players and returns personal ranks beyond the first 50', async () => {
+    const store = createMelodyStore(':memory:')
+    const request = createRequest(store)
+    const record = verifyFarm(input)
+    try {
+      for (let index = 0; index < 55; index++) {
+        const playerId = `farm_rank_${String(index).padStart(3, '0')}`
+        store.submit({ ...record, playerId, songId: farmKey('2026-10-01'), score: 1000 }, 100)
+        store.submit({ ...record, playerId, songId: farmKey('2026-10-02'), score: 999 }, 200)
+      }
+      const board = (await request('GET', '/api/farm/leaderboard?playerId=farm_rank_054')).data
+      expect(board.total).toBe(55)
+      expect(board.data).toHaveLength(50)
+      expect(board.data.map((entry) => entry.rank)).toEqual(Array.from({ length: 50 }, (_, index) => index + 1))
+      expect(board.own).toMatchObject({ rank: 55, score: 1000, isYou: true })
+      expect((await request('GET', '/api/farm/leaderboard?playerId=unknown_player')).data.own).toBeNull()
     } finally { store.close() }
   })
 
@@ -127,8 +187,8 @@ describe('replay-verified daily farm leaderboard', () => {
     const store = createMelodyStore(':memory:')
     const request = createRequest(store)
     try {
-      expect((await request('GET', '/api/farm/leaderboard?day=2026-02-30')).status).toBe(400)
-      expect((await request('GET', '/api/farm/leaderboard')).status).toBe(400)
+      expect((await request('GET', '/api/farm/leaderboard?day=2026-02-30')).status).toBe(200)
+      expect((await request('GET', '/api/farm/leaderboard')).data).toEqual({ data: [], own: null, total: 0 })
       expect((await request('POST', '/api/farm/score', '{')).status).toBe(400)
       expect((await request('POST', '/api/farm/score', 'a'.repeat(MAX_FARM_BODY_BYTES + 1))).status).toBe(413)
       expect((await request('POST', '/api/farm/score', JSON.stringify({ ...input, score: 999999 }))).status).toBe(400)

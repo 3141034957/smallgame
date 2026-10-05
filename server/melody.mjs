@@ -63,6 +63,21 @@ export function createMelodyStore(databasePath) {
       const total = db.prepare('SELECT COUNT(*) AS total FROM melody_scores WHERE song_id = ? AND difficulty = ?').get(songId, difficulty).total
       return { data: rows.map((row) => toEntry(row, playerId)), own: toEntry(own, playerId), total }
     },
+    boardAcrossDays(songPrefix, difficulty, playerId = null) {
+      // Keep existing daily records and select each player's best full record.
+      const allTimeRanking = `WITH personal AS (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY player_id
+          ORDER BY score DESC, accuracy DESC, max_combo DESC, updated_at ASC, song_id ASC) AS best
+        FROM melody_scores WHERE song_id GLOB ? AND difficulty = ?
+      ) SELECT *, ROW_NUMBER() OVER (
+        ORDER BY score DESC, accuracy DESC, max_combo DESC, updated_at ASC, player_id ASC
+      ) AS rank FROM personal WHERE best = 1`
+      const pattern = `${songPrefix}????-??-??`
+      const rows = db.prepare(`SELECT * FROM (${allTimeRanking}) ORDER BY rank LIMIT 50`).all(pattern, difficulty)
+      const own = playerId ? db.prepare(`SELECT * FROM (${allTimeRanking}) WHERE player_id = ?`).get(pattern, difficulty, playerId) : null
+      const total = db.prepare('SELECT COUNT(DISTINCT player_id) AS total FROM melody_scores WHERE song_id GLOB ? AND difficulty = ?').get(pattern, difficulty).total
+      return { data: rows.map((row) => toEntry(row, playerId)), own: toEntry(own, playerId), total }
+    },
     close: () => db.close(),
   }
 }
