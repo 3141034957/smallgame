@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EXPERIENCE_STAGES, FPS, RECIPES, TALENTS, THRESHOLDS, UPGRADE_XP, chooseTalent, createFarm, stepFarm } from './rules.mjs'
+import { EXPERIENCE_STAGES, FPS, MAX_GEAR_LEVEL, RECIPES, TALENTS, THRESHOLDS, UPGRADE_XP, chooseTalent, createFarm, stepFarm } from './rules.mjs'
 import { modifierDays, simulateFarm } from '../../../scripts/check-farm-balance.mjs'
 
 const arena = (tick = 0) => ({ ...createFarm('2026-10-04'), tick, crops: [], position: [50, 50], nextWave: Infinity, nextBoss: Infinity, nextBass: Infinity, lastPulse: tick, modifier: 'none' })
@@ -18,15 +18,15 @@ function reward(enemy, tick, lucky = 0, modifier = 'none') {
 }
 
 describe('farm experience progression', () => {
-  it('increases every upgrade cost, with cumulative thresholds for all 36 choices', () => {
-    expect(UPGRADE_XP).toHaveLength(TALENTS.length * 3)
-    expect(UPGRADE_XP.slice(0, 6)).toEqual([20, 45, 75, 110, 150, 200])
+  it('increases every upgrade cost, with cumulative thresholds for every choice', () => {
+    expect(UPGRADE_XP).toHaveLength(TALENTS.length * MAX_GEAR_LEVEL)
+    expect(UPGRADE_XP.slice(0, 6)).toEqual([20, 41, 62, 85, 109, 134])
     for (let index = 0; index < UPGRADE_XP.length; index++) {
       expect(Number.isSafeInteger(UPGRADE_XP[index])).toBe(true)
       expect(UPGRADE_XP[index]).toBeGreaterThan(UPGRADE_XP[index - 1] ?? 0)
       expect(THRESHOLDS[index] - (THRESHOLDS[index - 1] ?? 0)).toBe(UPGRADE_XP[index])
     }
-    expect(UPGRADE_XP.at(-1)).toBe(3500)
+    expect(UPGRADE_XP.at(-1)).toBe(20 + 20 * 59 + Math.round(0.55 * 59 ** 2))
   })
 
   it('does not upgrade early and carries pickup overflow through consecutive choices', () => {
@@ -115,10 +115,10 @@ describe('farm experience progression', () => {
     for (const run of runs) {
       expect(run.upgrades[0], `${run.modifier}/${run.focus}: first choice`).toBeLessThan(5)
       expect(run.evolutions.length, `${run.modifier}/${run.focus}: no evolution`).toBeGreaterThan(0)
-      expect(run.evolutions[0].seconds).toBeLessThan(45)
+      expect(run.evolutions[0].seconds).toBeLessThan(60)
       expect(run.seconds).toBeGreaterThan(30)
       expect(run.snapshots[30]).toBeGreaterThanOrEqual(6)
-      expect(run.snapshots[30]).toBeLessThanOrEqual(15)
+      expect(run.snapshots[30]).toBeLessThanOrEqual(18)
       if (run.snapshots[60]) expect(run.snapshots[60]).toBeGreaterThan(run.snapshots[30])
       if (run.snapshots[120]) expect(run.snapshots[120]).toBeGreaterThan(run.snapshots[60])
       if (run.snapshots[180]) expect(run.snapshots[180]).toBeGreaterThan(run.snapshots[120])
@@ -129,7 +129,7 @@ describe('farm experience progression', () => {
     for (const day of days) {
       const run = simulateFarm(day, 'echo', false, 120)
       expect(run.upgrades[0]).toBeLessThan(5)
-      expect(run.evolutions[0]?.seconds).toBeLessThan(45)
+      expect(run.evolutions[0]?.seconds).toBeLessThan(60)
       expect(run.seconds).toBe(120)
       expect(run.snapshots[120]).toBeGreaterThan(run.snapshots[60])
     }

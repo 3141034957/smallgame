@@ -5,6 +5,7 @@ export type FarmModifier = { id: string; name: string; icon: string; desc: strin
 export const FARM_MODIFIERS: FarmModifier[]
 export function farmModifier(day: string): FarmModifier
 export const MAX_BOSSES: number
+export const MAX_GEAR_LEVEL: number
 export const HEAL_COOLDOWN: number
 export const HEAL_TTL: number
 export const HEAL_WOUNDED: number

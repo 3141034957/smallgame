@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Readable } from 'node:stream'
 import { createMelodyStore } from './melody.mjs'
 import { farmKey, handleFarmRequest, MAX_FARM_BODY_BYTES, MAX_FARM_FRAMES, verifyFarm } from './farm.mjs'
-import { FPS, RECIPES, chooseTalent, clampPoint, createFarm, replayFarm, stepFarm } from '../src/features/farm/rules.mjs'
+import { FPS, MAX_GEAR_LEVEL, RECIPES, chooseTalent, clampPoint, createFarm, replayFarm, stepFarm } from '../src/features/farm/rules.mjs'
 
 const day = '2026-10-04'
 // The fixture farmer keeps its distance from the closest monster instead of
@@ -28,8 +28,8 @@ function playFixture(active = true) {
   const recipe = RECIPES.find((item) => item.weapon === FOCUS)
   for (let tick = 0; tick < FPS * 60 * 10 && state.hp > 0; tick++) {
     while (state.offered.length) {
-      const id = state.offered.includes(FOCUS) && state.gear[FOCUS] < 3 ? FOCUS
-        : state.offered.includes(recipe.chip) && state.gear[recipe.chip] < 3 ? recipe.chip : state.offered[0]
+      const id = state.offered.includes(FOCUS) && state.gear[FOCUS] < MAX_GEAR_LEVEL ? FOCUS
+        : state.offered.includes(recipe.chip) && state.gear[recipe.chip] < MAX_GEAR_LEVEL ? recipe.chip : state.offered[0]
       choices.push({ tick, id }); state = chooseTalent(state, id)
     }
     const point = clampPoint(state.position, active ? flee(state, [50 + 32 * Math.sin(tick / 45), 50 + 30 * Math.cos(tick / 61)]) : state.position)

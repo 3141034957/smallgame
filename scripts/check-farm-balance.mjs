@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
-import { FPS, RECIPES, chooseTalent, clampPoint, createFarm, evolved, farmModifier, stepFarm } from '../src/features/farm/rules.mjs'
+import { FPS, MAX_GEAR_LEVEL, RECIPES, chooseTalent, clampPoint, createFarm, evolved, farmModifier, stepFarm } from '../src/features/farm/rules.mjs'
 
 // Deterministic moving player: no invulnerability, injected XP or free gear.
 export function simulateFarm(day, focus = 'echo', dodge = true, seconds = 300) {
@@ -9,8 +9,8 @@ export function simulateFarm(day, focus = 'echo', dodge = true, seconds = 300) {
   const recipe = RECIPES.find((item) => item.weapon === focus)
   for (let tick = 0; tick < FPS * seconds && state.hp > 0; tick++) {
     while (state.offered.length) {
-      const id = state.offered.includes(focus) && state.gear[focus] < 3 ? focus
-        : state.offered.includes(recipe.chip) && state.gear[recipe.chip] < 3 ? recipe.chip : state.offered[0]
+      const id = state.offered.includes(focus) && state.gear[focus] < MAX_GEAR_LEVEL ? focus
+        : state.offered.includes(recipe.chip) && state.gear[recipe.chip] < MAX_GEAR_LEVEL ? recipe.chip : state.offered[0]
       state = chooseTalent(state, id)
       upgrades.push(tick / FPS)
       for (const form of evolved(state.gear)) if (!evolutions.some((item) => item.form === form)) evolutions.push({ form, seconds: tick / FPS })

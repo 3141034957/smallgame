@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createFarm, stepFarm, FPS, HEAL_COOLDOWN, HEAL_TTL, SHIELD_COOLDOWN, SHIELD_LIMIT } from './rules.mjs'
+import { createFarm, stepFarm, FPS, HEAL_COOLDOWN, HEAL_TTL, MAX_GEAR_LEVEL, SHIELD_COOLDOWN, SHIELD_LIMIT } from './rules.mjs'
 const enemy = (id, kind, x, y, boss = false) => ({ id, kind, x, y, hp: 100, maxHp: 100, boss, regrow: -1 })
 const arena = (enemies, tick = 100) => ({ ...createFarm('2026-10-04'), position: [50,50], crops: enemies, tick, nextBoss: Infinity, nextWave: Infinity, lastPulse: tick, hurtUntil: 0 })
 const step = (s, surge = false) => stepFarm(s, s.position, surge)
@@ -115,7 +115,7 @@ describe('survivor combat', () => {
     expect(struck.state.crops[0].x).toBeGreaterThan(56)
     expect(struck.events.find((event) => event.kind === 'shock').radius).toBe(30)
     // The final form fires three rings in a row instead of one.
-    const first = ring({ bell: 3, sustain: 3 }, 108)
+    const first = ring({ bell: MAX_GEAR_LEVEL, sustain: MAX_GEAR_LEVEL }, 108)
     expect(first.events.filter((event) => event.kind === 'shock')).toHaveLength(1)
     expect(first.state.bellRings).toBe(2)
     const second = step({ ...first.state, tick: 112, lastPulse: 112 })
@@ -123,7 +123,8 @@ describe('survivor combat', () => {
     expect(second.events.filter((event) => event.kind === 'shock')).toHaveLength(1)
     expect(third.events.filter((event) => event.kind === 'shock')).toHaveLength(1)
     expect(third.state.bellRings).toBe(0)
-    expect(step({ ...third.state, tick: 120, lastPulse: 120 }).events.filter((event) => event.kind === 'shock')).toHaveLength(0)
+    // The ring cadence shortens with the top-level chip, so the quiet tick moves too.
+    expect(step({ ...third.state, tick: 124, lastPulse: 124 }).events.filter((event) => event.kind === 'shock')).toHaveLength(0)
   })
   it('sends gold-record elites after 45 seconds: tougher, dashing and worth more', () => {
     const wave = (tick) => {

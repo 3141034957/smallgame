@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FPS, MAX_BOSSES, RECIPES, TALENTS, THRESHOLDS, chooseTalent, createFarm, evolved, finishFarm, orbitPositions, stepFarm } from './rules.mjs'
+import { FPS, MAX_BOSSES, MAX_GEAR_LEVEL, RECIPES, TALENTS, THRESHOLDS, chooseTalent, createFarm, evolved, finishFarm, orbitPositions, stepFarm } from './rules.mjs'
 
 const day = '2026-10-04'
 const arena = (tick) => ({ ...createFarm(day), tick, crops: [], nextWave: Infinity, nextBoss: Infinity, lastPulse: tick })
@@ -19,12 +19,12 @@ describe('endless survival', () => {
     let state = arena(2 * 60 * FPS)
     state.xp = THRESHOLDS.at(-1)
     state = stepFarm(state, state.position).state
-    for (let index = 0; index < TALENTS.length * 3; index++) {
+    for (let index = 0; index < TALENTS.length * MAX_GEAR_LEVEL; index++) {
       expect(state.offered.length).toBeGreaterThan(0)
-      expect(state.offered.every((id) => state.gear[id] < 3)).toBe(true)
+      expect(state.offered.every((id) => state.gear[id] < MAX_GEAR_LEVEL)).toBe(true)
       state = chooseTalent(state, state.offered[0])
     }
-    expect(state.level).toBe(TALENTS.length * 3)
+    expect(state.level).toBe(TALENTS.length * MAX_GEAR_LEVEL)
     expect(evolved(state.gear)).toHaveLength(RECIPES.length)
     expect(state.offered).toEqual([])
     expect(stepFarm(state, state.position)?.state.tick).toBe(state.tick + 1)

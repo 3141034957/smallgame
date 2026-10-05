@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { farmShareText } from './share'
+import { MAX_GEAR_LEVEL } from './rules.mjs'
 import type { FarmRound } from './rules.mjs'
 
 const round = (patch: Partial<FarmRound> = {}): FarmRound => ({
   day: '2026-10-04', frames: [[50, 76]], choices: [], surges: [], outcome: 'defeated', hp: 0, seconds: 185, score: 12345,
   maxCombo: 40, harvested: 820, bosses: 5, elites: 2, blocks: 3, maxShields: 2, coins: 900, xp: 40, stars: 2,
-  gear: { drum: 3, orbit: 0, magnet: 0, range: 3, tempo: 0, power: 0, echo: 0, lucky: 0, bell: 0, sustain: 0, whistle: 0, delay: 0 }, ...patch,
+  gear: { drum: MAX_GEAR_LEVEL, orbit: 0, magnet: 0, range: MAX_GEAR_LEVEL, tempo: 0, power: 0, echo: 0, lucky: 0, bell: 0, sustain: 0, whistle: 0, delay: 0 }, ...patch,
 })
 
 describe('result share text', () => {
@@ -17,8 +18,8 @@ describe('result share text', () => {
     expect(text).toContain('击败 820')
     expect(text).toContain('巨兽 5')
     expect(text).toContain('精英 2')
-    expect(text).toContain('音盾挡下 3 次')
-    expect(text).toContain('主力 鼓手咚咚 Lv.3')
+    expect(text).toContain('挡下 3 次攻击')
+    expect(text).toContain(`主力 鼓手咚咚 Lv.${MAX_GEAR_LEVEL}`)
     expect(text).toContain('终极 雷霆鼓组')
     expect(text.length).toBeLessThan(200)
   })

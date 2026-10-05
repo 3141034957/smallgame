@@ -2,11 +2,15 @@ import { routeSeed, todayRoute, validDay } from '../island/rules.mjs'
 export { todayRoute, validDay }
 export const FPS = 16
 export const MOVE_STEP = 3
+// Every band member and piece of gear climbs to this level; reaching it on a
+// matching pair unlocks that instrument's final form.
+export const MAX_GEAR_LEVEL = 5
 export const START = [50, 76]
 // Keep the first recipe attainable, then grow the cost of each additional
 // upgrade. XP is cumulative; picking a talent never discards overflow.
-export const UPGRADE_XP = [20, 45, 75, 110, 150, 200,
-  ...Array.from({ length: 30 }, (_, index) => { const level = index + 1; return 200 + 50 * level + 2 * level ** 2 })]
+// Five levels per item means more picks before a form evolves, so each step
+// costs less than before: the first evolution still lands inside a normal run.
+export const UPGRADE_XP = Array.from({ length: 60 }, (_, index) => Math.round(20 + 20 * index + 0.55 * index ** 2))
 export const THRESHOLDS = UPGRADE_XP.map((_, index) => UPGRADE_XP.slice(0, index + 1).reduce((sum, cost) => sum + cost, 0))
 export const EXPERIENCE_STAGES = [
   { seconds: 0, multiplier: 1 },
@@ -43,7 +47,7 @@ export const TALENTS = [
 ]
 export const RECIPES = [
   { weapon: 'drum', chip: 'range', name: '雷霆鼓组', icon: '🥁', description: '爆破范围大幅扩张，连锁伤害翻倍' },
-  { weapon: 'orbit', chip: 'tempo', name: '星环电吉他', icon: '🎸', description: '六道音刃环绕，触碰伤害翻倍' },
+  { weapon: 'orbit', chip: 'tempo', name: '星环电吉他', icon: '🎸', description: '八道音刃环绕，触碰伤害翻倍' },
   { weapon: 'power', chip: 'magnet', name: '黑洞贝斯', icon: '🎻', description: '黑洞大范围收割，全场经验涌向你' },
   { weapon: 'echo', chip: 'lucky', name: '星雨麦克风', icon: '🎤', description: '一次追击八只怪，全场降下暴击音雨' },
   { weapon: 'bell', chip: 'sustain', name: '银河键盘', icon: '🎹', description: '星浪连发三圈，范围与伤害大幅提升' },
@@ -60,14 +64,14 @@ export const FARM_MODIFIERS = [
   { id: 'brisk', name: '短弓', icon: '♭', desc: '巨兽来得更早，奖励多两成', boss: 0.8, reward: 1.2 },
 ]
 export const farmModifier = (day) => FARM_MODIFIERS[routeSeed(day, 'farm-mod') % FARM_MODIFIERS.length]
-export const evolved = (gear) => RECIPES.filter((recipe) => gear[recipe.weapon] >= 3 && gear[recipe.chip] >= 3).map((recipe) => recipe.weapon)
+export const evolved = (gear) => RECIPES.filter((recipe) => gear[recipe.weapon] >= MAX_GEAR_LEVEL && gear[recipe.chip] >= MAX_GEAR_LEVEL).map((recipe) => recipe.weapon)
 const PITCHES = [60, 64, 67, 69, 72, 76]
 export function clampPoint(previous, desired) {
   const dx = desired[0] - previous[0], dy = desired[1] - previous[1], length = Math.hypot(dx, dy), scale = length > MOVE_STEP ? MOVE_STEP / length : 1
   return [Math.round(previous[0] + dx * scale), Math.round(previous[1] + dy * scale)]
 }
 export function synergies(gear) {
-  return RECIPES.filter((recipe) => gear[recipe.weapon] >= 3 && gear[recipe.chip] >= 3).map((recipe) => recipe.name)
+  return RECIPES.filter((recipe) => gear[recipe.weapon] >= MAX_GEAR_LEVEL && gear[recipe.chip] >= MAX_GEAR_LEVEL).map((recipe) => recipe.name)
 }
 const random = (state) => { state.seed = (Math.imul(state.seed, 1664525) + 1013904223) >>> 0; return state.seed / 4294967296 }
 // Allocation-free: the arena is wider than tall, so x keeps its horizontal scale.
@@ -101,7 +105,7 @@ export function createFarm(day) {
   return state
 }
 export function orbitPositions(state) {
-  const count = evolved(state.gear).includes('orbit') ? 6 : state.gear.orbit ? 1 + state.gear.orbit : 0
+  const count = evolved(state.gear).includes('orbit') ? 8 : state.gear.orbit ? 1 + state.gear.orbit : 0
   return Array.from({ length: count }, (_, index) => {
     const angle = state.tick * .18 + index * Math.PI * 2 / count
     return [state.position[0] + Math.cos(angle) * (13 + state.gear.orbit * 2) / .84, state.position[1] + Math.sin(angle) * (13 + state.gear.orbit * 2)]
@@ -115,10 +119,10 @@ function offer(state) {
     state.offered = weapons.filter((_, index) => index !== omitted)
     return
   }
-  const available = TALENTS.filter((talent) => state.gear[talent.id] < 3).map((talent) => talent.id)
+  const available = TALENTS.filter((talent) => state.gear[talent.id] < MAX_GEAR_LEVEL).map((talent) => talent.id)
   const choices = []
-  const focus = TALENTS.filter((talent) => talent.kind === 'weapon' && state.gear[talent.id] > 0 && !(state.gear[talent.id] >= 3 && state.gear[talent.partner] >= 3)).sort((a, b) => state.gear[b.id] - state.gear[a.id])[0]
-  if (focus) { const needed = state.gear[focus.id] < 3 ? focus.id : focus.partner; choices.push(needed); available.splice(available.indexOf(needed), 1) }
+  const focus = TALENTS.filter((talent) => talent.kind === 'weapon' && state.gear[talent.id] > 0 && !(state.gear[talent.id] >= MAX_GEAR_LEVEL && state.gear[talent.partner] >= MAX_GEAR_LEVEL)).sort((a, b) => state.gear[b.id] - state.gear[a.id])[0]
+  if (focus) { const needed = state.gear[focus.id] < MAX_GEAR_LEVEL ? focus.id : focus.partner; choices.push(needed); available.splice(available.indexOf(needed), 1) }
   while (choices.length < 3 && available.length) choices.push(available.splice(Math.floor(random(state) * available.length), 1)[0])
   state.offered = choices
 }

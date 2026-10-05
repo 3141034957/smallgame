@@ -11,7 +11,7 @@ import { FarmBoard } from './FarmBoard'
 import { loadFarmAchievements } from '@/features/farm/achievements'
 import { loadFarmCareer } from '@/features/farm/stats'
 import { farmQuests, loadFarmQuests } from '@/features/farm/quests'
-import { createFarm, TALENTS } from '@/features/farm/rules.mjs'
+import { createFarm, MAX_GEAR_LEVEL, TALENTS } from '@/features/farm/rules.mjs'
 
 // The project has no DOM test environment, so this renders the screens once
 // with react-dom/server to catch crashes and missing copy in the new panels.
@@ -47,7 +47,7 @@ describe('farm screens render', () => {
     expect(goals).toContain('今日目标')
     expect(goals).toContain(farmQuests(day)[0].name)
     expect(goals).toContain('0 / ' + farmQuests(day)[0].target)
-    const gear = Object.fromEntries(TALENTS.map((talent) => [talent.id, talent.id === 'drum' || talent.id === 'range' ? 3 : 0])) as Record<string, number>
+    const gear = Object.fromEntries(TALENTS.map((talent) => [talent.id, talent.id === 'drum' || talent.id === 'range' ? MAX_GEAR_LEVEL : 0])) as Record<string, number>
     const build = renderToStaticMarkup(<BuildSummary gear={gear as never} />)
     expect(build).toContain('雷霆鼓组')
     expect(build).toContain('成员')

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { claimFarmAchievements, FARM_ACHIEVEMENTS, FARM_ACHIEVEMENT_KEY, formatFarmAchievement, loadFarmAchievements } from './achievements'
+import { MAX_GEAR_LEVEL, TALENTS } from './rules.mjs'
 import type { FarmRound } from './rules.mjs'
 
 const round = (patch: Partial<FarmRound> = {}): FarmRound => ({
@@ -22,10 +23,10 @@ describe('survivor achievements', () => {
     const first = claimFarmAchievements(round())
     expect(first.fresh).toEqual(['encore'])
     expect(Object.keys(first.log.unlocked)).toEqual(['encore'])
-    const big = claimFarmAchievements(round({ seconds: 620, harvested: 1200, bosses: 12, elites: 6, blocks: 5, maxShields: 3, maxCombo: 140, score: 120000, coins: 6000, gear: { ...round().gear, drum: 3, range: 3 } }))
+    const big = claimFarmAchievements(round({ seconds: 620, harvested: 1200, bosses: 12, elites: 6, blocks: 5, maxShields: 3, maxCombo: 140, score: 120000, coins: 6000, gear: { ...round().gear, drum: MAX_GEAR_LEVEL, range: MAX_GEAR_LEVEL } }))
     expect(big.fresh).toEqual(['survivor-3', 'survivor-10', 'harvest-1000', 'boss-10', 'combo-100', 'final-form', 'score-100k', 'rich-5000', 'elite-5', 'guard', 'stack'])
     expect(big.log.unlocked['all-forms']).toBeUndefined()
-    const full = claimFarmAchievements(round({ gear: { drum: 3, range: 3, orbit: 3, tempo: 3, power: 3, magnet: 3, echo: 3, lucky: 3, bell: 3, sustain: 3, whistle: 3, delay: 3 } }))
+    const full = claimFarmAchievements(round({ gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, MAX_GEAR_LEVEL])) as FarmRound['gear'] }))
     expect(full.fresh).toEqual(['all-forms'])
     expect(Object.keys(full.log.unlocked)).toHaveLength(FARM_ACHIEVEMENTS.length)
   })

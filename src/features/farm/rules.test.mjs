@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FARM_MODIFIERS, FPS, RECIPES, TALENTS, THRESHOLDS, chooseTalent, clampPoint, createFarm, evolved, farmModifier, orbitPositions, replayFarm, stepFarm } from './rules.mjs'
+import { FARM_MODIFIERS, FPS, MAX_GEAR_LEVEL, RECIPES, TALENTS, THRESHOLDS, chooseTalent, clampPoint, createFarm, evolved, farmModifier, orbitPositions, replayFarm, stepFarm } from './rules.mjs'
 
 const day = '2026-10-04'
 const TEST_TICKS = FPS * 60 * 10
@@ -29,8 +29,8 @@ function run(focus = 'drum', routeDay = day) {
   for (let tick = 0; tick < TEST_TICKS && state.hp > 0; tick++) {
     while (state.offered.length) {
       firstOffer ??= [...state.offered]; firstUpgrade ??= tick
-      const id = state.offered.includes(focus) && state.gear[focus] < 3 ? focus
-        : state.offered.includes(recipe.chip) && state.gear[recipe.chip] < 3 ? recipe.chip : state.offered[0]
+      const id = state.offered.includes(focus) && state.gear[focus] < MAX_GEAR_LEVEL ? focus
+        : state.offered.includes(recipe.chip) && state.gear[recipe.chip] < MAX_GEAR_LEVEL ? recipe.chip : state.offered[0]
       choices.push({ tick, id }); state = chooseTalent(state, id)
       if (evolved(state.gear).includes(focus)) terminalAt ??= tick
     }
@@ -102,13 +102,13 @@ describe('music roguelite farming', () => {
       const id = offered.offered[0]
       const partner = TALENTS.find((item) => item.id === id).partner
       let selected = chooseTalent(offered, id)
-      for (let level = 1; level < 6; level++) {
+      for (let level = 1; level < MAX_GEAR_LEVEL * 2; level++) {
         selected.xp = THRESHOLDS[level]
         selected = stepFarm(selected, selected.position).state
-        const needed = selected.gear[id] < 3 ? id : partner
+        const needed = selected.gear[id] < MAX_GEAR_LEVEL ? id : partner
         expect(selected.offered).toContain(needed)
         expect(new Set(selected.offered).size).toBe(3)
-        expect(selected.offered.every((choice) => selected.gear[choice] < 3)).toBe(true)
+        expect(selected.offered.every((choice) => selected.gear[choice] < MAX_GEAR_LEVEL)).toBe(true)
         selected = chooseTalent(selected, needed)
       }
       expect(evolved(selected.gear)).toContain(id)
@@ -116,28 +116,28 @@ describe('music roguelite farming', () => {
     expect(seen.size).toBe(TALENTS.filter((talent) => talent.kind === 'weapon').length)
   })
 
-  it('requires both matching items at level three for every terminal form', () => {
+  it('requires both matching items at the top level for every terminal form', () => {
     for (const recipe of RECIPES) {
       const gear = createFarm(day).gear
-      gear[recipe.weapon] = 3; gear[recipe.chip] = 2
+      gear[recipe.weapon] = MAX_GEAR_LEVEL; gear[recipe.chip] = MAX_GEAR_LEVEL - 1
       expect(evolved(gear)).not.toContain(recipe.weapon)
-      gear[recipe.weapon] = 2; gear[recipe.chip] = 3
+      gear[recipe.weapon] = MAX_GEAR_LEVEL - 1; gear[recipe.chip] = MAX_GEAR_LEVEL
       expect(evolved(gear)).not.toContain(recipe.weapon)
-      gear[recipe.weapon] = 3
+      gear[recipe.weapon] = MAX_GEAR_LEVEL
       expect(evolved(gear)).toContain(recipe.weapon)
     }
   })
 
   it('turns drum harvests into wider damaging chain blasts without counting a crop twice', () => {
-    const ordinary = arena({ drum: 3, range: 2 }, [crop(0, 50, 50), crop(1, 79, 50, 6)])
+    const ordinary = arena({ drum: MAX_GEAR_LEVEL, range: MAX_GEAR_LEVEL - 1 }, [crop(0, 50, 50), crop(1, 79, 50, 6)])
     ordinary.lastPulse = -8
-    const terminal = structuredClone(ordinary); terminal.gear.range = 3
+    const terminal = structuredClone(ordinary); terminal.gear.range = MAX_GEAR_LEVEL
     const normal = stepFarm(ordinary, ordinary.position)
     const ultimate = stepFarm(terminal, terminal.position)
-    expect(normal.state.crops[1].hp).toBe(6)
+    expect(normal.state.crops[1].hp).toBe(5)
     expect(ultimate.state.crops[1].hp).toBe(0)
     expect(ultimate.events.find((event) => event.kind === 'blast').radius).toBeGreaterThan(normal.events.find((event) => event.kind === 'blast').radius)
-    const dense = arena({ drum: 3, range: 3 }, [crop(0, 50, 50), crop(1, 51, 50), crop(2, 52, 50)])
+    const dense = arena({ drum: MAX_GEAR_LEVEL, range: MAX_GEAR_LEVEL }, [crop(0, 50, 50), crop(1, 51, 50), crop(2, 52, 50)])
     dense.lastPulse = -8
     const chain = stepFarm(dense, dense.position)
     expect(chain.state.harvested).toBe(3)
@@ -146,40 +146,40 @@ describe('music roguelite farming', () => {
     expect(dense.crops.every((item) => item.hp === 1)).toBe(true)
   })
 
-  it('evolves guitar from four rotating blades to six with doubled contact damage', () => {
-    const ordinary = arena({ orbit: 3, tempo: 2 }, [])
+  it('evolves guitar to eight rotating blades with doubled contact damage', () => {
+    const ordinary = arena({ orbit: MAX_GEAR_LEVEL, tempo: MAX_GEAR_LEVEL - 1 }, [])
     const [x, y] = orbitPositions(ordinary)[0]
     ordinary.crops = [crop(0, x, y, 20)]
-    const terminal = structuredClone(ordinary); terminal.gear.tempo = 3
-    expect(orbitPositions(ordinary)).toHaveLength(4)
-    expect(orbitPositions(terminal)).toHaveLength(6)
-    expect(stepFarm(ordinary, ordinary.position).state.crops[0].hp).toBe(17)
-    expect(stepFarm(terminal, terminal.position).state.crops[0].hp).toBe(14)
+    const terminal = structuredClone(ordinary); terminal.gear.tempo = MAX_GEAR_LEVEL
+    expect(orbitPositions(ordinary)).toHaveLength(6)
+    expect(orbitPositions(terminal)).toHaveLength(8)
+    expect(stepFarm(ordinary, ordinary.position).state.crops[0].hp).toBe(15)
+    expect(stepFarm(terminal, terminal.position).state.crops[0].hp).toBe(10)
   })
 
   it('changes the bass column beam into a wide black hole that pulls remote loot', () => {
-    const ordinary = arena({ power: 3, magnet: 2 }, [crop(0, 50, 8, 20), crop(1, 76, 50, 20)])
+    const ordinary = arena({ power: MAX_GEAR_LEVEL, magnet: MAX_GEAR_LEVEL - 1 }, [crop(0, 50, 8, 20), crop(1, 76, 50, 20)])
     ordinary.loot = [{ id: 100, x: 5, y: 5, xp: 7, coins: 8 }]
-    const terminal = structuredClone(ordinary); terminal.gear.magnet = 3
+    const terminal = structuredClone(ordinary); terminal.gear.magnet = MAX_GEAR_LEVEL
     const normal = stepFarm(ordinary, ordinary.position)
     const ultimate = stepFarm(terminal, terminal.position)
     expect(normal.events.some((event) => event.kind === 'beam')).toBe(true)
-    expect(normal.state.crops.map((item) => item.hp)).toEqual([16, 20])
+    expect(normal.state.crops.map((item) => item.hp)).toEqual([14, 20])
     expect(ultimate.events.some((event) => event.kind === 'blackhole')).toBe(true)
     expect(ultimate.events.some((event) => event.kind === 'beam')).toBe(false)
-    expect(ultimate.state.crops.map((item) => item.hp)).toEqual([20, 13])
+    expect(ultimate.state.crops.map((item) => item.hp)).toEqual([20, 11])
     expect(ultimate.state.loot[0].x).toBeGreaterThan(normal.state.loot[0].x + 20)
   })
 
   it('lets terminal harp rain hit eight remote crops and preserves already-due rain at high speed', () => {
-    const ordinary = arena({ echo: 3, lucky: 2 }, Array.from({ length: 8 }, (_, id) => crop(id, 5 + id * 10, 5, 20)))
+    const ordinary = arena({ echo: MAX_GEAR_LEVEL, lucky: MAX_GEAR_LEVEL - 1 }, Array.from({ length: 8 }, (_, id) => crop(id, 5 + id * 10, 5, 20)))
     ordinary.echoDue = 0
-    const terminal = structuredClone(ordinary); terminal.gear.lucky = 3
+    const terminal = structuredClone(ordinary); terminal.gear.lucky = MAX_GEAR_LEVEL
     expect(stepFarm(ordinary, ordinary.position).events.filter((event) => event.kind === 'rain')).toHaveLength(0)
     const rain = stepFarm(terminal, terminal.position)
     expect(rain.events.filter((event) => event.kind === 'rain')).toHaveLength(8)
     expect(rain.state.crops.every((item) => item.hp <= 14)).toBe(true)
-    const fast = arena({ echo: 1, tempo: 3 }, [crop(1, 50, 25, 20)], 3)
+    const fast = arena({ echo: 1, tempo: MAX_GEAR_LEVEL }, [crop(1, 50, 25, 20)], 3)
     Object.assign(fast, { echoDue: 3, lastPulse: 0, surgeUntil: 50 })
     const scheduled = stepFarm(fast, fast.position)
     expect(scheduled.events.filter((event) => event.kind === 'rain')).toHaveLength(1)
@@ -199,7 +199,7 @@ describe('music roguelite farming', () => {
     expect(respawned.crops[0].hp).toBeGreaterThan(0)
     expect(Math.hypot(respawned.crops[0].x - 50, respawned.crops[0].y - 50)).toBeGreaterThan(40)
     expect(respawned.harvested).toBe(1)
-    const magnetic = { ...waiting, gear: { ...waiting.gear, magnet: 3 } }
+    const magnetic = { ...waiting, gear: { ...waiting.gear, magnet: MAX_GEAR_LEVEL } }
     expect(stepFarm(magnetic, magnetic.position).state.loot[0].y).toBeGreaterThan(waiting.loot[0].y)
 
   })
@@ -255,7 +255,7 @@ describe('music roguelite farming', () => {
   it('lets a focused build evolve early on every daily modifier and preserves exact full-run replay', () => {
     for (const [focus, routeDay] of [['drum', '2026-10-01'], ['orbit', '2026-10-04'], ['power', '2026-10-02'], ['echo', '2026-10-01']]) {
       const round = run(focus, routeDay)
-      expect(round.state.gear[focus]).toBe(3)
+      expect(round.state.gear[focus]).toBe(MAX_GEAR_LEVEL)
       expect(round.terminalAt).toBeLessThan(FPS * 60)
       expect(round.state.tick).toBeGreaterThan(FPS * 20)
       const replay = replayFarm(routeDay, round.frames, round.choices, round.surges)
