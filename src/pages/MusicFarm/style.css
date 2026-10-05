@@ -77,7 +77,6 @@
 .farm-badge-bar{display:block;height:3px;margin-top:4px;background:#ece3f3;border-radius:3px;overflow:hidden}.farm-badge-bar b{display:block;height:100%;background:#b79ed0}
 .farm-pause-goals{margin:9px 0 0;text-align:left}.farm-pause-goals>small{display:block;font-size:9px;color:#8d7d9c;font-weight:800;margin-bottom:6px}
 .farm-pause-goals .farm-quests{max-width:none}
-.farm-quests.is-compact li{padding:5px 8px}.farm-quests.is-compact strong{font-size:10px}.farm-quests.is-compact b{font-size:9px}
 
 /* Keep the numeric upgrade requirement visible in portrait and landscape. */
 .farm-xp>span{flex-shrink:0;white-space:nowrap;font-variant-numeric:tabular-nums}

@@ -138,7 +138,7 @@ export function FarmBoard({ round, characterId, compact = false }: { round?: Far
           <b>{entry.score.toLocaleString()}</b>
         </li>
       }) : <li className="farm-board-empty">总榜首位幸存者，等你来挑战 ♫</li>}</ol>
-      {board.own && !compact && <p className="farm-board-own">你的历史最佳 {board.own.score.toLocaleString()} 分 · 第 {board.own.rank} / {board.total} 名</p>}
+      {board.own && !compact && <p className="farm-board-own">你在总榜第 {board.own.rank} / {board.total} 名</p>}
     </>}
   </section>
 }
