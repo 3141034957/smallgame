@@ -15,7 +15,7 @@ export function farmShareText(round: FarmRound | null, day: string): string {
     `击败 ${digits(round.harvested)}`,
     `巨兽 ${digits(round.bosses)}`,
     round.elites ? `精英 ${digits(round.elites)}` : '',
-    round.blocks ? `音盾挡下 ${digits(round.blocks)} 次` : '',
+    round.blocks ? `挡下 ${digits(round.blocks)} 次攻击` : '',
     best && best.level ? `主力 ${best.name} Lv.${best.level}` : '',
     forms.length ? `终极 ${forms.join('＋')}` : '',
   ].filter(Boolean)
