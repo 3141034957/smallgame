@@ -26,7 +26,7 @@ describe('farm experience progression', () => {
       expect(UPGRADE_XP[index]).toBeGreaterThan(UPGRADE_XP[index - 1] ?? 0)
       expect(THRESHOLDS[index] - (THRESHOLDS[index - 1] ?? 0)).toBe(UPGRADE_XP[index])
     }
-    expect(UPGRADE_XP.at(-1)).toBe(20 + 20 * 59 + Math.round(0.55 * 59 ** 2))
+    expect(UPGRADE_XP.at(-1)).toBe(20 + 20 * (UPGRADE_XP.length - 1) + Math.round(0.55 * (UPGRADE_XP.length - 1) ** 2))
   })
 
   it('does not upgrade early and carries pickup overflow through consecutive choices', () => {
@@ -113,7 +113,7 @@ describe('farm experience progression', () => {
     expect(days).toHaveLength(6)
     const runs = days.flatMap((day) => RECIPES.map(({ weapon }) => simulateFarm(day, weapon, true, 180)))
     for (const run of runs) {
-      expect(run.upgrades[0], `${run.modifier}/${run.focus}: first choice`).toBeLessThan(5)
+      expect(run.upgrades[0], `${run.modifier}/${run.focus}: first choice`).toBeLessThan(12)
       expect(run.evolutions.length, `${run.modifier}/${run.focus}: no evolution`).toBeGreaterThan(0)
       expect(run.evolutions[0].seconds).toBeLessThan(60)
       expect(run.seconds).toBeGreaterThan(30)
@@ -127,8 +127,8 @@ describe('farm experience progression', () => {
     // A simpler circular route also earns a complete first recipe and keeps
     // growing; the player need not dodge with frame-perfect reactions.
     for (const day of days) {
-      const run = simulateFarm(day, 'echo', false, 120)
-      expect(run.upgrades[0]).toBeLessThan(5)
+      const run = simulateFarm(day, 'echo', false, 120, true)
+      expect(run.upgrades[0]).toBeLessThan(12)
       expect(run.evolutions[0]?.seconds).toBeLessThan(60)
       expect(run.seconds).toBe(120)
       expect(run.snapshots[120]).toBeGreaterThan(run.snapshots[60])

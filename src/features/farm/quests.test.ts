@@ -2,13 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { applyFarmQuests, farmQuestDone, farmQuests, farmQuestProgress, loadFarmQuests, FARM_QUEST_KEY } from './quests'
 import { FARM_PROFILE_KEY } from './characters'
 import { loadFarmProfile } from './characters'
+import { TALENTS } from './rules.mjs'
 import type { FarmRound } from './rules.mjs'
 
 const day = '2026-10-04'
+const emptyGear = () => Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])) as FarmRound['gear']
 const round = (patch: Partial<FarmRound> = {}): FarmRound => ({
   day, frames: [[50, 76]], choices: [], surges: [], outcome: 'defeated', hp: 0, seconds: 30, score: 100,
   maxCombo: 5, harvested: 10, bosses: 0, elites: 0, blocks: 0, maxShields: 0, coins: 20, xp: 30, stars: 1,
-  gear: { drum: 0, orbit: 0, magnet: 0, range: 0, tempo: 0, power: 0, echo: 0, lucky: 0, bell: 0, sustain: 0, whistle: 0, delay: 0 }, ...patch,
+  gear: emptyGear(), ...patch,
 })
 
 let data: Map<string, string>

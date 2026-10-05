@@ -303,6 +303,49 @@ function groundEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress:
     ctx.moveTo(x, y - Y(120))
     ctx.lineTo(x, y + Y(120))
     ctx.stroke()
+  } else if (event.kind === 'horn') {
+    // Sax blast: a widening wedge down the aim, brightest right after the call.
+    const heading = Math.atan2(event.fromY ?? 0, (event.fromX ?? 1) * .84)
+    const reach = X(event.radius ?? 26) * (.35 + Math.min(1, progress * 1.6) * .65)
+    ctx.globalAlpha = (1 - progress) * .8
+    ctx.translate(x, y)
+    ctx.rotate(heading)
+    ctx.fillStyle = '#e8b46e'
+    ctx.beginPath()
+    ctx.moveTo(0, 0)
+    ctx.arc(0, 0, reach, -0.62, 0.62)
+    ctx.closePath()
+    ctx.fill()
+    ctx.globalAlpha = (1 - progress) * .5
+    ctx.strokeStyle = '#fff3d8'
+    ctx.lineWidth = 2
+    ctx.stroke()
+  } else if (event.kind === 'fan') {
+    const angle = event.angle ?? 0, spread = event.spread ?? .45
+    const reach = X(event.radius ?? 34) * (.4 + Math.min(1, progress * 1.8) * .6)
+    ctx.globalAlpha = (1 - progress) * .7
+    ctx.translate(x, y)
+    ctx.rotate(angle)
+    ctx.fillStyle = '#bfe0b4'
+    ctx.beginPath()
+    ctx.moveTo(0, 0)
+    ctx.arc(0, 0, reach, -spread, spread)
+    ctx.closePath()
+    ctx.fill()
+    ctx.globalAlpha = (1 - progress) * .45
+    ctx.strokeStyle = '#f2fff0'
+    ctx.lineWidth = 1.5
+    ctx.stroke()
+  } else if (event.kind === 'mine') {
+    ctx.globalAlpha = (1 - progress) * .85
+    ctx.strokeStyle = '#b795e0'
+    ctx.lineWidth = 3
+    ctx.beginPath(); ctx.arc(x, y, radius * (.25 + progress * .9), 0, Math.PI * 2); ctx.stroke()
+    ctx.globalAlpha *= .35
+    ellipse(ctx, x, y, radius * (.25 + progress * .9), radius * (.25 + progress * .9), '#caaef0')
+    ctx.globalAlpha = (1 - progress)
+    ctx.fillStyle = '#7a5aa8'; ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center'
+    ctx.fillText('✸', x, y + 6)
   } else if (event.kind === 'blackhole') {
     ctx.translate(x, y)
     ctx.globalAlpha = (1 - progress) * .55
@@ -349,6 +392,18 @@ function airEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress: nu
     ctx.beginPath(); ctx.arc(x, y, 5 + progress * 16, 0, Math.PI * 2); ctx.stroke()
     ctx.fillStyle = '#8f74c4'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'
     ctx.fillText('♪', x, y + 5 - progress * 10)
+    ctx.globalAlpha = 1
+    ctx.restore()
+    return
+  }
+  if (event.kind === 'ricochet') {
+    const tx = X(event.fromX ?? event.x), ty = Y(event.fromY ?? event.y)
+    ctx.globalAlpha = 1 - progress
+    ctx.strokeStyle = '#9db9c9'
+    ctx.lineWidth = 2
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(tx, ty); ctx.stroke()
+    ctx.fillStyle = '#6f93a8'; ctx.font = 'bold 14px system-ui'; ctx.textAlign = 'center'
+    ctx.fillText('♪', (x + tx) / 2, (y + ty) / 2 - 6 + progress * -10)
     ctx.globalAlpha = 1
     ctx.restore()
     return
@@ -451,6 +506,24 @@ export function drawFarm(ctx: CanvasRenderingContext2D, state: FarmState, effect
     ctx.drawImage(assets.notes[0], X(trail.x) - 13, Y(trail.y) - 15, 26, 26)
     ctx.restore()
   }
+  // Sampler beats sit on the floor and tick louder just before they blow.
+  for (const mine of state.mines) {
+    if (!visibleAt(mine.x, mine.y)) continue
+    const left = Math.max(0, mine.due - moving.tick)
+    const armed = 1 - Math.min(1, left / FPS)
+    ctx.save()
+    ctx.globalAlpha = .45 + Math.sin(now / (110 - armed * 70) + mine.id) * .25
+    ellipse(ctx, X(mine.x), Y(mine.y) + 5, 9 + armed * 3, 4 + armed * 2, '#b795e070')
+    ctx.restore()
+    ctx.save()
+    ctx.globalAlpha = .9
+    ctx.strokeStyle = '#8f6fc0'
+    ctx.lineWidth = 1.5
+    ctx.beginPath(); ctx.arc(X(mine.x), Y(mine.y), 6 + armed * 3, 0, Math.PI * 2); ctx.stroke()
+    ctx.fillStyle = '#6f4f9e'; ctx.font = `bold ${11 + armed * 5}px system-ui`; ctx.textAlign = 'center'
+    ctx.fillText('✸', X(mine.x), Y(mine.y) + 4)
+    ctx.restore()
+  }
   for (const drop of state.loot) {
     if (!visibleAt(drop.x, drop.y)) continue
     const previous = pose?.previousLoot?.get(drop.id)
@@ -479,6 +552,35 @@ export function drawFarm(ctx: CanvasRenderingContext2D, state: FarmState, effect
     ctx.restore()
     for (const [x, y] of orbit) {
       ctx.drawImage(assets.notes[terminalOrbit ? 1 : 0], X(x) - 24, Y(y) - 24, 48, 48)
+    }
+  }
+  const deckLevel = state.gear.deck
+  if (deckLevel && !pose?.simple) {
+    const terminalDeck = evolved(state.gear).includes('deck')
+    const blades = terminalDeck ? 4 : 2
+    const reach = 24 + deckLevel * 3
+    ctx.save()
+    ctx.strokeStyle = terminalDeck ? '#9db9c980' : '#9db9c940'
+    ctx.setLineDash([3, 6])
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.ellipse(X(moving.position[0]), Y(moving.position[1]), reach / .84 * 3.6, reach * 4.3, 0, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.restore()
+    for (let index = 0; index < blades; index++) {
+      const angle = moving.tick * .12 + index * Math.PI * 2 / blades
+      const bx = X(moving.position[0] + Math.cos(angle) * reach / .84), by = Y(moving.position[1] + Math.sin(angle) * reach)
+      ctx.save()
+      ctx.translate(bx, by)
+      ctx.rotate(angle)
+      ctx.fillStyle = terminalDeck ? '#cfe3ee' : '#e6eff5'
+      ctx.beginPath()
+      ctx.ellipse(0, 0, 13, 7, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = '#6f93a8'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+      ctx.restore()
     }
   }
   bunny(ctx, moving, now, assets, pose?.character)

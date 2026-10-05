@@ -5,12 +5,14 @@ export const MOVE_STEP = 3
 // Every band member and piece of gear climbs to this level; reaching it on a
 // matching pair unlocks that instrument's final form.
 export const MAX_GEAR_LEVEL = 5
+// How many instruments the opening deal offers.
+export const STARTER_CHOICES = 3
 export const START = [50, 76]
 // Keep the first recipe attainable, then grow the cost of each additional
 // upgrade. XP is cumulative; picking a talent never discards overflow.
 // Five levels per item means more picks before a form evolves, so each step
 // costs less than before: the first evolution still lands inside a normal run.
-export const UPGRADE_XP = Array.from({ length: 60 }, (_, index) => Math.round(20 + 20 * index + 0.55 * index ** 2))
+export const UPGRADE_XP = Array.from({ length: 100 }, (_, index) => Math.round(20 + 20 * index + 0.55 * index ** 2))
 export const THRESHOLDS = UPGRADE_XP.map((_, index) => UPGRADE_XP.slice(0, index + 1).reduce((sum, cost) => sum + cost, 0))
 export const EXPERIENCE_STAGES = [
   { seconds: 0, multiplier: 1 },
@@ -44,6 +46,14 @@ export const TALENTS = [
   { id: 'sustain', kind: 'chip', partner: 'bell', name: '延音踏板', icon: '◐', color: '#7fa8c4', description: '星浪更快更广，配键盘手进化。', tag: '冲击强化' },
   { id: 'whistle', kind: 'weapon', partner: 'delay', name: '口琴手呼呼', icon: '🎷', color: '#9ac6b4', description: '走过的地方留下延迟音符，踩到的怪物持续受伤。', tag: '残留音阵' },
   { id: 'delay', kind: 'chip', partner: 'whistle', name: '延迟效果器', icon: '◑', color: '#84b3a2', description: '残留音符更久更密，配口琴手进化。', tag: '残留强化' },
+  { id: 'sax', kind: 'weapon', partner: 'mute', name: '萨克斯阿鸣', icon: '🎺', color: '#d8a05f', description: '朝最近的怪吹出号角冲刺波，撞飞并拖慢一排怪。', tag: '冲刺音波' },
+  { id: 'mute', kind: 'chip', partner: 'sax', name: '弱音器', icon: '◒', color: '#c08a4e', description: '冲刺波更长更宽，还能贯穿整排，配萨克斯进化。', tag: '冲刺强化' },
+  { id: 'sampler', kind: 'weapon', partner: 'trigger', name: '采样机咔哒', icon: '🎛️', color: '#c0a2d8', description: '走过的地方埋下音爆采样，片刻后炸开一圈。', tag: '音爆地雷' },
+  { id: 'trigger', kind: 'chip', partner: 'sampler', name: '触发器', icon: '◓', color: '#a585c4', description: '采样埋得更快更密，配采样机进化。', tag: '地雷强化' },
+  { id: 'deck', kind: 'weapon', partner: 'needle', name: '打碟猫 DJ', icon: '💿', color: '#9db9c9', description: '刮碟甩出宽音刃，命中后弹出回响弹。', tag: '刮碟音刃' },
+  { id: 'needle', kind: 'chip', partner: 'deck', name: '唱针', icon: '◔', color: '#7c9cb0', description: '音刃更多更利，回响弹更痛，配打碟进化。', tag: '音刃强化' },
+  { id: 'synth', kind: 'weapon', partner: 'arp', name: '合成器哔哔', icon: '🎚️', color: '#a8c9a0', description: '朝最近的怪扇形连发音浪，穿透一排怪。', tag: '扇形音浪' },
+  { id: 'arp', kind: 'chip', partner: 'synth', name: '琶音器', icon: '◕', color: '#86ab7e', description: '扇形更宽更远，配合成器进化。', tag: '音浪强化' },
 ]
 export const RECIPES = [
   { weapon: 'drum', chip: 'range', name: '雷霆鼓组', icon: '🥁', description: '爆破范围大幅扩张，连锁伤害翻倍' },
@@ -52,6 +62,10 @@ export const RECIPES = [
   { weapon: 'echo', chip: 'lucky', name: '星雨麦克风', icon: '🎤', description: '一次追击八只怪，全场降下暴击音雨' },
   { weapon: 'bell', chip: 'sustain', name: '银河键盘', icon: '🎹', description: '星浪连发三圈，范围与伤害大幅提升' },
   { weapon: 'whistle', chip: 'delay', name: '回音口琴阵', icon: '🎷', description: '残留音符更长更痛，整片舞台都是你的音阵' },
+  { weapon: 'sax', chip: 'mute', name: '金焰萨克斯', icon: '🎺', description: '冲刺波贯穿全场，击退更远并长时间拖慢' },
+  { weapon: 'sampler', chip: 'trigger', name: '爆音采样台', icon: '🎛️', description: '音爆连锁三连炸，炸开整片怪潮' },
+  { weapon: 'deck', chip: 'needle', name: '黑胶风暴台', icon: '💿', description: '四片宽音刃环绕，回响弹连锁全场' },
+  { weapon: 'synth', chip: 'arp', name: '棱镜合成器', icon: '🎚️', description: '扇形化为三道棱镜音浪，伤害翻倍' },
 ]
 // Every calendar day plays under one modifier, drawn from the day seed so all
 // players on that day share it and the leaderboard stays comparable.
@@ -94,7 +108,7 @@ function placeAtEdge(state, enemy, respawn = false) {
 export function createFarm(day) {
   if (!validDay(day)) throw new Error('Invalid farm date')
   const modifier = farmModifier(day)
-  const state = { day, seed: routeSeed(day, 'farm-v3'), tick: 0, position: [...START], crops: [], loot: [], gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])), xp: 0, level: 0, offered: [], score: 0, coins: 0, harvested: 0, bosses: 0, elites: 0, blocks: 0, maxShields: 0, combo: 0, maxCombo: 0, lastHarvest: -1000, charge: 0, nextId: 100, lastPulse: -8, echoDue: -1, bellRings: 0, modifier: modifier.id, nextBoss: Math.round(16 * FPS * (modifier.boss ?? 1)), nextBass: Math.round(90 * FPS * (modifier.boss ?? 1)), surgeUntil: -1, hp: 100, maxHp: 100, hurtUntil: 32, nextHeal: 0, nextShield: 0, shields: 0, shots: [], dangers: [], trails: [], nextWave: 32 }
+  const state = { day, seed: routeSeed(day, 'farm-v3'), tick: 0, position: [...START], crops: [], loot: [], gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])), xp: 0, level: 0, offered: [], score: 0, coins: 0, harvested: 0, bosses: 0, elites: 0, blocks: 0, maxShields: 0, combo: 0, maxCombo: 0, lastHarvest: -1000, charge: 0, nextId: 100, lastPulse: -8, echoDue: -1, bellRings: 0, modifier: modifier.id, nextBoss: Math.round(16 * FPS * (modifier.boss ?? 1)), nextBass: Math.round(90 * FPS * (modifier.boss ?? 1)), surgeUntil: -1, hp: 100, maxHp: 100, hurtUntil: 32, nextHeal: 0, nextShield: 0, shields: 0, aim: [1, 0], shots: [], dangers: [], trails: [], mines: [], nextWave: 32 }
   for (let id = 0; id < 24; id++) {
     const enemy = { id, x: 0, y: 0, kind: id % 4, hp: 1, maxHp: 1, regrow: -1, boss: false }
     placeAtEdge(state, enemy)
@@ -114,16 +128,26 @@ export function orbitPositions(state) {
 function offer(state) {
   if (state.level >= THRESHOLDS.length || state.xp < THRESHOLDS[state.level] || state.hp <= 0) return
   if (!state.level) {
+    // Ten instruments would flood the dialog: deal three starters instead.
     const weapons = TALENTS.filter((talent) => talent.kind === 'weapon').map((talent) => talent.id)
-    const omitted = Math.floor(random(state) * weapons.length)
-    state.offered = weapons.filter((_, index) => index !== omitted)
+    const starters = []
+    while (starters.length < STARTER_CHOICES && weapons.length) starters.push(weapons.splice(Math.floor(random(state) * weapons.length), 1)[0])
+    state.offered = starters
     return
   }
   const available = TALENTS.filter((talent) => state.gear[talent.id] < MAX_GEAR_LEVEL).map((talent) => talent.id)
   const choices = []
   const focus = TALENTS.filter((talent) => talent.kind === 'weapon' && state.gear[talent.id] > 0 && !(state.gear[talent.id] >= MAX_GEAR_LEVEL && state.gear[talent.partner] >= MAX_GEAR_LEVEL)).sort((a, b) => state.gear[b.id] - state.gear[a.id])[0]
   if (focus) { const needed = state.gear[focus.id] < MAX_GEAR_LEVEL ? focus.id : focus.partner; choices.push(needed); available.splice(available.indexOf(needed), 1) }
-  while (choices.length < 3 && available.length) choices.push(available.splice(Math.floor(random(state) * available.length), 1)[0])
+  // Ten instruments would otherwise scatter every build: one offer deepens what
+  // the player already has, the last one keeps the pool open.
+  const owned = available.filter((id) => state.gear[id] > 0)
+  const fresh = available.filter((id) => state.gear[id] === 0)
+  while (choices.length < 3) {
+    const pool = choices.length === 2 ? (fresh.length ? fresh : owned) : (owned.length ? owned : fresh)
+    if (!pool.length) break
+    choices.push(pool.splice(Math.floor(random(state) * pool.length), 1)[0])
+  }
   state.offered = choices
 }
 export function chooseTalent(previous, id) {
@@ -134,7 +158,7 @@ export function chooseTalent(previous, id) {
 }
 export function stepFarm(previous, point, useSurge = false) {
   if (previous.offered.length || previous.hp <= 0 || !Array.isArray(point) || point.length !== 2 || point.some((value) => !Number.isSafeInteger(value)) || Math.hypot(point[0] - previous.position[0], point[1] - previous.position[1]) > MOVE_STEP + Math.SQRT1_2 || useSurge && previous.charge < 100) return null
-  const state = { ...previous, position: [...point], crops: previous.crops.filter((crop) => !crop.boss || crop.hp > 0).map((crop) => ({ ...crop })), loot: previous.loot.map((drop) => ({ ...drop })), shots: previous.shots.map((shot) => ({ ...shot })), dangers: previous.dangers.map((danger) => ({ ...danger })), trails: previous.trails.map((trail) => ({ ...trail })), offered: [] }
+  const state = { ...previous, position: [...point], aim: (point[0] !== previous.position[0] || point[1] !== previous.position[1]) ? [point[0] - previous.position[0], point[1] - previous.position[1]] : previous.aim, crops: previous.crops.filter((crop) => !crop.boss || crop.hp > 0).map((crop) => ({ ...crop })), loot: previous.loot.map((drop) => ({ ...drop })), shots: previous.shots.map((shot) => ({ ...shot })), dangers: previous.dangers.map((danger) => ({ ...danger })), trails: previous.trails.map((trail) => ({ ...trail })), mines: previous.mines.map((mine) => ({ ...mine })), offered: [] }
   const events = []
   const gear = state.gear
   const modifier = FARM_MODIFIERS.find((item) => item.id === state.modifier)
@@ -299,6 +323,104 @@ export function stepFarm(previous, point, useSurge = false) {
       }
     }
   }
+  // Directional instruments aim at the closest monster: fleeing players should
+  // still hit something.
+  const aimAt = () => {
+    let target = null, nearest = Infinity
+    for (const crop of state.crops) {
+      if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
+      const gap = distance(crop.x, crop.y, point[0], point[1])
+      if (gap < nearest) { nearest = gap; target = crop }
+    }
+    return target ? [target.x - point[0], target.y - point[1]] : state.aim ?? [1, 0]
+  }
+  // Sax: a horn blast down the way you are heading, knocking the row back and
+  // leaving it sluggish for a moment.
+  if (gear.sax) {
+    const every = Math.max(8, 26 - gear.mute * 3)
+    if (state.tick % every === 0) {
+      const dir = aimAt()
+      const norm = Math.max(.01, Math.hypot(dir[0], dir[1]))
+      const heading = [dir[0] / norm, dir[1] / norm]
+      const length = 30 + gear.mute * 6 + (forms.includes('sax') ? 18 : 0)
+      const half = 13 + gear.mute * 2
+      events.push({ id: state.nextId++, kind: 'horn', x: point[0], y: point[1], fromX: heading[0], fromY: heading[1], radius: length, lane: 2 })
+      for (const crop of state.crops) {
+        if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
+        const vx = crop.x - point[0], vy = crop.y - point[1]
+        const along = vx * heading[0] + vy * heading[1]
+        const side = Math.abs(vx * -heading[1] + vy * heading[0])
+        if (along < -4 || along > length || side > half + along * .9) continue
+        damage(crop, 2 + gear.sax * 2 + (forms.includes('sax') ? 4 : 0))
+        crop.slowUntil = state.tick + FPS * (forms.includes('sax') ? 3 : 2)
+        crop.x += heading[0] * (forms.includes('sax') ? 9 : 6); crop.y += heading[1] * (forms.includes('sax') ? 9 : 6)
+      }
+      // The blast also washes over whoever is already on top of the player.
+      for (const crop of state.crops) {
+        if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
+        if (distance(crop.x, crop.y, point[0], point[1]) > 14) continue
+        crop.slowUntil = state.tick + FPS * (forms.includes('sax') ? 3 : 2)
+      }
+    }
+  }
+  // Sampler: plants a beat that blows up a beat and a half later.
+  if (gear.sampler) {
+    const every = Math.max(10, 28 - gear.trigger * 4)
+    if (state.tick % every === 0) {
+      state.mines.push({ id: state.nextId++, x: point[0], y: point[1], due: state.tick + FPS, damage: gear.sampler + 1 + (forms.includes('sampler') ? 2 : 0), radius: 18 + gear.trigger * 4 + (forms.includes('sampler') ? 10 : 0) })
+      if (state.mines.length > 12) state.mines.shift()
+    }
+  }
+  state.mines = state.mines.filter((mine) => {
+    if (state.tick < mine.due) return true
+    events.push({ id: state.nextId++, kind: 'mine', x: mine.x, y: mine.y, radius: mine.radius, lane: 2 })
+    for (const crop of state.crops) {
+      if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
+      if (distance(crop.x, crop.y, mine.x, mine.y) <= mine.radius) damage(crop, mine.damage)
+    }
+    return false
+  })
+  // DJ: wide scratch blades that also bounce a note into a nearby monster.
+  if (gear.deck && state.tick % 2 === 0) {
+    const blades = forms.includes('deck') ? 4 : 2
+    const radius = 24 + gear.deck * 3
+    for (let index = 0; index < blades; index++) {
+      const angle = state.tick * .12 + index * Math.PI * 2 / blades
+      const bx = point[0] + Math.cos(angle) * radius / .84, by = point[1] + Math.sin(angle) * radius
+      for (const crop of state.crops) {
+        if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
+        if (distance(crop.x, crop.y, bx, by) > 9) continue
+        damage(crop, gear.deck + (forms.includes('deck') ? 3 : 1))
+        if (!forms.includes('deck')) continue
+        const other = state.crops.find((target) => target !== crop && target.hp > 0 && state.tick >= (target.spawnAt ?? 0) && distance(target.x, target.y, crop.x, crop.y) <= 34)
+        if (!other) continue
+        events.push({ id: state.nextId++, kind: 'ricochet', x: crop.x, y: crop.y, fromX: other.x, fromY: other.y, lane: 3 })
+        damage(other, 2 + gear.needle)
+      }
+    }
+  }
+  // Synth: a fan of sound waves down the way you are heading.
+  if (gear.synth) {
+    const every = Math.max(4, 12 - gear.arp * 2)
+    if (state.tick % every === 0) {
+      const dir = aimAt()
+      const base = Math.atan2(dir[1], dir[0] * .84)
+      const reach = 36 + gear.arp * 6 + (forms.includes('synth') ? 14 : 0)
+      const spread = .45 + gear.arp * .1 + (forms.includes('synth') ? .3 : 0)
+      for (const offset of forms.includes('synth') ? [-.32, 0, .32] : [0]) {
+        const angle = base + offset
+        events.push({ id: state.nextId++, kind: 'fan', x: point[0], y: point[1], angle, spread, radius: reach, lane: 3 })
+        for (const crop of state.crops) {
+          if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
+          if (distance(crop.x, crop.y, point[0], point[1]) > reach) continue
+          const towards = Math.atan2(crop.y - point[1], (crop.x - point[0]) * .84)
+          const off = Math.abs(((towards - angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI)
+          if (off > spread) continue
+          damage(crop, gear.synth + 1 + (forms.includes('synth') ? 2 : 0))
+        }
+      }
+    }
+  }
   if (state.tick % 2 === 0) for (const orb of orbitPositions(state)) for (const crop of state.crops) if (crop.hp > 0 && distance(crop.x, crop.y, orb[0], orb[1]) <= 6) damage(crop, (gear.orbit + (boomFlow ? 1 : 0)) * (forms.includes('orbit') ? 2 : 1))
   const attraction = 15 + gear.magnet * 15
   for (const drop of state.loot) {
@@ -334,7 +456,7 @@ export function stepFarm(previous, point, useSurge = false) {
     if (state.tick < (enemy.spawnAt ?? 0)) continue
     const dx = point[0] - enemy.x, dy = point[1] - enemy.y, dist = Math.max(.01, distance(enemy.x, enemy.y, point[0], point[1]))
     if (enemy.elite && (state.tick + enemy.id) % 80 === 0) enemy.dashUntil = state.tick + 8
-    const speed = (enemy.elite ? (state.tick < (enemy.dashUntil ?? -1) ? 1.7 : .42) : enemy.bass ? .2 : enemy.boss ? .38 : [.48, .85, .34, .3][enemy.kind]) * (1 + Math.min(1.5, state.tick / (FPS * 60) * .55)) * (modifier?.speed ?? 1)
+    const speed = (enemy.elite ? (state.tick < (enemy.dashUntil ?? -1) ? 1.7 : .42) : enemy.bass ? .2 : enemy.boss ? .38 : [.48, .85, .34, .3][enemy.kind]) * (1 + Math.min(1.5, state.tick / (FPS * 60) * .55)) * (modifier?.speed ?? 1) * (state.tick < (enemy.slowUntil ?? -1) ? .45 : 1)
     const approach = enemy.kind === 2 && !enemy.boss && dist < 28 ? (dist < 20 ? -.5 : 0) : 1
     const travel = Math.min(speed, dist) / dist * approach
     enemy.x += dx * travel; enemy.y += dy * travel

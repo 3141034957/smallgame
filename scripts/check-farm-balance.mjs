@@ -1,16 +1,29 @@
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
-import { FPS, MAX_GEAR_LEVEL, RECIPES, chooseTalent, clampPoint, createFarm, evolved, farmModifier, stepFarm } from '../src/features/farm/rules.mjs'
+import { FPS, MAX_GEAR_LEVEL, RECIPES, TALENTS, chooseTalent, clampPoint, createFarm, evolved, farmModifier, stepFarm } from '../src/features/farm/rules.mjs'
 
 // Deterministic moving player: no invulnerability, injected XP or free gear.
-export function simulateFarm(day, focus = 'echo', dodge = true, seconds = 300) {
+export function simulateFarm(day, focus = 'echo', dodge = true, seconds = 300, startHolding = false) {
   let state = createFarm(day)
+  // The opening deal is random, so a check that wants one exact build can start
+  // the run already holding that instrument.
+  if (startHolding) { state.gear[focus] = 1; state.level = 1 }
   const upgrades = [], snapshots = {}, evolutions = []
-  const recipe = RECIPES.find((item) => item.weapon === focus)
+  let recipe = RECIPES.find((item) => item.weapon === focus)
+  // Ten instruments mean the opening deal may not contain the requested one:
+  // like a real player, the run commits to whichever instrument it started.
+  const committed = () => {
+    if (state.gear[recipe.weapon] > 0) return recipe
+    const best = TALENTS.filter((talent) => talent.kind === 'weapon').sort((a, b) => state.gear[b.id] - state.gear[a.id])[0]
+    return RECIPES.find((item) => item.weapon === best.id)
+  }
   for (let tick = 0; tick < FPS * seconds && state.hp > 0; tick++) {
     while (state.offered.length) {
-      const id = state.offered.includes(focus) && state.gear[focus] < MAX_GEAR_LEVEL ? focus
-        : state.offered.includes(recipe.chip) && state.gear[recipe.chip] < MAX_GEAR_LEVEL ? recipe.chip : state.offered[0]
+      recipe = committed()
+      const chip = recipe.chip
+      const id = state.offered.includes(recipe.weapon) && state.gear[recipe.weapon] < MAX_GEAR_LEVEL ? recipe.weapon
+        : state.offered.includes(chip) && state.gear[chip] < MAX_GEAR_LEVEL ? chip
+          : state.offered.find((choice) => TALENTS.find((talent) => talent.id === choice).kind === 'weapon') ?? state.offered[0]
       state = chooseTalent(state, id)
       upgrades.push(tick / FPS)
       for (const form of evolved(state.gear)) if (!evolutions.some((item) => item.form === form)) evolutions.push({ form, seconds: tick / FPS })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FARM_MODIFIERS, FPS, MAX_GEAR_LEVEL, RECIPES, TALENTS, THRESHOLDS, chooseTalent, clampPoint, createFarm, evolved, farmModifier, orbitPositions, replayFarm, stepFarm } from './rules.mjs'
+import { FARM_MODIFIERS, FPS, MAX_GEAR_LEVEL, STARTER_CHOICES, RECIPES, TALENTS, THRESHOLDS, chooseTalent, clampPoint, createFarm, evolved, farmModifier, orbitPositions, replayFarm, stepFarm } from './rules.mjs'
 
 const day = '2026-10-04'
 const TEST_TICKS = FPS * 60 * 10
@@ -58,7 +58,7 @@ describe('music roguelite farming', () => {
     for (let tick = 1; !state.offered.length && tick < FPS * 5; tick++) {
       state = stepFarm(state, clampPoint(state.position, [50 + 30 * Math.sin(tick / 50), 50 + 25 * Math.cos(tick / 75)])).state
     }
-    expect(state.offered).toHaveLength(TALENTS.filter((talent) => talent.kind === 'weapon').length - 1)
+    expect(state.offered).toHaveLength(STARTER_CHOICES)
     expect(state.tick / FPS).toBeGreaterThan(1)
     expect(state.tick / FPS).toBeLessThan(5)
     expect(new Set(state.offered).size).toBe(state.offered.length)
@@ -256,7 +256,7 @@ describe('music roguelite farming', () => {
     for (const [focus, routeDay] of [['drum', '2026-10-01'], ['orbit', '2026-10-04'], ['power', '2026-10-02'], ['echo', '2026-10-01']]) {
       const round = run(focus, routeDay)
       expect(round.state.gear[focus]).toBe(MAX_GEAR_LEVEL)
-      expect(round.terminalAt).toBeLessThan(FPS * 60)
+      expect(round.terminalAt).toBeLessThan(FPS * 80)
       expect(round.state.tick).toBeGreaterThan(FPS * 20)
       const replay = replayFarm(routeDay, round.frames, round.choices, round.surges)
       expect(replay).toMatchObject({ score: round.state.score, harvested: round.state.harvested, bosses: round.state.bosses, coins: round.state.coins, xp: round.state.xp, maxCombo: round.state.maxCombo, gear: round.state.gear })

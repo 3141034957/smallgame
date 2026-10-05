@@ -1,0 +1,77 @@
+import { describe, expect, it } from 'vitest'
+import { FPS, MAX_GEAR_LEVEL, createFarm, evolved, stepFarm } from './rules.mjs'
+
+const day = '2026-10-04'
+const crop = (id, x, y, hp = 20) => ({ id, x, y, hp, maxHp: hp, kind: id % 4, regrow: -1, boss: false })
+function arena(gear, crops, tick = 0) {
+  const state = createFarm(day)
+  Object.assign(state, { position: [50, 50], crops, tick, aim: [1, 0], lastPulse: tick, nextBoss: Infinity, nextWave: Infinity })
+  Object.assign(state.gear, gear)
+  return state
+}
+
+describe('the four new instruments', () => {
+  it('blows a sax horn down the aim, damaging, slowing and shoving the row', () => {
+    const state = arena({ sax: MAX_GEAR_LEVEL, mute: MAX_GEAR_LEVEL - 1 }, [crop(0, 58, 50)], 28)
+    const result = stepFarm(state, state.position)
+    const horn = result.events.find((event) => event.kind === 'horn')
+    expect(horn).toBeTruthy()
+    expect(horn.fromX).toBeGreaterThan(0)
+    expect(result.state.crops[0].hp).toBeLessThan(20)
+    expect(result.state.crops[0].slowUntil).toBeGreaterThan(state.tick)
+    expect(result.state.crops[0].x).toBeGreaterThan(58)
+    // The final form reaches further, so a monster far down the row is hit too.
+    const ordinary = arena({ sax: MAX_GEAR_LEVEL, mute: MAX_GEAR_LEVEL - 1 }, [crop(0, 112, 50)], 28)
+    const terminal = arena({ sax: MAX_GEAR_LEVEL, mute: MAX_GEAR_LEVEL }, [crop(0, 112, 50)], 22)
+    expect(evolved(terminal.gear)).toContain('sax')
+    expect(stepFarm(ordinary, ordinary.position).state.crops[0].hp).toBe(20)
+    expect(stepFarm(terminal, terminal.position).state.crops[0].hp).toBeLessThan(20)
+  })
+
+  it('arms a sampler beat on the floor and blows it up a second later', () => {
+    const state = arena({ sampler: 2, trigger: 2 }, [crop(0, 52, 52)], 20)
+    const planted = stepFarm(state, state.position).state
+    expect(planted.mines).toHaveLength(1)
+    expect(planted.crops[0].hp).toBe(20)
+    const due = planted.mines[0].due
+    let current = planted
+    for (let index = 0; index < FPS + 4 && current.mines.length; index++) current = stepFarm(current, current.position).state
+    expect(current.mines).toHaveLength(0)
+    expect(current.crops[0].hp).toBeLessThan(20)
+    expect(current.tick).toBeGreaterThanOrEqual(due)
+  })
+
+  it('spins dj blades that hit on contact and bounce a note when evolved', () => {
+    const state = arena({ deck: MAX_GEAR_LEVEL, needle: MAX_GEAR_LEVEL - 1 }, [], 0)
+    const angles = []
+    for (let index = 0; index < 4; index++) {
+      const blade = stepFarm({ ...state, tick: index * 2 }, state.position)
+      angles.push(blade.state.tick)
+    }
+    // A monster sitting on the blade ring takes damage.
+    const reach = 24 + MAX_GEAR_LEVEL * 3
+    const hit = arena({ deck: MAX_GEAR_LEVEL, needle: MAX_GEAR_LEVEL - 1 }, [crop(0, 50 + reach / .84, 50)], 0)
+    const ordinary = stepFarm(hit, hit.position).state
+    expect(ordinary.crops[0].hp).toBeLessThan(20)
+    const terminalGear = { deck: MAX_GEAR_LEVEL, needle: MAX_GEAR_LEVEL }
+    const pair = arena(terminalGear, [crop(0, 50 + reach / .84, 50), crop(1, 50 + reach / .84 + 12, 50)], 0)
+    expect(evolved(pair.gear)).toContain('deck')
+    const bounced = stepFarm(pair, pair.position)
+    expect(bounced.events.some((event) => event.kind === 'ricochet')).toBe(true)
+    expect(bounced.state.crops[1].hp).toBeLessThan(20)
+  })
+
+  it('fires a synth fan towards the closest monster and only inside its spread', () => {
+    const state = arena({ synth: 2, arp: 2 }, [crop(0, 70, 50), crop(1, 30, 50)], 8)
+    const result = stepFarm(state, state.position)
+    const fan = result.events.find((event) => event.kind === 'fan')
+    expect(fan).toBeTruthy()
+    expect(Math.cos(fan.angle)).toBeGreaterThan(0)
+    expect(result.state.crops[0].hp).toBeLessThan(20)
+    expect(result.state.crops[1].hp).toBe(20)
+    // The final form fires three fans at once.
+    const terminal = arena({ synth: MAX_GEAR_LEVEL, arp: MAX_GEAR_LEVEL }, [crop(0, 70, 50)], 8)
+    expect(evolved(terminal.gear)).toContain('synth')
+    expect(stepFarm(terminal, terminal.position).events.filter((event) => event.kind === 'fan')).toHaveLength(3)
+  })
+})
