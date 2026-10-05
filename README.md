@@ -99,6 +99,8 @@ Mochi Cat 的排行榜接口会由 Vite 转发到 `http://localhost:3001`。
 
 ## 内网服务器部署
 
+Ubuntu 服务器推荐使用项目自带的进程守护脚本：在服务器拉取代码后执行 `bash scripts/game-service.sh install`，自动完成自测、构建、80 端口权限配置和开机自启。更新代码后执行 `bash scripts/game-service.sh update`。完整复制执行步骤及日志、启停命令见 [服务器进程守护说明](docs/server-service.md)。
+
 ```bash
 npm ci
 npm run build
