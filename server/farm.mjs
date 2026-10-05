@@ -13,7 +13,9 @@ export function verifyFarm(input) {
   if (!Array.isArray(input.frames) || !input.frames.length || input.frames.length > MAX_FARM_FRAMES) return null
   const round = replayFarm(input.day, input.frames, input.choices, input.surges)
   if (!round || !Number.isInteger(input.score) || input.score !== round.score || !round.score) return null
-  return { playerId, name, songId: farmKey(round.day), difficulty: 'farm', score: round.score, accuracy: Math.min(10000, round.bosses * 1000 + round.harvested), maxCombo: round.maxCombo, stars: round.stars, seconds: Math.round(round.seconds) }
+  // The avatar is cosmetic: keep the id only when it looks like one.
+  const characterId = typeof input.characterId === 'string' && /^[a-z0-9_-]{1,32}$/.test(input.characterId) ? input.characterId : ''
+  return { playerId, name, songId: farmKey(round.day), difficulty: 'farm', score: round.score, accuracy: Math.min(10000, round.bosses * 1000 + round.harvested), maxCombo: round.maxCombo, stars: round.stars, seconds: Math.round(round.seconds), characterId }
 }
 export async function handleFarmRequest(req, res, url, store) {
   const send = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)) }

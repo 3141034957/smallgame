@@ -61,8 +61,11 @@ describe('replay-verified all-time farm leaderboard', () => {
     expect(round.score).toBeGreaterThan(0)
     expect(verifyFarm({ ...input, maxCombo: 999999, bosses: 999999, stars: 999, harvested: 999999, gear: { drum: 99 } })).toEqual({
       playerId: input.playerId, name: input.name, songId: farmKey(day), difficulty: 'farm', score: round.score,
-      accuracy: Math.min(10000, round.bosses * 1000 + round.harvested), maxCombo: round.maxCombo, stars: round.stars, seconds: Math.round(round.seconds),
+      accuracy: Math.min(10000, round.bosses * 1000 + round.harvested), maxCombo: round.maxCombo, stars: round.stars, seconds: Math.round(round.seconds), characterId: '',
     })
+    // The avatar id is cosmetic and never influences the verified score.
+    expect(verifyFarm({ ...input, characterId: 'burger-dog' }).characterId).toBe('burger-dog')
+    expect(verifyFarm({ ...input, characterId: 'DROP TABLE melody_scores' }).characterId).toBe('')
     expect(Math.round(round.seconds)).toBeGreaterThan(60)
   })
 
@@ -102,7 +105,7 @@ describe('replay-verified all-time farm leaderboard', () => {
     const store = createMelodyStore(':memory:')
     const request = createRequest(store)
     try {
-      const accepted = await request('POST', '/api/farm/score', JSON.stringify(input))
+      const accepted = await request('POST', '/api/farm/score', JSON.stringify({ ...input, characterId: 'burger-dog' }))
       expect(Buffer.byteLength(JSON.stringify(input))).toBeGreaterThan(32768)
       expect(accepted.status).toBe(200)
       expect(accepted.headers['Cache-Control']).toBe('no-store')
@@ -115,6 +118,9 @@ describe('replay-verified all-time farm leaderboard', () => {
       expect(retry.data.total).toBe(2)
       const board = await request('GET', `/api/farm/leaderboard?playerId=${input.playerId}`)
       expect(board.data.data.map((entry) => entry.score)).toEqual([round.score, lowerRound.score])
+      // The row avatar comes from the id sent with the run.
+      expect(board.data.data[0].characterId).toBe('burger-dog')
+      expect(board.data.own.characterId).toBe('burger-dog')
       expect(board.data.own.rank).toBe(1)
       expect((await request('GET', '/api/farm/leaderboard?day=2026-10-05')).data.total).toBe(2)
       expect(store.board(`wave:v1:${day}`, 'wave').total).toBe(0)

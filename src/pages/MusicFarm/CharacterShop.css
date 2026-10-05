@@ -63,15 +63,12 @@
 @media(min-width:681px){.farm-dialog.is-fullscreen{background:#e5edcf}.farm-shop{width:min(520px,100%);margin:0 auto;box-shadow:0 0 50px #6f7a5a33}}
 @media(max-width:380px){.farm-shop-bar{grid-template-columns:42px minmax(0,1fr) 84px;gap:6px;padding-left:10px;padding-right:10px}.farm-shop-back{width:42px;height:42px;font-size:38px}.farm-shop-title h2{letter-spacing:2px}.farm-shop-showcase{padding:0 12px}.farm-shop-list{grid-auto-columns:clamp(96px,31%,120px)}}
 @media(prefers-reduced-motion:reduce){.farm-shop *{animation:none!important;transition:none!important}}
-.farm-start-character{display:flex;align-items:center;justify-content:center;gap:9px;margin-bottom:7px;border:1px solid #dfd4e9;background:#f4ecf8;border-radius:16px;padding:8px 14px;color:#8e759f;font-size:10px!important}
-.farm-start-character img{width:40px;height:44px;object-fit:contain}
-.farm-start-character span{text-align:left}
-.farm-start-character strong{display:block;color:#655576;font-size:14px;margin-bottom:3px}
+.farm-shop-pill{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:44px;margin-top:10px;border:1px solid #dfd4e9;border-radius:22px;background:#fffdf9;color:#8e759f;font:inherit;font-size:13px;font-weight:800;cursor:pointer}
+.farm-shop-pill:active{transform:translateY(1px)}
 .farm-result .farm-wallet-reward{background:#fff1d3;border:1px solid #ead8a4;border-radius:13px;padding:12px 16px;font-size:13px;color:#9e7a3c}
 .farm-result .farm-wallet-reward small{display:block;font-size:10px;margin-top:6px}
 .farm-result .farm-result-shop{display:block;width:100%;margin:12px auto 0;border:1px solid #d9cbe7;border-radius:12px;padding:11px;background:#f1e9f7;color:#8a719e;font:inherit;font-size:12px}
 .farm-result .farm-primary{margin-bottom:14px}
 .farm-header nav .farm-shop-open{font-size:17px}
-@media(max-width:520px){.farm-start-character{padding:5px 10px}.farm-start-character img{width:28px;height:32px}.farm-start-character strong{font-size:12px}.farm-header nav{gap:4px}}
-@media(max-height:740px){.farm-start-character{margin-bottom:0}.farm-start-character img{height:28px;width:26px}}
-@media(max-height:500px) and (min-width:681px){.farm-start-character{display:none}}
+@media(max-width:520px){.farm-header nav{gap:4px}}
+@media(max-height:500px) and (min-width:681px){.farm-shop-pill{display:none}}

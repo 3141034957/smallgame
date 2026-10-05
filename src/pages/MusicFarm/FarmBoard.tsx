@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { melodyRequest } from '@/features/melody/leaderboard'
 import type { Board } from '@/features/melody/leaderboard'
-import { formatFarmTime } from '@/features/farm/presentation'
-import { FPS } from '@/features/farm/rules.mjs'
+import { FARM_CHARACTERS } from '@/features/farm/characters'
 import type { FarmRound } from '@/features/farm/rules.mjs'
 import './FarmBoard.css'
 
@@ -59,9 +58,12 @@ function getStoredNickname() {
   return readLegacyPlayer()?.name.trim().slice(0, MAX_NAME_LENGTH) ?? ''
 }
 
+const avatarFor = (characterId: string | undefined) =>
+  FARM_CHARACTERS.find((character) => character.id === characterId) ?? FARM_CHARACTERS[0]
+
 // `compact` renders the read-only board that greets players on the start screen:
-// heading, scrollable top list, own best — no submit form.
-export function FarmBoard({ round, compact = false }: { round?: FarmRound | null; compact?: boolean }) {
+// heading, scrollable top list — no submit form.
+export function FarmBoard({ round, characterId, compact = false }: { round?: FarmRound | null; characterId?: string; compact?: boolean }) {
   const [playerId] = useState(getOrCreatePlayerId)
   const [name, setName] = useState(getStoredNickname)
   const [draft, setDraft] = useState('')
@@ -93,12 +95,12 @@ export function FarmBoard({ round, compact = false }: { round?: FarmRound | null
     boardRef.current?.abort()
     const controller = new AbortController(); submitRef.current = controller
     setBusy(true); setError('')
-    const submission = { day: target.day, frames: target.frames, choices: target.choices, surges: target.surges, score: target.score, playerId, name: next }
+    const submission = { day: target.day, frames: target.frames, choices: target.choices, surges: target.surges, score: target.score, playerId, name: next, characterId: characterId ?? '' }
     void melodyRequest<Board>('score', controller.signal, submission, 'farm')
       .then((value) => { if (!controller.signal.aborted) { setBoard(value); setSubmittedRound(target) } })
       .catch((reason) => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : '暂时连不上，再试一次。') })
       .finally(() => { if (!controller.signal.aborted) setBusy(false) })
-  }, [busy, playerId])
+  }, [busy, playerId, characterId])
 
   // A player who already picked a nickname is on the board the moment the run
   // ends; a failure is retried from the button, never in a loop.
@@ -126,13 +128,17 @@ export function FarmBoard({ round, compact = false }: { round?: FarmRound | null
     {error && <p role="alert" className="farm-board-error">{error}</p>}
     {!board && !error && <p role="status" className="farm-board-empty">乐手们的成绩正在赶来…</p>}
     {board && <>
-      <div className="farm-board-columns" aria-hidden="true"><span>名次</span><span>玩家</span><span>分数</span></div>
-      <ol className="farm-board-list">{board.data.length ? board.data.slice(0, 10).map((entry) => <li key={entry.rank} className={entry.isYou ? 'is-you' : ''}>
-        <span className="farm-board-rank">{entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : entry.rank}</span>
-        <div><strong>{entry.name}</strong><small>生存 {formatFarmTime(entry.seconds * FPS)} · {entry.maxCombo} 连击 <span aria-label={`${entry.stars} 星`}>{'★'.repeat(entry.stars)}</span></small></div>
-        <b>{entry.score.toLocaleString()}</b>
-      </li>) : <li className="farm-board-empty">总榜首位幸存者，等你来挑战 ♫</li>}</ol>
-      {board.own && <p className="farm-board-own">你的历史最佳 {board.own.score.toLocaleString()} 分 · 第 {board.own.rank} / {board.total} 名</p>}
+      <div className="farm-board-columns" aria-hidden="true"><span>角色</span><span>名次</span><span>玩家</span><span>分数</span></div>
+      <ol className="farm-board-list">{board.data.length ? board.data.slice(0, 10).map((entry) => {
+        const avatar = avatarFor(entry.characterId)
+        return <li key={entry.rank} className={entry.isYou ? 'is-you' : ''}>
+          <span className="farm-board-avatar"><img src={avatar.image} alt="" loading="lazy" /></span>
+          <span className="farm-board-rank">{entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : entry.rank}</span>
+          <strong>{entry.name}</strong>
+          <b>{entry.score.toLocaleString()}</b>
+        </li>
+      }) : <li className="farm-board-empty">总榜首位幸存者，等你来挑战 ♫</li>}</ol>
+      {board.own && !compact && <p className="farm-board-own">你的历史最佳 {board.own.score.toLocaleString()} 分 · 第 {board.own.rank} / {board.total} 名</p>}
     </>}
   </section>
 }

@@ -26,7 +26,7 @@ export function verifyPerformance(input) {
   return { playerId, name, songId: song.id, difficulty: input.difficulty, score: run.score, accuracy: Math.round(runAccuracy(run, notes.length) * 10000), maxCombo: run.maxCombo, stars: runStars(run, notes.length), seconds: 0 }
 }
 
-const ranking = `SELECT player_id, name, score, accuracy, max_combo, stars, seconds,
+const ranking = `SELECT player_id, name, score, accuracy, max_combo, stars, seconds, character_id,
   ROW_NUMBER() OVER (ORDER BY score DESC, accuracy DESC, max_combo DESC, updated_at ASC, player_id ASC) AS rank
   FROM melody_scores WHERE song_id = ? AND difficulty = ?`
 
@@ -43,16 +43,17 @@ export function createMelodyStore(databasePath) {
   // Older databases predate the survival clock: add the column in place.
   const columns = db.prepare('PRAGMA table_info(melody_scores)').all().map((column) => column.name)
   if (!columns.includes('seconds')) db.exec('ALTER TABLE melody_scores ADD COLUMN seconds INTEGER NOT NULL DEFAULT 0')
-  const upsert = db.prepare(`INSERT INTO melody_scores (player_id, song_id, difficulty, name, score, accuracy, max_combo, stars, seconds, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  if (!columns.includes('character_id')) db.exec("ALTER TABLE melody_scores ADD COLUMN character_id TEXT NOT NULL DEFAULT ''")
+  const upsert = db.prepare(`INSERT INTO melody_scores (player_id, song_id, difficulty, name, score, accuracy, max_combo, stars, seconds, character_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(player_id, song_id, difficulty) DO UPDATE SET name = excluded.name,
-      score = excluded.score, accuracy = excluded.accuracy, max_combo = excluded.max_combo, stars = excluded.stars, seconds = excluded.seconds, updated_at = excluded.updated_at
+      score = excluded.score, accuracy = excluded.accuracy, max_combo = excluded.max_combo, stars = excluded.stars, seconds = excluded.seconds, character_id = excluded.character_id, updated_at = excluded.updated_at
     WHERE excluded.score > melody_scores.score
       OR (excluded.score = melody_scores.score AND excluded.accuracy > melody_scores.accuracy)
       OR (excluded.score = melody_scores.score AND excluded.accuracy = melody_scores.accuracy AND excluded.max_combo > melody_scores.max_combo)`)
-  const toEntry = (row, playerId) => row ? { rank: row.rank, name: row.name, score: row.score, accuracy: row.accuracy / 100, maxCombo: row.max_combo, stars: row.stars, seconds: row.seconds ?? 0, isYou: row.player_id === playerId } : null
+  const toEntry = (row, playerId) => row ? { rank: row.rank, name: row.name, score: row.score, accuracy: row.accuracy / 100, maxCombo: row.max_combo, stars: row.stars, seconds: row.seconds ?? 0, characterId: row.character_id ?? '', isYou: row.player_id === playerId } : null
   return {
     submit(record, now = Date.now()) {
-      upsert.run(record.playerId, record.songId, record.difficulty, record.name, record.score, record.accuracy, record.maxCombo, record.stars, Math.round(record.seconds ?? 0), now)
+      upsert.run(record.playerId, record.songId, record.difficulty, record.name, record.score, record.accuracy, record.maxCombo, record.stars, Math.round(record.seconds ?? 0), record.characterId ?? '', now)
       // Renaming a player should work even when this performance is below their best.
       db.prepare('UPDATE melody_scores SET name = ? WHERE player_id = ?').run(record.name, record.playerId)
       return this.board(record.songId, record.difficulty, record.playerId)

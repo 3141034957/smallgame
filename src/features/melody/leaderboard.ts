@@ -2,7 +2,7 @@ import type { Difficulty, Lane } from './engine'
 
 export type Player = { id: string; name: string }
 export type Tap = { lane: Lane; time: number }
-export type ScoreEntry = { rank: number; name: string; score: number; accuracy: number; maxCombo: number; stars: number; seconds: number; isYou: boolean }
+export type ScoreEntry = { rank: number; name: string; score: number; accuracy: number; maxCombo: number; stars: number; seconds: number; characterId?: string; isYou: boolean }
 export type Board = { data: ScoreEntry[]; own: ScoreEntry | null; total: number }
 export type Submission = { songId: string; difficulty: Difficulty; score: number; taps: Tap[] }
 const PLAYER_KEY = 'mochi-melody-player-v1'
