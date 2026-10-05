@@ -81,3 +81,26 @@
 
 /* Keep the numeric upgrade requirement visible in portrait and landscape. */
 .farm-xp>span{flex-shrink:0;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* Leave the mobile battlefield open; the build remains in pause/results. */
+@media (max-width:680px), (hover:none) and (pointer:coarse) {
+  .music-farm .farm-rack,
+  .music-farm .farm-bottom-note,
+  .music-farm .farm-controls>div { display:none; }
+  .music-farm .farm-game { min-height:0; }
+  .music-farm .farm-field { inset:0; width:100%; height:100%; }
+  .music-farm .farm-controls {
+    display:none;
+    left:auto;
+    right:max(12px,env(safe-area-inset-right));
+    bottom:max(12px,env(safe-area-inset-bottom));
+    transform:none;
+    width:auto;
+    max-width:none;
+    padding:0;
+    background:none;
+    box-shadow:none;
+  }
+  .music-farm[data-phase='play'] .farm-controls { display:flex; }
+  .music-farm .farm-surge { width:112px; min-width:0; height:44px; padding:0 10px; font-size:12px; }
+}
