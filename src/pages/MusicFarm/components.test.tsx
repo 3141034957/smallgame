@@ -62,7 +62,11 @@ describe('farm screens render', () => {
       gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])) }
     const html = renderToStaticMarkup(<FarmBoard round={round as never} />)
     expect(html).toContain('上榜')
-    expect(html).toContain('留下这一局的战绩')
+    expect(html).toContain('取个昵称，把这一局送上总榜')
+    // A player who already saved a nickname goes straight onto the board: no input.
+    localStorage.setItem('clockwork-player-nickname-v1', '老乐手')
+    expect(renderToStaticMarkup(<FarmBoard round={round as never} />)).not.toContain('farm-player-name')
+    localStorage.removeItem('clockwork-player-nickname-v1')
     const stats = renderToStaticMarkup(<MemoryRouter initialEntries={[`/farm?day=${day}&stats=1`]}><MusicFarm /></MemoryRouter>)
     expect(stats).toContain('性能诊断')
   })
