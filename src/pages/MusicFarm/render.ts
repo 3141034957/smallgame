@@ -343,6 +343,16 @@ function airEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress: nu
     ctx.restore()
     return
   }
+  if (event.kind === 'block') {
+    ctx.globalAlpha = Math.max(0, 1 - progress)
+    ctx.strokeStyle = '#b7a0dd'; ctx.lineWidth = 3
+    ctx.beginPath(); ctx.arc(x, y, 5 + progress * 16, 0, Math.PI * 2); ctx.stroke()
+    ctx.fillStyle = '#8f74c4'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'
+    ctx.fillText('♪', x, y + 5 - progress * 10)
+    ctx.globalAlpha = 1
+    ctx.restore()
+    return
+  }
   if (event.kind === 'hurt' || event.kind === 'heal') {
     ctx.globalAlpha = 1 - progress; ctx.font = '800 17px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = event.kind === 'hurt' ? '#cf476d' : '#3c9c7c'; ctx.strokeStyle = '#fffaf4'; ctx.lineWidth = 3
     const text = `${event.kind === 'hurt' ? '−' : '+'}${event.points}`; ctx.strokeText(text, x, y - 30 - progress * 30); ctx.fillText(text, x, y - 30 - progress * 30)

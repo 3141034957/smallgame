@@ -24,7 +24,7 @@ export function evolved(gear: Gear): TalentId[]
 export type Gear = Record<TalentId, number>
 export type Crop = { id: number; x: number; y: number; kind: Lane; hp: number; maxHp: number; regrow: number; boss: boolean; bass?: boolean; elite?: boolean; dashUntil?: number; spawnAt?: number; xpStage?: number }
 export type Loot = { id: number; x: number; y: number; xp: number; coins: number; heal?: number; shield?: number; expires?: number }
-export type FarmEvent = { id: number; kind: 'harvest' | 'boss' | 'blast' | 'pulse' | 'echo' | 'surge' | 'arrival' | 'hit' | 'collect' | 'rain' | 'beam' | 'blackhole' | 'hurt' | 'heal' | 'slam' | 'shield' | 'shock'; x: number; y: number; lane: Lane; midi?: number; points?: number; radius?: number; chain?: boolean; fromX?: number; fromY?: number; bass?: boolean }
+export type FarmEvent = { id: number; kind: 'harvest' | 'boss' | 'blast' | 'pulse' | 'echo' | 'surge' | 'arrival' | 'hit' | 'collect' | 'rain' | 'beam' | 'blackhole' | 'hurt' | 'heal' | 'slam' | 'shield' | 'shock' | 'block'; x: number; y: number; lane: Lane; midi?: number; points?: number; radius?: number; chain?: boolean; fromX?: number; fromY?: number; bass?: boolean }
 export type Shot = { id: number; x: number; y: number; dx: number; dy: number; expires: number }
 export type Danger = { id: number; x: number; y: number; radius: number; due: number }
 export type Trail = { id: number; x: number; y: number; damage: number; expires: number }

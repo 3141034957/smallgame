@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FPS, MAX_BOSSES, RECIPES, TALENTS, THRESHOLDS, chooseTalent, createFarm, evolved, finishFarm, stepFarm } from './rules.mjs'
+import { FPS, MAX_BOSSES, RECIPES, TALENTS, THRESHOLDS, chooseTalent, createFarm, evolved, finishFarm, orbitPositions, stepFarm } from './rules.mjs'
 
 const day = '2026-10-04'
 const arena = (tick) => ({ ...createFarm(day), tick, crops: [], nextWave: Infinity, nextBoss: Infinity, lastPulse: tick })
@@ -47,6 +47,26 @@ describe('endless survival', () => {
     expect(state.score).toBe(0)
     state.nextWave = state.tick
     expect(stepFarm(state, state.position).state.crops.length).toBeGreaterThan(MAX_BOSSES)
+  })
+
+  it('lets the guitarist orbiting notes swallow ranged shots before they land', () => {
+    const fire = (orbit) => {
+      let state = arena(10 * FPS)
+      state.gear = { ...state.gear, orbit }
+      state = stepFarm(state, state.position).state
+      const target = orbit ? orbitPositions(state)[0] : [state.position[0] + 20, state.position[1]]
+      state.shots = [{ id: 900, x: target[0], y: target[1], dx: 0, dy: 0, expires: state.tick + FPS * 5 }]
+      return stepFarm(state, state.position)
+    }
+    const guarded = fire(2)
+    expect(guarded.events.some((event) => event.kind === 'block')).toBe(true)
+    expect(guarded.state.blocks).toBe(1)
+    expect(guarded.state.shots).toHaveLength(0)
+    expect(guarded.state.hp).toBe(100)
+    const bare = fire(0)
+    expect(bare.events.some((event) => event.kind === 'block')).toBe(false)
+    expect(bare.state.blocks).toBe(0)
+    expect(bare.state.shots).toHaveLength(1)
   })
 
   it('increases late enemy health while keeping even hour-long pursuit speeds bounded', () => {

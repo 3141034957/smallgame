@@ -29,7 +29,7 @@ export const SHIELD_COOLDOWN = 20 * FPS
 export const SHIELD_LIMIT = 3
 export const TALENTS = [
   { id: 'drum', kind: 'weapon', partner: 'range', name: '鼓手咚咚', icon: '🥁', color: '#edaa8e', description: '击败怪物，鼓点引爆周围怪群。', tag: '连锁爆破' },
-  { id: 'orbit', kind: 'weapon', partner: 'tempo', name: '吉他手弦弦', icon: '🎸', color: '#b7a0dd', description: '旋转音符绕着你飞，碰到怪物就造成伤害。', tag: '旋转音刃' },
+  { id: 'orbit', kind: 'weapon', partner: 'tempo', name: '吉他手弦弦', icon: '🎸', color: '#b7a0dd', description: '旋转音符绕着你飞，碰到怪物就造成伤害，还能挡下飞来的弹幕。', tag: '旋转音刃' },
   { id: 'power', kind: 'weapon', partner: 'magnet', name: '贝斯手阿低', icon: '🎻', color: '#a5b7d1', description: '奏出低音光柱，击穿同列敌人。', tag: '贯穿攻击' },
   { id: 'echo', kind: 'weapon', partner: 'lucky', name: '主唱麦麦', icon: '🎤', color: '#df9bb1', description: '追着怪物唱出高音箭雨，自动命中。', tag: '自动追踪' },
   { id: 'range', kind: 'chip', partner: 'drum', name: '共鸣音箱', icon: '◉', color: '#9ebf86', description: '扩大收割音浪，让身边更多小怪一起爆开。', tag: '收割范围' },
@@ -348,8 +348,15 @@ export function stepFarm(previous, point, useSurge = false) {
     }
     if (distance([enemy.x, enemy.y], point) < (enemy.bass ? 10 : enemy.boss ? 9 : enemy.elite ? 7 : 5)) hurt(enemy.bass ? 20 : enemy.boss ? 24 : enemy.elite ? 20 : enemy.kind === 3 ? 18 : 12)
   }
+  // The guitarist's orbiting notes swat ranged shots out of the air.
+  const orbs = gear.orbit ? orbitPositions(state) : null
   state.shots = state.shots.filter((shot) => {
     shot.x += shot.dx; shot.y += shot.dy
+    if (orbs?.some((orb) => distance([shot.x, shot.y], orb) <= 6)) {
+      state.blocks++
+      events.push({ id: state.nextId++, kind: 'block', x: shot.x, y: shot.y, lane: 3 })
+      return false
+    }
     if (distance([shot.x, shot.y], point) < 3.5) { hurt(14); return false }
     return shot.expires > state.tick && distance([shot.x, shot.y], point) < 180
   })
