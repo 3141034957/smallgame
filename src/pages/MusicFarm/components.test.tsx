@@ -36,6 +36,8 @@ describe('farm screens render', () => {
     expect(html).toContain('今日词缀')
     expect(html).toContain('今日目标')
     expect(html).toContain('0 / 20 经验')
+    // The start screen opens straight onto the all-time leaderboard.
+    expect(html).toContain('无限总榜')
   })
   it('renders the badge wall, quest list, build summary and recap', () => {
     const log = loadFarmAchievements()
@@ -74,5 +76,10 @@ describe('farm screens render', () => {
     expect(board).not.toContain('查看日期')
     expect(board).not.toContain('type="date"')
     expect(createFarm(day).day).toBe(day)
+    const compact = renderToStaticMarkup(<FarmBoard compact />)
+    expect(compact).toContain('无限总榜')
+    expect(compact).toContain('is-compact')
+    expect(compact).not.toContain('留下这一局的战绩')
+    expect(compact).not.toContain('当前浏览器记住你的昵称')
   })
 })

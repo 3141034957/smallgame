@@ -27,3 +27,16 @@
 .farm-board .farm-board-error { color: #b07862; font-size: 12px; line-height: 1.7; }
 .farm-board .farm-board-note { margin: 14px 0 0; color: #a6ad98; font-size: 9px; line-height: 1.8; }
 @media (max-width: 380px) { .farm-board { padding: 16px; } .farm-board li { gap: 7px; padding: 12px 4px; } .farm-board li > b { font-size: 16px; } }
+
+/* Compact board on the start screen: title → scrollable list → start button. */
+.farm-board.is-compact { width: 100%; max-width: 320px; margin-top: 14px; padding: 12px 12px 10px; border-radius: 18px; box-shadow: none; }
+.farm-board.is-compact .farm-board-heading h2 { margin: 4px 0 0; font-size: 16px; }
+.farm-board.is-compact .farm-board-heading button { width: 30px; height: 30px; font-size: 19px; }
+.farm-board.is-compact .farm-board-list { max-height: 186px; overflow-y: auto; overscroll-behavior: contain; }
+.farm-board.is-compact li { gap: 8px; padding: 9px 3px; }
+.farm-board.is-compact .farm-board-rank { width: 24px; font-size: 17px; }
+.farm-board.is-compact li > b { font-size: 15px; }
+.farm-board.is-compact .farm-board-own { margin: 9px 0 0; padding: 9px 10px; font-size: 11px; }
+.farm-board.is-compact .farm-board-empty { padding: 12px 0; font-size: 11px; }
+.farm-board.is-compact .farm-board-error { font-size: 11px; }
+@media (max-height: 720px) { .farm-board.is-compact .farm-board-list { max-height: 128px; } }
