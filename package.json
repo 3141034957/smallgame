@@ -12,7 +12,7 @@
     "build": "tsc -b && vite build",
     "db:inspect": "node scripts/inspect-database.mjs",
     "test": "vitest run",
-    "start": "node server/index.mjs",
+    "start": "PORT=${PORT:-80} node server/index.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },

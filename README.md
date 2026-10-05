@@ -9,7 +9,7 @@
 - `#/rhythm`、`#/island`、`#/wave`、`#/bounce`：保留之前的音乐玩法。
 - `#/mochi`、`#/shop`：原小游戏及商店。
 
-安装依赖：`npm ci`。生产试玩：`npm run build` 后 `npm start`，默认在 3001 端口同时提供页面和排行榜；开发：分别运行 `npm run dev:server` 与 `npm run dev`。验证：`npm test`、`npm run lint`、`npm run build`。
+安装依赖：`npm ci`。生产试玩：`npm run build` 后 `npm start`，默认在 80 端口同时提供页面和排行榜，可通过 `PORT` 环境变量覆盖；开发：分别运行 `npm run dev:server` 与 `npm run dev`，开发后端仍使用 3001 端口。验证：`npm test`、`npm run lint`、`npm run build`。
 
 首页右上角的角色商店可预览、解锁并选择 7 个角色；战斗结算金币可用于购买，购买与选择保存在当前浏览器，选择后立即在战场显示。 右上角的成就墙记录 10 个局内里程碑，死亡结算时解锁并展示本局新成就。
 
@@ -105,7 +105,9 @@ npm run build
 npm start
 ```
 
-构建产物输出到 `dist/client`。使用原有 Node 服务时，页面和 Mochi Cat 的排行榜接口统一由 `http://localhost:3001` 提供。
+构建产物输出到 `dist/client`。运行 `npm start` 后，页面和排行榜接口统一由 `http://localhost`（80 端口）提供；如需其他端口，可运行 `PORT=3001 npm start`。
+
+域名 `yueduigameyuedui.site` 解析到部署服务器、服务器安全组及防火墙放行 TCP 80 后，即可直接通过 `http://yueduigameyuedui.site/` 进入游戏。启动前确保 80 端口没有被其他服务占用，且没有遗留的 `PORT` 环境变量覆盖默认值。若 Linux 上启动报 `EACCES`，需为运行服务配置绑定低位端口的权限（例如 systemd 的 `AmbientCapabilities=CAP_NET_BIND_SERVICE`）。
 
 第一次启动时，服务会自动创建 SQLite 数据库，并把原来的排行榜和统计 JSON 数据导入数据库。生产环境建议使用 systemd、Supervisor 或其他进程管理工具保持 `npm start` 常驻，并在升级前备份 `server/data`。
 
