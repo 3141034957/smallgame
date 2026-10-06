@@ -1,3 +1,4 @@
+import { accountStorage } from '@/utils/accountStorage'
 import { routeSeed } from './calendar.mjs'
 import { awardFarmCoins } from './characters'
 import { evolved, type FarmRound } from './rules.mjs'
@@ -105,7 +106,7 @@ const number = (value: unknown) =>
 export function loadFarmQuests(day: string): FarmQuestLog {
   let stored: unknown = null
   try {
-    stored = JSON.parse(localStorage.getItem(FARM_QUEST_KEY) ?? 'null')
+    stored = JSON.parse(accountStorage.getItem(FARM_QUEST_KEY) ?? 'null')
   } catch {
     stored = null
   }
@@ -162,7 +163,7 @@ export function applyFarmQuests(
   // Save progress before paying: retries must not count this run twice, even
   // when the wallet or the final claim write fails independently.
   try {
-    localStorage.setItem(FARM_QUEST_KEY, JSON.stringify(log))
+    accountStorage.setItem(FARM_QUEST_KEY, JSON.stringify(log))
   } catch {
     return { log: previous, completed: [], error: '今日目标暂时无法保存，请允许浏览器存储后重试。' }
   }
@@ -180,7 +181,7 @@ export function applyFarmQuests(
     if (paid.paid) completed.push(quest.id)
   }
   try {
-    localStorage.setItem(FARM_QUEST_KEY, JSON.stringify(log))
+    accountStorage.setItem(FARM_QUEST_KEY, JSON.stringify(log))
   } catch {
     error = '今日目标领取状态暂时无法保存，请重试；已到账金币不会重复发放。'
   }

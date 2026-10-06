@@ -1,3 +1,4 @@
+import { accountStorage, activeAccountId } from '@/utils/accountStorage'
 export const PLAYER_ID_STORAGE_KEY = 'clockwork-player-id-v1'
 export const NICKNAME_STORAGE_KEY = 'clockwork-player-nickname-v1'
 const LEGACY_PLAYER_KEY = 'mochi-melody-player-v1'
@@ -5,7 +6,7 @@ export const MAX_NAME_LENGTH = 12
 
 function read(key: string) {
   try {
-    return localStorage.getItem(key)
+    return accountStorage.getItem(key)
   } catch {
     return null
   }
@@ -13,7 +14,7 @@ function read(key: string) {
 
 function write(key: string, value: string) {
   try {
-    localStorage.setItem(key, value)
+    accountStorage.setItem(key, value)
   } catch {
     /* Keep playing with an in-memory identity. */
   }
@@ -55,6 +56,8 @@ export function createCompatiblePlayerId(): string {
 }
 
 export function getOrCreatePlayerId(): string {
+  const accountId = activeAccountId()
+  if (accountId) return accountId
   const stored = read(PLAYER_ID_STORAGE_KEY)?.trim()
   if (validId(stored)) return stored
   const legacy = legacyPlayer()?.id

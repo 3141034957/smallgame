@@ -43,7 +43,7 @@ export function verifyFarm(input) {
     characterId,
   }
 }
-export async function handleFarmRequest(req, res, url, store) {
+export async function handleFarmRequest(req, res, url, store, authenticate = () => null) {
   const send = (status, body) => {
     res.writeHead(status, {
       'Content-Type': 'application/json; charset=utf-8',
@@ -53,15 +53,12 @@ export async function handleFarmRequest(req, res, url, store) {
   }
   try {
     if (req.method === 'GET' && url.pathname === '/api/farm/leaderboard') {
-      send(
-        200,
-        store.boardAcrossDays(
-          FARM_PREFIX,
-          'farm',
-          normalizePlayerId(url.searchParams.get('playerId')),
-        ),
-      )
+      send(200, store.boardAcrossDays(FARM_PREFIX, 'farm', authenticate()?.id ?? null))
     } else if (req.method === 'POST' && url.pathname === '/api/farm/score') {
+      if (!authenticate()) {
+        send(401, { error: '请先登录，再提交成绩。' })
+        return
+      }
       let bytes = 0
       const chunks = []
       for await (const chunk of req) {
@@ -84,7 +81,13 @@ export async function handleFarmRequest(req, res, url, store) {
         send(409, { error: '怪潮规则已更新，请刷新页面后重新挑战；本机存档仍然保留。' })
         return
       }
-      const record = verifyFarm(input)
+      // Recheck after receiving the body: another login may have revoked it.
+      const user = authenticate()
+      if (!user) {
+        send(401, { error: '登录已失效或在别处登录，请重新登录。' })
+        return
+      }
+      const record = verifyFarm({ ...input, playerId: user.id })
       if (!record) {
         send(400, { error: '成绩未通过校验，完成一局生存挑战后再上榜吧。' })
         return

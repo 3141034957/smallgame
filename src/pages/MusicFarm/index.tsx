@@ -1,3 +1,4 @@
+import { accountStorage } from '@/utils/accountStorage'
 import { farmBestKey } from '@/features/farm/monsters.mjs'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -263,13 +264,13 @@ export default function MusicFarm() {
   useEffect(() => {
     let seen = true
     try {
-      seen = localStorage.getItem(FARM_HELP_SEEN_KEY) === '1'
+      seen = accountStorage.getItem(FARM_HELP_SEEN_KEY) === '1'
     } catch {
       seen = true
     }
     if (seen) return
     try {
-      localStorage.setItem(FARM_HELP_SEEN_KEY, '1')
+      accountStorage.setItem(FARM_HELP_SEEN_KEY, '1')
     } catch {
       /* Storage optional. */
     }

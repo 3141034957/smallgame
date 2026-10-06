@@ -1,3 +1,4 @@
+import { accountStorage } from '@/utils/accountStorage'
 import { TALENTS, type FarmRound, type Gear } from './rules.mjs'
 
 export type FarmCareer = {
@@ -35,7 +36,7 @@ const levels = (value: unknown) => {
 export function loadFarmCareer(): FarmCareer {
   let stored: unknown = null
   try {
-    stored = JSON.parse(localStorage.getItem(FARM_CAREER_KEY) ?? 'null')
+    stored = JSON.parse(accountStorage.getItem(FARM_CAREER_KEY) ?? 'null')
   } catch {
     stored = null
   }
@@ -83,7 +84,7 @@ export function recordFarmCareer(round: FarmRound): FarmCareerRecord {
     combo: career.bestCombo > previous.bestCombo,
   }
   try {
-    localStorage.setItem(FARM_CAREER_KEY, JSON.stringify(career))
+    accountStorage.setItem(FARM_CAREER_KEY, JSON.stringify(career))
     return { career, records }
   } catch {
     return {

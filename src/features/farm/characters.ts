@@ -1,3 +1,4 @@
+import { accountStorage } from '@/utils/accountStorage'
 import { BAND_CHARACTERS, DEFAULT_CHARACTER_ID, migrateCharacterId } from './characterRoster.mjs'
 import {
   normalizePermanentLevels,
@@ -34,7 +35,7 @@ const defaults = (): FarmProfile => ({
 })
 function readJSON(key: string) {
   try {
-    return JSON.parse(localStorage.getItem(key) ?? 'null')
+    return JSON.parse(accountStorage.getItem(key) ?? 'null')
   } catch {
     return null
   }
@@ -48,7 +49,7 @@ export function loadFarmProfile(): FarmProfile {
     const legacyOwned = [...ids(readJSON('character-unlocks-v1')), ...ids(legacy?.unlocks)]
     const owned = [...new Set([FARM_DEFAULT_CHARACTER, ...ids(stored?.owned), ...legacyOwned])]
     const candidate = migrateCharacterId(
-      stored?.selected ?? localStorage.getItem('character-selected-v1') ?? legacy?.selected,
+      stored?.selected ?? accountStorage.getItem('character-selected-v1') ?? legacy?.selected,
     )
     return {
       coins: Number.isSafeInteger(stored?.coins) && stored.coins >= 0 ? stored.coins : 0,
@@ -80,7 +81,7 @@ export function loadFarmProfile(): FarmProfile {
 function saveProfile(profile: FarmProfile, previous: FarmProfile): ProfileResult {
   try {
     // Currency, ownership and selection are committed together, never partially.
-    localStorage.setItem(FARM_PROFILE_KEY, JSON.stringify(profile))
+    accountStorage.setItem(FARM_PROFILE_KEY, JSON.stringify(profile))
     return { profile, paid: true }
   } catch {
     return { profile: previous, error: '暂时无法保存，请允许浏览器存储后重试。', paid: false }

@@ -4,10 +4,14 @@ import { fileURLToPath } from 'node:url'
 import { createFarmStore } from './farm-store.mjs'
 import { handleFarmRequest } from './farm.mjs'
 import { createStaticHandler } from './static.mjs'
+import { createAuthStore } from './auth-store.mjs'
+import { createAuthHandler, allowAccountWrite } from './auth.mjs'
 
 const directory = dirname(fileURLToPath(import.meta.url))
 const databasePath = join(process.env.DATA_DIR || join(directory, 'data'), 'game.db')
 const store = createFarmStore(databasePath)
+const accounts = createAuthStore(databasePath)
+const auth = createAuthHandler(accounts)
 const sendStatic = createStaticHandler(join(directory, '..', 'dist', 'client'))
 
 const server = createServer((req, res) => {
@@ -21,16 +25,19 @@ const server = createServer((req, res) => {
     return
   }
 
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  // Account cookies are same-origin; do not expose credentialed APIs via CORS.
   if (req.method === 'OPTIONS') {
     res.writeHead(204)
     res.end()
     return
   }
+  if (url.pathname.startsWith('/api/auth/')) {
+    void auth.handle(req, res, url)
+    return
+  }
   if (url.pathname.startsWith('/api/farm/')) {
-    void handleFarmRequest(req, res, url, store)
+    if (req.method === 'POST' && !allowAccountWrite(req, res)) return
+    void handleFarmRequest(req, res, url, store, () => auth.authenticate(req))
     return
   }
   if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
@@ -49,6 +56,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
   process.once(signal, () => {
     server.close(() => {
       store.close()
+      accounts.close()
       process.exit(0)
     })
   })

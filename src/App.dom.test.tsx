@@ -27,7 +27,20 @@ beforeEach(() => {
   vi.stubGlobal(
     'fetch',
     vi.fn(
-      async () => new Response(JSON.stringify({ data: [], total: 0, own: null }), { status: 200 }),
+      async (url: string) =>
+        new Response(
+          JSON.stringify(
+            url.includes('/api/auth/session')
+              ? {
+                  user: {
+                    id: 'account_00000000-0000-4000-8000-000000000001',
+                    username: 'test_player',
+                  },
+                }
+              : { data: [], total: 0, own: null },
+          ),
+          { status: 200 },
+        ),
     ),
   )
   Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: vi.fn() })
@@ -59,6 +72,7 @@ it.each([
       </MemoryRouter>
     </StrictMode>,
   )
+  await screen.findByRole('button', { name: '退出登录' })
   await screen.findAllByText(
     (_, element) =>
       element?.textContent?.includes(title) === true &&
@@ -73,7 +87,7 @@ it('opens and closes the farm help dialog', async () => {
       <App />
     </MemoryRouter>,
   )
-  fireEvent.click(screen.getByRole('button', { name: '查看进化配方' }))
+  fireEvent.click(await screen.findByRole('button', { name: '查看进化配方' }))
   expect(screen.getByRole('dialog')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: /懂啦，开战/ }))
   expect(screen.queryByRole('dialog')).toBeNull()

@@ -1,3 +1,4 @@
+import { accountStorage } from '@/utils/accountStorage'
 export type FarmSettings = { effects: boolean }
 export const FARM_SETTINGS_KEY = 'farm-settings-v1'
 
@@ -6,7 +7,7 @@ export const FARM_SETTINGS_KEY = 'farm-settings-v1'
 export function loadFarmSettings(): FarmSettings {
   let stored: unknown = null
   try {
-    stored = JSON.parse(localStorage.getItem(FARM_SETTINGS_KEY) ?? 'null')
+    stored = JSON.parse(accountStorage.getItem(FARM_SETTINGS_KEY) ?? 'null')
   } catch {
     stored = null
   }
@@ -17,7 +18,7 @@ export function loadFarmSettings(): FarmSettings {
 export function saveFarmSettings(next: FarmSettings): FarmSettings {
   const settings = { effects: next.effects !== false }
   try {
-    localStorage.setItem(FARM_SETTINGS_KEY, JSON.stringify(settings))
+    accountStorage.setItem(FARM_SETTINGS_KEY, JSON.stringify(settings))
   } catch {
     /* Storage optional. */
   }

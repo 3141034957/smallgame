@@ -114,7 +114,15 @@ function createRequest(store) {
         result.data = JSON.parse(value)
       },
     }
-    await handleFarmRequest(req, res, new URL(path, 'http://localhost'), store)
+    const url = new URL(path, 'http://localhost')
+    // Pure route tests inject a trusted principal; real HTTP tests exercise cookies.
+    let id = url.searchParams.get('playerId')
+    try {
+      id = JSON.parse(body)?.playerId ?? id
+    } catch {
+      /* Malformed body is tested by the route. */
+    }
+    await handleFarmRequest(req, res, url, store, () => ({ id: id ?? input.playerId }))
     return result
   }
 }

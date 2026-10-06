@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, useSearchParams } from 'react-router-dom'
 import MusicFarm from '@/pages/MusicFarm'
+import { AuthGate } from '@/features/auth/AuthGate'
 
 function FarmHome() {
   const [params] = useSearchParams()
@@ -8,10 +9,12 @@ function FarmHome() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<FarmHome />} />
-      <Route path="/farm" element={<FarmHome />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <AuthGate>
+      <Routes>
+        <Route path="/" element={<FarmHome />} />
+        <Route path="/farm" element={<FarmHome />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AuthGate>
   )
 }

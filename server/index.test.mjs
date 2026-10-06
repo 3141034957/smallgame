@@ -68,6 +68,35 @@ function get(path, headers = {}) {
   })
 }
 
+function post(path, body, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const req = request(
+      {
+        hostname: '127.0.0.1',
+        port,
+        path,
+        method: 'POST',
+        agent: false,
+        headers: { 'Content-Type': 'application/json', 'X-Echo-Request': '1', ...headers },
+      },
+      (res) => {
+        let text = ''
+        res.setEncoding('utf8')
+        res.on('data', (chunk) => {
+          text += chunk
+        })
+        res.on('end', () =>
+          resolve({ status: res.statusCode, headers: res.headers, data: JSON.parse(text) }),
+        )
+        res.on('error', reject)
+      },
+    )
+    req.on('error', reject)
+    req.setTimeout(10000, () => req.destroy(new Error('测试请求超时')))
+    req.end(JSON.stringify(body))
+  })
+}
+
 it('survives a malformed Host header and continues serving the leaderboard', async () => {
   const result = await get('/api/farm/leaderboard', { Host: '[' })
   expect(result.status).toBe(200)
@@ -91,6 +120,12 @@ it('returns JSON 404 for unknown APIs instead of a page or cached asset', async 
 })
 
 it('preserves Chinese nicknames when request chunks split a UTF-8 character', async () => {
+  const registered = await post('/api/auth/register', {
+    account: 'http_test_player',
+    password: 'Mixed_Aa1!<>"&+',
+  })
+  expect(registered.status).toBe(200)
+  const cookie = registered.headers['set-cookie'][0].split(';')[0]
   const day = '2026-10-04'
   let state = createFarm(day)
   const frames = [],
@@ -124,7 +159,13 @@ it('preserves Chinese nicknames when request chunks split a UTF-8 character', as
         port,
         path: '/api/farm/score',
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Content-Length': body.length },
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': body.length,
+          'X-Echo-Request': '1',
+          'X-Echo-User': registered.data.user.id,
+          Cookie: cookie,
+        },
         agent: false,
       },
       (res) => {
@@ -144,6 +185,50 @@ it('preserves Chinese nicknames when request chunks split a UTF-8 character', as
   expect(board.data).toContainEqual(
     expect.objectContaining({ name: '快乐小猫', score: round.score }),
   )
+  const own = JSON.parse(
+    (await get('/api/farm/leaderboard?playerId=http-test-player', { Cookie: cookie })).text,
+  )
+  expect(own.own).toMatchObject({ name: '快乐小猫', score: round.score, isYou: true })
+  expect(board.own).toBeNull()
+})
+
+it('uses one persistent session, revokes earlier logins and protects account writes over IP', async () => {
+  expect(JSON.parse((await get('/api/auth/session')).text)).toEqual({ user: null })
+  const registered = await post('/api/auth/register', {
+    account: 'single_http',
+    password: 'Aa1!"<> &+/%',
+  })
+  expect(registered.status).toBe(200)
+  expect(registered.headers['set-cookie'][0]).toContain('HttpOnly')
+  expect(registered.headers['set-cookie'][0]).toContain('SameSite=Lax')
+  expect(registered.headers['access-control-allow-origin']).toBeUndefined()
+  const first = registered.headers['set-cookie'][0].split(';')[0]
+  const login = await post('/api/auth/login', { account: 'SINGLE_HTTP', password: 'Aa1!"<> &+/%' })
+  const second = login.headers['set-cookie'][0].split(';')[0]
+  expect(second).not.toBe(first)
+  expect((await get('/api/auth/session', { Cookie: first })).status).toBe(401)
+  expect(JSON.parse((await get('/api/auth/session', { Cookie: second })).text).user).toEqual(
+    login.data.user,
+  )
+  expect((await post('/api/farm/score', {})).status).toBe(401)
+  expect((await post('/api/farm/score', {}, { Cookie: first })).status).toBe(401)
+  expect(
+    (await post('/api/auth/logout', {}, { Cookie: second, 'X-Echo-User': 'someone_else' })).status,
+  ).toBe(401)
+  expect(
+    (await post('/api/auth/logout', {}, { Cookie: second, 'X-Echo-User': login.data.user.id }))
+      .status,
+  ).toBe(200)
+  expect((await get('/api/auth/session', { Cookie: second })).status).toBe(401)
+  expect(
+    (
+      await post(
+        '/api/auth/login',
+        { account: 'single_http', password: 'Aa1!"<> &+/%' },
+        { 'X-Echo-Request': '0' },
+      )
+    ).status,
+  ).toBe(403)
 })
 
 it.each([

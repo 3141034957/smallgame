@@ -1,3 +1,4 @@
+import { accountStorage } from '@/utils/accountStorage'
 import { evolved, type FarmRound } from './rules.mjs'
 
 export type FarmAchievement = {
@@ -147,7 +148,7 @@ export const formatFarmAchievement = (achievement: FarmAchievement, value: numbe
 
 function readJSON(key: string): unknown {
   try {
-    return JSON.parse(localStorage.getItem(key) ?? 'null')
+    return JSON.parse(accountStorage.getItem(key) ?? 'null')
   } catch {
     return null
   }
@@ -189,7 +190,7 @@ export function claimFarmAchievements(round: FarmRound | null): FarmAchievementC
   }
   const log = { unlocked, best }
   try {
-    localStorage.setItem(FARM_ACHIEVEMENT_KEY, JSON.stringify(log))
+    accountStorage.setItem(FARM_ACHIEVEMENT_KEY, JSON.stringify(log))
     return { log, fresh }
   } catch {
     return { log: previous, fresh: [], error: '成就暂时无法保存，浏览器存储可能已满。' }
