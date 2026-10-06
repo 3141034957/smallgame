@@ -15,6 +15,10 @@ function runService(action = 'install', mode = '', supervisor = 'systemd') {
   writeFileSync(join(root, 'package-lock.json'), '{}')
   writeFileSync(join(root, 'server/index.mjs'), '')
   writeFileSync(join(root, 'hold'), '')
+  if (['start', 'restart'].includes(action)) {
+    mkdirSync(join(root, 'dist/client'), { recursive: true })
+    writeFileSync(join(root, 'dist/client/index.html'), '<html></html>')
+  }
   writeFileSync(log, '')
   const command = (name, script) => writeFileSync(join(bin, name), '#!/bin/bash\nset -eu\n' + script, { mode: 0o755 })
   command('uname', 'echo Linux\n')
@@ -37,7 +41,7 @@ case "$1" in
   systemctl)
     case "$2" in
       is-active) [[ -f "$SERVICE_TEST_ROOT/restarted" ]] ;;
-      restart) touch "$SERVICE_TEST_ROOT/restarted" ;;
+      start|restart) touch "$SERVICE_TEST_ROOT/restarted" ;;
       stop|status|enable|daemon-reload|reset-failed) exit 0 ;;
       *) exit 88 ;;
     esac ;;
@@ -52,9 +56,10 @@ if [[ "$*" == 'run build' ]]; then mkdir -p dist/client; echo '<html></html>' > 
 [[ -s "$2" ]]
 `)
   command('curl', `printf 'curl %s\n' "$*" >> "$SERVICE_TEST_ROOT/calls"
-[[ "$SERVICE_TEST_MODE" != unhealthy ]]
+if [[ "$SERVICE_TEST_MODE" == unhealthy ]]; then exit 1; fi
+if [[ "$SERVICE_TEST_MODE" == api-fails && "$*" == *api/farm/leaderboard* ]]; then exit 1; fi
 `)
-  command('sleep', 'exit 0\n')
+  command('sleep', '/bin/sleep 0.02\n')
   try {
     const result = spawnSync('bash', [join(root, 'scripts/game-service.sh'), action], {
       env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, SERVICE_TEST_ROOT: root, SERVICE_TEST_MODE: mode, GAME_SUPERVISOR: supervisor },
@@ -132,4 +137,37 @@ describe('server service installation workflow', () => {
     expect(result.state.server).not.toBe('')
     expect(result.stdout).toContain('自带常驻守护进程')
   }, 30000)
+  it('returns failure for daemon status when no managed processes exist', () => {
+    const result = runService('status', '', 'daemon')
+    expect(result.status).not.toBe(0)
+    expect(result.stdout).toContain('游戏服务：未运行')
+    expect(result.stderr).toContain('服务状态检查失败')
+  })
+  it('does not report a successful daemon start when HTTP is unavailable', () => {
+    const result = runService('start', 'unhealthy', 'daemon')
+    expect(result.state.daemon).not.toBe('')
+    expect(result.state.server).not.toBe('')
+    expect(result.status).not.toBe(0)
+    expect(result.calls).not.toContain('npm ci')
+    expect(result.stderr).toContain('启动或 HTTP 检查失败')
+  })
+  it('requires the API as well as the homepage after systemd restart', () => {
+    const result = runService('restart', 'api-fails')
+    expect(result.status).not.toBe(0)
+    expect(result.calls).toContain('sudo systemctl restart smallgame.service')
+    expect(result.calls).toContain('http://127.0.0.1:80/api/farm/leaderboard')
+    expect(result.calls).toContain('sudo journalctl -u smallgame.service')
+  })
+  it('checks both endpoints on successful start without rebuilding', () => {
+    const result = runService('start')
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.calls).not.toContain('npm ci')
+    expect(result.stdout).toContain('首页和排行榜接口正常')
+  })
+  it('rejects an unknown supervisor instead of silently changing modes', () => {
+    const result = runService('install', '', 'invalid')
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('GAME_SUPERVISOR 仅支持')
+    expect(result.calls).toBe('')
+  })
 })

@@ -38,6 +38,8 @@ command -v sudo >/dev/null || die '缺少命令：sudo'
 detect_supervisor() {
   case "${GAME_SUPERVISOR:-auto}" in
     systemd|daemon) printf '%s' "$GAME_SUPERVISOR"; return ;;
+    auto) ;;
+    *) die 'GAME_SUPERVISOR 仅支持 auto、systemd 或 daemon。' ;;
   esac
   if command -v systemctl >/dev/null 2>&1 &&
     { [[ -d /run/systemd/system ]] || systemctl is-system-running >/dev/null 2>&1; }; then
@@ -81,6 +83,30 @@ daemon_start() {
   disown 2>/dev/null || true
 }
 
+managed_alive() {
+  if [[ "$GAME_SUPERVISOR" == systemd ]]; then
+    sudo systemctl is-active --quiet "$GAME_SERVICE"
+  else
+    daemon_alive && server_alive
+  fi
+}
+http_healthy() {
+  curl --noproxy '*' -fsS --max-time 2 "http://127.0.0.1:${GAME_PORT}/" -o /dev/null &&
+    curl --noproxy '*' -fsS --max-time 2 "http://127.0.0.1:${GAME_PORT}/api/farm/leaderboard" -o /dev/null
+}
+wait_service() {
+  for (( attempt=0; attempt<15; attempt++ )); do
+    if managed_alive && http_healthy; then return 0; fi
+    sleep 1
+  done
+  if [[ "$GAME_SUPERVISOR" == systemd ]]; then
+    sudo journalctl -u "$GAME_SERVICE" -n 60 --no-pager || true
+  else
+    tail -n 60 -- "$GAME_LOG" || true
+  fi
+  die '启动或 HTTP 检查失败，请根据上面的日志排查；修复后重新运行 install/update 或 start/restart。'
+}
+
 case "$GAME_ACTION" in
   status)
     if [[ "$GAME_SUPERVISOR" == systemd ]]; then
@@ -89,10 +115,12 @@ case "$GAME_ACTION" in
       printf '%s\n' "守护方式：自带常驻进程（未检测到 systemd）"
       if daemon_alive; then printf '%s\n' "守护进程：运行中（PID $(cat -- "$GAME_RUNTIME_DIR/daemon.pid")）"; else printf '%s\n' '守护进程：未运行'; fi
       if server_alive; then printf '%s\n' "游戏服务：运行中（PID $(cat -- "$GAME_RUNTIME_DIR/server.pid")）"; else printf '%s\n' '游戏服务：未运行'; fi
-      curl --noproxy '*' -fsS --max-time 2 "http://127.0.0.1:${GAME_PORT}/" -o /dev/null &&
-        printf '%s\n' "HTTP 检查：http://127.0.0.1:${GAME_PORT}/ 正常" || printf '%s\n' 'HTTP 检查：失败'
     fi
-    exit ;;
+    if managed_alive && http_healthy; then
+      printf '%s\n' "HTTP 检查：http://127.0.0.1:${GAME_PORT}/ 首页和排行榜接口正常"
+      exit 0
+    fi
+    die '服务状态检查失败：守护进程、游戏进程或 HTTP 接口未就绪。' ;;
   logs)
     if [[ "$GAME_SUPERVISOR" == systemd ]]; then sudo journalctl -u "$GAME_SERVICE" -n 100 -f
     else tail -n 100 -f -- "$GAME_LOG"; fi
@@ -104,7 +132,6 @@ case "$GAME_ACTION" in
   start|restart)
     if [[ "$GAME_SUPERVISOR" == systemd ]]; then
       sudo systemctl "$GAME_ACTION" "$GAME_SERVICE"
-      sudo systemctl status "$GAME_SERVICE" --no-pager
     else
       [[ "$GAME_ACTION" == restart ]] && daemon_stop
       if daemon_alive; then printf '%s\n' '守护进程已在运行。'; else
@@ -112,8 +139,9 @@ case "$GAME_ACTION" in
         GAME_NODE="$(readlink -f "$(command -v node)")"
         daemon_start
       fi
-      sleep 2; bash "$0" status
     fi
+    wait_service
+    bash "$0" status
     exit ;;
 esac
 
@@ -208,24 +236,6 @@ else
   fi
 fi
 
-# Require both a live managed process and HTTP responses from the game and API.
-for (( attempt=0; attempt<15; attempt++ )); do
-  if [[ "$GAME_SUPERVISOR" == systemd ]]; then
-    sudo systemctl is-active --quiet "$GAME_SERVICE" || { sleep 1; continue; }
-  else
-    server_alive || { sleep 1; continue; }
-  fi
-  if curl --noproxy '*' -fsS --max-time 2 "http://127.0.0.1:${GAME_PORT}/" -o /dev/null &&
-    curl --noproxy '*' -fsS --max-time 2 "http://127.0.0.1:${GAME_PORT}/api/farm/leaderboard" -o /dev/null; then
-    bash "$0" status
-    printf '%s\n' '守护服务已启动，页面和排行榜接口检查通过。' '域名解析和 TCP 80 放行后可访问：http://yueduigameyuedui.site/'
-    exit 0
-  fi
-  sleep 1
-done
-if [[ "$GAME_SUPERVISOR" == systemd ]]; then
-  sudo journalctl -u "$GAME_SERVICE" -n 60 --no-pager || true
-else
-  tail -n 60 -- "$GAME_LOG" || true
-fi
-die '启动或 HTTP 检查失败，请根据上面的日志排查；修复后重新运行 install/update。'
+wait_service
+bash "$0" status
+printf '%s\n' '守护服务已启动，页面和排行榜接口检查通过。' '域名解析和 TCP 80 放行后可访问：http://yueduigameyuedui.site/'

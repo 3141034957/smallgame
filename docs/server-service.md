@@ -30,7 +30,7 @@ bash scripts/game-service.sh install
 
 脚本自动获取当前 Node 的绝对路径（支持 nvm）和执行用户名，依次执行 `npm ci`、测试、lint、构建。全部通过后写入 `/etc/systemd/system/smallgame.service`，启用开机自启并启动服务，检查首页和总排行榜 API。已有服务配置会先备份到同目录的 `.backup-时间戳` 文件。
 
-看到「守护服务已启动，开机自启已启用，页面和排行榜接口检查通过」即可断开 SSH。域名解析指向该服务器，且云服务器安全组及系统防火墙放行 TCP 80 后，可访问 <http://yueduigameyuedui.site/>。
+看到「守护服务已启动，页面和排行榜接口检查通过」即可断开 SSH。域名解析指向该服务器，且云服务器安全组及系统防火墙放行 TCP 80 后，可访问 <http://yueduigameyuedui.site/>。
 
 服务以普通用户运行，由 systemd 授予绑定 80 端口的能力，不需要额外执行 `setcap`。进程退出后 3 秒重启；60 秒内连续启动超过 10 次会暂停重试，避免配置错误时反复启动。数据库继续使用项目中的 `server/data/game.db`，脚本不删除或迁移数据库。
 
@@ -62,6 +62,8 @@ bash scripts/game-service.sh restart
 bash scripts/game-service.sh stop
 bash scripts/game-service.sh start
 ```
+
+`install`、`update`、`start`、`restart` 都会等待进程和首页、排行榜接口就绪，失败时输出日志并返回非零退出码。`status` 也会检查进程和两个接口；未就绪时返回非零退出码，不能仅凭日志中出现「守护进程：运行中」判定部署成功。
 
 主动停止后不会自动重启；但开机自启仍然有效。如需取消开机自启并立即停止：
 
