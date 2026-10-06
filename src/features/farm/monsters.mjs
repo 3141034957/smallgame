@@ -1,5 +1,5 @@
 // Appearance timing and art are shared by the battle, help and server replay.
-export const FARM_RULESET = 'v8-recovery'
+export const FARM_RULESET = 'v9-boss-interval'
 export const FARM_SCORE_PREFIX = `farm:${FARM_RULESET}:`
 export const farmBestKey = (day) => `farm-best-${FARM_RULESET}:${day}`
 export const MONSTERS = [
@@ -53,8 +53,8 @@ export const MONSTERS = [
     name: '鼓噪巨兽',
     kind: 3,
     boss: true,
-    starts: 60,
-    interval: 18,
+    starts: 120,
+    interval: 240,
     size: 112,
     image: './assets/monsters/boss-drum-beast.webp',
     attack: '追击并锁定你的落点，红圈预警一秒后砸地；两分钟后连续锁定两处。',
@@ -64,8 +64,8 @@ export const MONSTERS = [
     name: '低音炮王',
     kind: 3,
     boss: true,
-    starts: 90,
-    interval: 45,
+    starts: 240,
+    interval: 240,
     size: 120,
     image: './assets/monsters/boss-bass-king.webp',
     attack: '每三秒释放八向环形弹幕，每六秒锁定大范围砸地。走弹幕间隙。',

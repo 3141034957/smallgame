@@ -359,8 +359,7 @@ export const FARM_MODIFIERS = [
     id: 'brisk',
     name: '短弓',
     icon: '♭',
-    desc: '巨兽来得更早，奖励多两成',
-    boss: 0.8,
+    desc: '经验与金币奖励多两成',
     reward: 1.2,
   },
 ]
@@ -450,12 +449,8 @@ export function createFarm(day, permanent) {
     echoDue: -1,
     bellRings: 0,
     modifier: modifier.id,
-    nextBoss: Math.round(
-      MONSTERS.find((monster) => monster.id === 'drum-boss').starts * FPS * (modifier.boss ?? 1),
-    ),
-    nextBass: Math.round(
-      MONSTERS.find((monster) => monster.id === 'bass-boss').starts * FPS * (modifier.boss ?? 1),
-    ),
+    nextBoss: MONSTERS.find((monster) => monster.id === 'drum-boss').starts * FPS,
+    nextBass: MONSTERS.find((monster) => monster.id === 'bass-boss').starts * FPS,
     surgeUntil: -1,
     hp: stats.maxHp,
     maxHp: stats.maxHp,

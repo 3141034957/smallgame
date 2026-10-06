@@ -45,7 +45,7 @@ const flee = (state, target) => {
 // It also plays one focused build: late runs now meet a second boss, and a
 // scattered build would not survive long enough to exercise the big payload.
 const FOCUS = 'echo'
-function playFixture(active = true, permanent = {}, movingSeconds = 600) {
+function playFixture(active = true, permanent = {}, movingSeconds = MAX_FARM_FRAMES / FPS - 60) {
   let state = createFarm(day, permanent)
   const frames = [],
     choices = [],
@@ -74,7 +74,7 @@ function playFixture(active = true, permanent = {}, movingSeconds = 600) {
     frames.push(point)
     state = stepFarm(state, point, surge).state
   }
-  // The fleeing route can outlive ten minutes, and the replay needs a death.
+  // Reserve a minute before the upload limit for ending the long-run fixture.
   // Walk into the horde until it ends: contact damage outpaces capped healing,
   // so this finishes on every platform instead of depending on float details.
   while (state.hp > 0 && frames.length < FPS * 60 * 12) {
@@ -196,7 +196,7 @@ describe('replay-verified all-time farm leaderboard', () => {
       verifyFarm({ ...defeat, frames: [...lowerRound.frames, lowerRound.frames.at(-1)] }),
     ).toBeNull()
     expect(verifyFarm({ ...defeat, surges: [lowerRound.frames.length] })).toBeNull()
-    expect(farmKey(day)).toBe(`farm:v8-recovery:${day}`)
+    expect(farmKey(day)).toBe(`farm:v9-boss-interval:${day}`)
   })
 
   it('rejects the former one-minute finish while the player is alive', () => {
@@ -326,6 +326,7 @@ describe('replay-verified all-time farm leaderboard', () => {
         50,
       )
       for (const [songId, difficulty] of [
+        [`farm:v8-recovery:${day}`, 'farm'],
         [`farm:v3:${day}`, 'farm'],
         [`farm:v4:endless:${day}`, 'farm'],
         [`wave:v1:${day}`, 'wave'],
@@ -434,13 +435,15 @@ describe('replay-verified all-time farm leaderboard', () => {
         (await request('POST', '/api/farm/score', JSON.stringify({ ...input, score: 999999 })))
           .status,
       ).toBe(400)
-      const outdated = await request(
-        'POST',
-        '/api/farm/score',
-        JSON.stringify({ ...input, ruleset: 'v4-endless' }),
-      )
-      expect(outdated.status).toBe(409)
-      expect(outdated.data.error).toContain('刷新页面')
+      for (const ruleset of ['v4-endless', 'v8-recovery']) {
+        const outdated = await request(
+          'POST',
+          '/api/farm/score',
+          JSON.stringify({ ...input, ruleset }),
+        )
+        expect(outdated.status).toBe(409)
+        expect(outdated.data.error).toContain('刷新页面')
+      }
       expect((await request('GET', '/api/farm/leaderboard')).data.total).toBe(0)
       expect((await request('GET', '/api/farm/no-such-route')).status).toBe(404)
       expect((await request('POST', '/api/farm/leaderboard', '{}')).status).toBe(404)

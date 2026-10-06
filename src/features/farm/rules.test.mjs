@@ -374,7 +374,7 @@ describe('music roguelite farming', () => {
     }
     expect(coins('golden')).toBeGreaterThan(coins('calm'))
     expect(createFarm('2026-10-04').modifier).toBe(farmModifier('2026-10-04').id)
-    expect(createFarm('2026-10-01').nextBoss).toBeLessThanOrEqual(60 * FPS)
+    expect(createFarm('2026-10-01').nextBoss).toBe(120 * FPS)
     const days = new Set()
     for (let index = 0; index < 60; index++)
       days.add(farmModifier(`2026-11-${String((index % 28) + 1).padStart(2, '0')}`).id)
@@ -406,7 +406,7 @@ describe('music roguelite farming', () => {
           ]
         : [50 + 30 * Math.sin(current.tick / 50), 50 + 25 * Math.cos(current.tick / 75)]
     }
-    for (let tick = 0; tick < FPS * 120 && state.hp > 0; tick++) {
+    for (let tick = 0; tick < FPS * 240 && state.hp > 0; tick++) {
       state.hp = state.maxHp
       while (state.offered.length) state = chooseTalent(state, state.offered[0])
       state = stepFarm(state, clampPoint(state.position, dodge(state))).state

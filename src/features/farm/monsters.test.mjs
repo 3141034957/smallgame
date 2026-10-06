@@ -77,14 +77,43 @@ describe('new monster roster and encounters', () => {
     expect(next.score).toBe(0)
     expect(next.harvested).toBe(0)
   })
-  it('schedules the two bosses at 60/90 seconds and applies the daily early-boss modifier', () => {
-    for (let date = 1; date <= 12; date++) {
+  it('alternates one boss every two minutes on every day, including the brisk modifier', () => {
+    for (let date = 1; date <= 28; date++) {
       const state = createFarm(`2026-10-${String(date).padStart(2, '0')}`)
-      const early = state.modifier === 'brisk'
-      expect(state.nextBoss).toBe(Math.round(60 * FPS * (early ? 0.8 : 1)))
-      expect(state.nextBass).toBe(Math.round(90 * FPS * (early ? 0.8 : 1)))
+      expect(state.nextBoss).toBe(120 * FPS)
+      expect(state.nextBass).toBe(240 * FPS)
+      state.crops = []
+      state.nextWave = Infinity
+      for (let seconds = 120; seconds <= 720; seconds += 120) {
+        // Keep the scheduled timers from the previous appearance, while isolating combat.
+        state.tick = seconds * FPS - 1
+        state.lastPulse = state.tick
+        state.crops = []
+        const before = step(state).state
+        expect(before.crops.some((crop) => crop.boss)).toBe(false)
+        const due = step(before).state
+        const bosses = due.crops.filter((crop) => crop.boss)
+        expect(bosses).toHaveLength(1)
+        expect(monsterFor(bosses[0]).id).toBe(seconds % 240 === 0 ? 'bass-boss' : 'drum-boss')
+        expect(Math.min(due.nextBoss, due.nextBass)).toBe((seconds + 120) * FPS)
+        expect(step({ ...due, crops: [] }).state.crops.some((crop) => crop.boss)).toBe(false)
+        state.nextBoss = due.nextBoss
+        state.nextBass = due.nextBass
+      }
     }
-    const state = arena(90 * FPS)
+  })
+  it('skips a full boss slot until the next scheduled appearance instead of refilling immediately', () => {
+    const state = arena(120 * FPS)
+    state.nextBoss = 120 * FPS
+    state.nextBass = 240 * FPS
+    state.crops = Array.from({ length: 4 }, (_, id) => enemy(3, { id, boss: true }))
+    const full = step(state).state
+    expect(full.crops.filter((crop) => crop.boss)).toHaveLength(4)
+    expect(full.nextBoss).toBe(360 * FPS)
+    expect(step({ ...full, crops: [] }).state.crops.some((crop) => crop.boss)).toBe(false)
+  })
+  it('respects the boss cap and reserves a slot for the bass boss when both timers are due', () => {
+    const state = arena(240 * FPS)
     state.nextBoss = state.tick
     state.nextBass = state.tick
     state.crops = [enemy(3, { boss: true, id: 5 }), enemy(3, { boss: true, id: 6 })]

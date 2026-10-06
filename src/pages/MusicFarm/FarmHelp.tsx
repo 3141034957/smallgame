@@ -28,7 +28,8 @@ export function FarmHelp({ onClose }: { onClose: () => void }) {
       </div>
       <h3 className="farm-monsters-title">怪潮图鉴 · 什么时候来？</h3>
       <p>
-        时间按本局生存秒数计算，暂停与升级不计时。「短弓」词缀让两种巨兽提前两成登场；满场时按空位补充，传送预警期间不会攻击。
+        时间按本局生存秒数计算，暂停与升级不计时。每 2
+        分钟出现一只巨兽，两种巨兽轮流登场；满场时跳过本次登场，传送预警期间不会攻击。
       </p>
       <div className="farm-monsters">
         {MONSTERS.map((monster) => (

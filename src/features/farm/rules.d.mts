@@ -11,7 +11,6 @@ export type FarmModifier = {
   health?: number
   speed?: number
   reward?: number
-  boss?: number
 }
 export const FARM_MODIFIERS: FarmModifier[]
 export function farmModifier(day: string): FarmModifier
