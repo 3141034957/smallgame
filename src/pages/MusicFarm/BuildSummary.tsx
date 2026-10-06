@@ -1,4 +1,5 @@
 import { farmBuildSummary, farmBuiltLevels } from '@/features/farm/build'
+import { MAX_GEAR_LEVEL } from '@/features/farm/rules.mjs'
 import type { Gear } from '@/features/farm/rules.mjs'
 
 export function BuildSummary({ gear }: { gear: Gear }) {
@@ -9,7 +10,7 @@ export function BuildSummary({ gear }: { gear: Gear }) {
     <ul>{summary.map((item) => <li key={item.weapon} className={item.evolved ? 'is-evolved' : ''}>
       <span aria-hidden="true">{item.weaponIcon}</span>
       <div><strong>{item.evolved ? item.form : item.weaponName}</strong><small>成员 {item.weaponName} Lv.{item.weaponLevel} ＋ 装备 {item.chipName} Lv.{item.chipLevel}</small></div>
-      <b>{item.evolved ? '终极 ✦' : `${item.weaponLevel + item.chipLevel}/6`}</b>
+      <b>{item.evolved ? '终极 ✦' : `${item.weaponLevel + item.chipLevel}/${MAX_GEAR_LEVEL * 2}`}</b>
     </li>)}</ul>
   </section>
 }

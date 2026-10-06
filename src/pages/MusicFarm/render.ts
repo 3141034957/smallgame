@@ -392,7 +392,6 @@ function groundEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress:
     }
     ctx.restore()
     sparks(ctx, x, y, progress, event.id, 8, '#ffd79a', reach * .9, 2.4)
-    ctx.restore()
     return
   } else if (event.kind === 'fan') {
     const angle = event.angle ?? 0, spread = event.spread ?? .45
@@ -426,7 +425,6 @@ function groundEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress:
     ctx.fillText('⌁', reach * .5, 4)
     ctx.restore()
     sparks(ctx, x, y, progress, event.id, 7, '#d8f0c4', reach * .8, 2.2)
-    ctx.restore()
     return
   } else if (event.kind === 'mine') {
     ctx.globalAlpha = (1 - progress) * .85
@@ -579,7 +577,9 @@ export function drawFarm(ctx: CanvasRenderingContext2D, state: FarmState, effect
     shakeX += (noise(event.id, 3) - .5) * power * decay
     shakeY += (noise(event.id, 9) - .5) * power * decay
   }
-  if (shakeX || shakeY) ctx.translate(shakeX, shakeY)
+  // Several big hits can land together: keep the stage readable.
+  const shake = 5
+  if (shakeX || shakeY) ctx.translate(Math.max(-shake, Math.min(shake, shakeX)), Math.max(-shake, Math.min(shake, shakeY)))
   // Sample dense drum bursts; every important weapon cast still gets its own visual.
   for (const { event, born } of active) {
     // Low-effect mode keeps the telegraphs that must be dodged and drops the rest.
