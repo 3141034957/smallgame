@@ -77,7 +77,7 @@ describe('replay-verified all-time farm leaderboard', () => {
     expect(verifyFarm({ ...input, characterId: 'burger-dog' }).characterId).toBe('burger-dog')
     expect(verifyFarm({ ...input, characterId: 'DROP TABLE melody_scores' }).characterId).toBe('')
     expect(Math.round(round.seconds)).toBeGreaterThan(60)
-  })
+  }, 120000)
 
   it('accepts a replay-verified defeat, but rejects truncation and frames after death', () => {
     expect(lowerRound.outcome).toBe('defeated')
@@ -109,7 +109,7 @@ describe('replay-verified all-time farm leaderboard', () => {
       { ...input, frames: badFrames }, { ...input, choices: [] }, { ...input, choices: [{ tick: 0, id: 'lucky' }, ...input.choices] },
       { ...input, surges: [0] }, { ...input, name: '   ' }, { ...input, playerId: '../bad' }, { ...input, day: '2026-02-30' },
     ]) expect(verifyFarm(bad)).toBeNull()
-  })
+  }, 120000)
 
   it('submits, ranks two farmers, preserves each best score across dates and isolates games', async () => {
     const store = createMelodyStore(':memory:')

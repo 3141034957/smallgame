@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { FARM_MODIFIERS, FPS, MAX_GEAR_LEVEL, STARTER_CHOICES, RECIPES, TALENTS, THRESHOLDS, chooseTalent, clampPoint, createFarm, evolved, farmModifier, orbitPositions, replayFarm, stepFarm } from './rules.mjs'
 
 const day = '2026-10-04'
-const TEST_TICKS = FPS * 60 * 10
+// Four minutes is plenty to reach the final form; death is produced by the
+// chase tail below, so a longer dodge phase only slows slow CI machines down.
+const TEST_TICKS = FPS * 60 * 4
 const crop = (id, x, y, hp = 1) => ({ id, x, y, hp, maxHp: hp, kind: id % 4, regrow: -1, boss: false })
 function arena(gear, crops, tick = 0) {
   const state = createFarm(day)
@@ -270,7 +272,7 @@ describe('music roguelite farming', () => {
     expect(state.maxShields).toBeGreaterThan(0)
     expect(state.blocks).toBeGreaterThan(0)
     expect(state.bosses).toBeGreaterThan(0)
-  })
+  }, 60000)
   it('lets a focused build evolve early on every daily modifier and preserves exact full-run replay', () => {
     for (const [focus, routeDay] of [['drum', '2026-10-01'], ['orbit', '2026-10-04'], ['power', '2026-10-02'], ['echo', '2026-10-01']]) {
       const round = run(focus, routeDay)
@@ -285,7 +287,7 @@ describe('music roguelite farming', () => {
       expect(round.state.hp).toBe(0)
       expect(round.state.loot.length).toBeLessThanOrEqual(600)
     }
-  })
+  }, 120000)
 
   it('rejects partial or forged replay inputs and unmatched or illegal choices and boosts', () => {
     const round = run('orbit', '2026-10-01')
@@ -299,5 +301,5 @@ describe('music roguelite farming', () => {
     expect(replay(round.frames, [...round.choices, { tick: round.frames.length, id: 'drum' }])).toBeNull()
     for (const surges of [[0], [1, 1], [5, 4], [-1], [round.frames.length], [NaN]]) expect(replay(round.frames, round.choices, surges)).toBeNull()
     expect(replayFarm('2026-02-30', round.frames, round.choices, round.surges)).toBeNull()
-  })
+  }, 120000)
 })

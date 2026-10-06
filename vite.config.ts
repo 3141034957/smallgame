@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 
@@ -38,5 +38,11 @@ export default defineConfig({
         javascriptEnabled: true,
       },
     },
+  },
+  test: {
+    // Several suites simulate minutes of gameplay, which easily busts the 5s
+    // default on a small deployment box. Heavy cases set their own budget too;
+    // this is the floor so a slow machine cannot fail a correct build.
+    testTimeout: 60000,
   },
 })

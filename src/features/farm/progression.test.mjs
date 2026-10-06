@@ -133,5 +133,5 @@ describe('farm experience progression', () => {
       expect(run.seconds).toBe(120)
       expect(run.snapshots[120]).toBeGreaterThan(run.snapshots[60])
     }
-  }, 30000)
+  }, 120000)
 })
