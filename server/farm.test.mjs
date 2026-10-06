@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { Readable } from 'node:stream'
 import { createFarmStore } from './farm-store.mjs'
+import { AuthError } from './auth-store.mjs'
 import {
+  FARM_PREFIX,
+  FARM_SCORE_LIMIT,
   farmKey,
   handleFarmRequest,
   MAX_FARM_BODY_BYTES,
@@ -100,7 +103,7 @@ const round = playFixture()
 const lowerRound = playFixture(false)
 const input = { ...round, name: '丰收小兔', playerId: 'farm_test_player' }
 
-function createRequest(store) {
+function createRequest(store, consumeAttempt) {
   return async (method, path, body) => {
     const req = Readable.from(body === undefined ? [] : [Buffer.from(body)])
     req.method = method
@@ -124,7 +127,14 @@ function createRequest(store) {
     } catch {
       /* Malformed body is tested by the route. */
     }
-    await handleFarmRequest(req, res, url, store, () => ({ id: id ?? input.playerId }))
+    await handleFarmRequest(
+      req,
+      res,
+      url,
+      store,
+      () => ({ id: id ?? input.playerId }),
+      consumeAttempt,
+    )
     return result
   }
 }
@@ -414,6 +424,30 @@ describe('replay-verified all-time farm leaderboard', () => {
       expect(
         (await request('GET', '/api/farm/leaderboard?playerId=unknown_player')).data.own,
       ).toBeNull()
+    } finally {
+      store.close()
+    }
+  })
+
+  it('limits score uploads per account before replaying a single frame', async () => {
+    const store = createFarmStore(':memory:')
+    const keys = []
+    let calls = 0
+    const request = createRequest(store, (key, limit) => {
+      keys.push(key)
+      expect(limit).toBe(FARM_SCORE_LIMIT)
+      // The real store counts attempts in a 15 minute window; throw like it does.
+      if (++calls > 2) throw new AuthError(429, '尝试次数过多，请 15 分钟后重试。')
+    })
+    try {
+      // 409 means the request passed the limiter and reached the ruleset check.
+      expect((await request('POST', '/api/farm/score', '{}')).status).toBe(409)
+      expect((await request('POST', '/api/farm/score', '{}')).status).toBe(409)
+      const blocked = await request('POST', '/api/farm/score', JSON.stringify(input))
+      expect(blocked.status).toBe(429)
+      expect(blocked.headers['Retry-After']).toBe('900')
+      expect(keys).toEqual(Array(3).fill(`score:${input.playerId}`))
+      expect(store.boardAcrossDays(FARM_PREFIX, 'farm').total).toBe(0)
     } finally {
       store.close()
     }

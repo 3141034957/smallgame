@@ -86,6 +86,26 @@ it('survives restarts, expires at seven days and leaves existing scores intact',
   expect(farm.boardAcrossDays('farm:', 'farm').data).toEqual([])
   farm.close()
 })
+it('purges expired sessions on startup so the table cannot grow forever', async () => {
+  const expired = await store.register('expired_player', password)
+  time += SESSION_TTL
+  const live = await store.register('live_player', password)
+  expect(store.user(expired.token)).toBeNull()
+  const count = () => {
+    const db = new DatabaseSync(join(directory, 'game.db'))
+    try {
+      return db.prepare('SELECT COUNT(*) AS total FROM account_sessions').get().total
+    } finally {
+      db.close()
+    }
+  }
+  expect(count()).toBe(2)
+  store.close()
+  store = createAuthStore(join(directory, 'game.db'), { now: () => time })
+  expect(count()).toBe(1)
+  expect(store.user(live.token)).toEqual(live.user)
+  expect(store.user(expired.token)).toBeNull()
+})
 it('rejects duplicate and concurrent registration without creating a second identity', async () => {
   const results = await Promise.allSettled([
     store.register('race_player', password),

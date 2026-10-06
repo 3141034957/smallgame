@@ -83,6 +83,9 @@ it('rejects revoked sessions, including revocation while the body was uploading'
   expect(store.progress(registered.user.id)).toEqual({ data, revision: 1 })
 })
 it('rejects cross-site requests, unapproved save keys and oversized payloads without changing the save', async () => {
+  const unsupported = await request('DELETE')
+  expect(unsupported.status).toBe(405)
+  expect(unsupported.headers.Allow).toBe('GET, POST')
   expect((await request('POST', { data, revision: 1 }, { 'x-echo-request': '' })).status).toBe(403)
   expect(
     (await request('POST', { data, revision: 1 }, { 'sec-fetch-site': 'cross-site' })).status,

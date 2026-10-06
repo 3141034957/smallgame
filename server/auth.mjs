@@ -2,10 +2,11 @@ import { AuthError, SESSION_TTL } from './auth-store.mjs'
 import { PROGRESS_LIMIT } from '../src/features/auth/progress.mjs'
 export const SESSION_COOKIE = 'echo_session'
 export const AUTH_BODY_LIMIT = 16 * 1024
-export function sendJson(res, status, body) {
+export function sendJson(res, status, body, headers = {}) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
+    ...headers,
   })
   res.end(JSON.stringify(body))
 }
@@ -16,6 +17,27 @@ export function sessionToken(req) {
     .filter((item) => item.startsWith(`${SESSION_COOKIE}=`))
   return matches.length === 1 ? matches[0].slice(SESSION_COOKIE.length + 1) : null
 }
+// Requests without Origin/Referer keep working: old browsers, scripts and
+// native clients do not send them, and the other checks still apply.
+export function sameOrigin(req) {
+  const host = typeof req.headers.host === 'string' ? req.headers.host : ''
+  const forwarded = String(req.headers['x-forwarded-proto'] ?? '')
+    .split(',')[0]
+    .trim()
+  const protocol = req.socket?.encrypted || forwarded === 'https' ? 'https' : 'http'
+  const expected = `${protocol}://${host}`
+  const origin = req.headers.origin
+  if (typeof origin === 'string' && origin) return origin === expected
+  const referer = req.headers.referer
+  if (typeof referer === 'string' && referer) {
+    try {
+      return new URL(referer).origin === expected
+    } catch {
+      return false
+    }
+  }
+  return true
+}
 export function allowAccountWrite(req, res) {
   if (
     req.headers['x-echo-request'] !== '1' ||
@@ -25,11 +47,31 @@ export function allowAccountWrite(req, res) {
     sendJson(res, 403, { error: '请从游戏页面操作账号。' })
     return false
   }
+  // SameSite=Lax still lets a same-site sibling page write, so compare origins.
+  if (!sameOrigin(req)) {
+    sendJson(res, 403, { error: '请从游戏页面操作账号，跨站请求已被拒绝。' })
+    return false
+  }
   return true
 }
-export function createAuthHandler(store, { secure = process.env.AUTH_COOKIE_SECURE === '1' } = {}) {
-  const cookie = (token, maxAge) =>
-    `${SESSION_COOKIE}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${secure ? '; Secure' : ''}`
+let warnedPlainCookie = false
+export function createAuthHandler(store, { secure = null } = {}) {
+  // null means "decide per request": Secure only when the connection is HTTPS.
+  const forced = secure ?? (process.env.AUTH_COOKIE_SECURE === '1' ? true : null)
+  if (forced !== true && !warnedPlainCookie) {
+    warnedPlainCookie = true
+    console.warn(
+      '⚠️ 会话 Cookie 未强制 Secure：请通过 HTTPS 访问，或设置 AUTH_COOKIE_SECURE=1 后重启。',
+    )
+  }
+  const isSecure = (req) =>
+    forced ??
+    (Boolean(req.socket?.encrypted) ||
+      String(req.headers['x-forwarded-proto'] ?? '')
+        .split(',')[0]
+        .trim() === 'https')
+  const cookie = (token, maxAge, secureFlag) =>
+    `${SESSION_COOKIE}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${secureFlag ? '; Secure' : ''}`
   const authenticate = (req) => {
     const user = store.user(sessionToken(req))
     const expected = req.headers['x-echo-user']
@@ -61,12 +103,15 @@ export function createAuthHandler(store, { secure = process.env.AUTH_COOKIE_SECU
             return
           }
           store.logout(sessionToken(req))
-          res.setHeader('Set-Cookie', cookie('', 0))
+          res.setHeader('Set-Cookie', cookie('', 0, isSecure(req)))
           sendJson(res, 200, { user: null })
           return
         }
-        // Use the socket address, never a forgeable forwarded IP.
-        store.consumeAttempt(`ip:${req.socket.remoteAddress}`, 30)
+        // Use the socket address, never a forgeable forwarded IP. Registering and
+        // logging in keep separate quotas so one action cannot starve the other,
+        // and the limit stays high enough for users sharing a NAT address.
+        const action = url.pathname.endsWith('/register') ? 'register' : 'login'
+        store.consumeAttempt(`ip:${req.socket.remoteAddress}:${action}`, 60)
         let bytes = 0
         const chunks = []
         for await (const chunk of req) {
@@ -92,7 +137,7 @@ export function createAuthHandler(store, { secure = process.env.AUTH_COOKIE_SECU
         const result = url.pathname.endsWith('/register')
           ? await store.register(input?.account, input?.password, input?.progress)
           : await store.login(input?.account, input?.password)
-        res.setHeader('Set-Cookie', cookie(result.token, SESSION_TTL / 1000))
+        res.setHeader('Set-Cookie', cookie(result.token, SESSION_TTL / 1000, isSecure(req)))
         sendJson(res, 200, { user: result.user })
       } catch (error) {
         if (error instanceof AuthError) {

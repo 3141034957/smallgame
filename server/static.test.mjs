@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { brotliDecompressSync, gunzipSync } from 'node:zlib'
@@ -108,6 +108,15 @@ describe('static response correctness', () => {
     expect(response('/%2e%2e%2fclient-private/secret.txt').status).toBe(403)
     expect(response('/%zz').status).toBe(400)
     expect(response('/%00').status).toBe(400)
+  })
+  it('refuses symlinks that resolve outside the root but still serves links inside it', () => {
+    writeFileSync(join(root, 'outside.txt'), 'outside-secret')
+    symlinkSync(join(root, 'outside.txt'), join(root, 'client/assets/leak.txt'))
+    symlinkSync(join(root, 'client/hello world.txt'), join(root, 'client/assets/linked.txt'))
+    const leaked = response('/assets/leak.txt')
+    expect(leaked.status).toBe(403)
+    expect(String(leaked.body)).not.toContain('outside-secret')
+    expect(response('/assets/linked.txt').body.toString()).toBe('hello')
   })
   it('returns 404 when even the SPA entry is absent', () => {
     rmSync(join(root, 'client/index.html'))

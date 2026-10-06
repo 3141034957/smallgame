@@ -55,6 +55,9 @@ export function createAuthStore(path, { now = Date.now } = {}) {
       account_id TEXT PRIMARY KEY REFERENCES accounts(id), data TEXT NOT NULL,
       revision INTEGER NOT NULL, updated_at INTEGER NOT NULL
     ) STRICT;`)
+  // Expired sessions are invisible to user() already; drop them so the table
+  // does not grow forever on a long-running server.
+  db.prepare('DELETE FROM account_sessions WHERE expires_at <= ?').run(now())
   let busy = 0
   async function expensive(action) {
     if (busy >= 2) throw new AuthError(503, '登录服务正在忙碌，请稍后重试。')

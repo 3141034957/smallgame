@@ -51,24 +51,34 @@ export function createFarmStore(databasePath) {
       : null
   return {
     submit(record, now = Date.now()) {
-      upsert.run(
-        record.playerId,
-        record.songId,
-        record.difficulty,
-        record.name,
-        record.score,
-        record.accuracy,
-        record.maxCombo,
-        record.stars,
-        Math.round(record.seconds ?? 0),
-        record.characterId ?? '',
-        now,
-      )
-      // Renaming a player should work even when this performance is below their best.
-      db.prepare('UPDATE melody_scores SET name = ? WHERE player_id = ?').run(
-        record.name,
-        record.playerId,
-      )
+      // One transaction: a crash between the two writes must not leave the best
+      // score carrying a nickname from another run.
+      db.exec('BEGIN IMMEDIATE')
+      try {
+        upsert.run(
+          record.playerId,
+          record.songId,
+          record.difficulty,
+          record.name,
+          record.score,
+          record.accuracy,
+          record.maxCombo,
+          record.stars,
+          Math.round(record.seconds ?? 0),
+          record.characterId ?? '',
+          now,
+        )
+        // Renaming a player should work even when this performance is below their best.
+        db.prepare('UPDATE melody_scores SET name = ? WHERE player_id = ? AND song_id = ?').run(
+          record.name,
+          record.playerId,
+          record.songId,
+        )
+        db.exec('COMMIT')
+      } catch (error) {
+        db.exec('ROLLBACK')
+        throw error
+      }
       return this.board(record.songId, record.difficulty, record.playerId)
     },
     board(songId, difficulty, playerId = null) {

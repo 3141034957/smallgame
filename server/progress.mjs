@@ -8,7 +8,8 @@ export async function handleProgressRequest(req, res, store, authenticate) {
     if (!user)
       return sendJson(res, 401, { error: '登录已失效，请重新登录后同步；本机进度仍保留。' })
     if (req.method === 'GET') return sendJson(res, 200, store.progress(user.id))
-    if (req.method !== 'POST') return sendJson(res, 405, { error: '不支持的进度操作。' })
+    if (req.method !== 'POST')
+      return sendJson(res, 405, { error: '不支持的进度操作。' }, { Allow: 'GET, POST' })
     if (!allowAccountWrite(req, res)) return
     let size = 0
     const chunks = []

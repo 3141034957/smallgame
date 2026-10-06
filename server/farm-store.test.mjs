@@ -7,6 +7,40 @@ import { spawnSync } from 'node:child_process'
 import { createFarmStore } from './farm-store.mjs'
 import { FARM_PREFIX, farmKey } from './farm.mjs'
 
+it('keeps the score write and the rename in one transaction, scoped to the submitted song', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'farm-tx-'))
+  const store = createFarmStore(join(directory, 'game.db'))
+  try {
+    const base = {
+      playerId: 'tx_player',
+      difficulty: 'farm',
+      name: '旧昵称',
+      accuracy: 100,
+      maxCombo: 1,
+      stars: 0,
+      seconds: 10,
+      characterId: 'bear-drums',
+    }
+    store.submit({ ...base, songId: farmKey('2026-10-01'), score: 100 }, 100)
+    // A rename on one day must not rewrite the player's other records.
+    store.submit({ ...base, songId: farmKey('2026-10-02'), name: '新昵称', score: 200 }, 200)
+    expect(store.board(farmKey('2026-10-01'), 'farm', 'tx_player').own.name).toBe('旧昵称')
+    expect(store.board(farmKey('2026-10-02'), 'farm', 'tx_player').own.name).toBe('新昵称')
+    // A rejected write must leave no partial row and no half-applied rename.
+    expect(() =>
+      store.submit(
+        { ...base, songId: farmKey('2026-10-03'), name: '坏昵称', accuracy: 20000 },
+        300,
+      ),
+    ).toThrow()
+    expect(store.board(farmKey('2026-10-03'), 'farm').total).toBe(0)
+    expect(store.board(farmKey('2026-10-01'), 'farm', 'tx_player').own.name).toBe('旧昵称')
+  } finally {
+    store.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 it('migrates the deployed schema and preserves existing farm scores and avatars', () => {
   const directory = mkdtempSync(join(tmpdir(), 'farm-schema-'))
   const path = join(directory, 'game.db')

@@ -8,6 +8,15 @@ import { createAuthStore } from './auth-store.mjs'
 import { createAuthHandler, allowAccountWrite } from './auth.mjs'
 import { handleProgressRequest } from './progress.mjs'
 
+// Never swallow a crash silently: log it, then let the process supervisor act.
+process.on('unhandledRejection', (error) => {
+  console.error('Unhandled rejection:', error?.message ?? error)
+})
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception:', error?.message ?? error)
+  process.exit(1)
+})
+
 const directory = dirname(fileURLToPath(import.meta.url))
 const databasePath = join(process.env.DATA_DIR || join(directory, 'data'), 'game.db')
 const store = createFarmStore(databasePath)
@@ -42,7 +51,14 @@ const server = createServer((req, res) => {
   }
   if (url.pathname.startsWith('/api/farm/')) {
     if (req.method === 'POST' && !allowAccountWrite(req, res)) return
-    void handleFarmRequest(req, res, url, store, () => auth.authenticate(req))
+    void handleFarmRequest(
+      req,
+      res,
+      url,
+      store,
+      () => auth.authenticate(req),
+      (key, limit) => accounts.consumeAttempt(key, limit),
+    )
     return
   }
   if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {

@@ -1,7 +1,11 @@
 import { FARM_RULESET, FARM_SCORE_PREFIX } from '../src/features/farm/monsters.mjs'
 import { FPS, replayFarm } from '../src/features/farm/rules.mjs'
+import { AuthError } from './auth-store.mjs'
 import { normalizeCharacterId, normalizePlayerId } from './identity.mjs'
 export const MAX_FARM_BODY_BYTES = 1024 * 1024
+// Replay verification is synchronous, so one account may only start a bounded
+// number of runs per attempt window.
+export const FARM_SCORE_LIMIT = 20
 // Ten minutes of simulation: enough for any real run, and it keeps a forged
 // body from blocking the event loop during replay verification.
 export const MAX_FARM_FRAMES = 10 * 60 * FPS
@@ -11,11 +15,7 @@ export function verifyFarm(input) {
   const playerId = normalizePlayerId(input?.playerId)
   const name =
     typeof input?.name === 'string'
-      ? input.name
-          .trim()
-          .replace(/[\s\p{Cc}]+/gu, ' ')
-          .slice(0, 12)
-          .trim()
+      ? [...input.name.trim().replace(/[\s\p{Cc}]+/gu, ' ')].slice(0, 12).join('').trim()
       : ''
   if (!playerId || !name) return null
   if (!Array.isArray(input.frames) || !input.frames.length || input.frames.length > MAX_FARM_FRAMES)
@@ -43,11 +43,19 @@ export function verifyFarm(input) {
     characterId,
   }
 }
-export async function handleFarmRequest(req, res, url, store, authenticate = () => null) {
-  const send = (status, body) => {
+export async function handleFarmRequest(
+  req,
+  res,
+  url,
+  store,
+  authenticate = () => null,
+  consumeAttempt = () => {},
+) {
+  const send = (status, body, headers = {}) => {
     res.writeHead(status, {
       'Content-Type': 'application/json; charset=utf-8',
       'Cache-Control': 'no-store',
+      ...headers,
     })
     res.end(JSON.stringify(body))
   }
@@ -55,10 +63,13 @@ export async function handleFarmRequest(req, res, url, store, authenticate = () 
     if (req.method === 'GET' && url.pathname === '/api/farm/leaderboard') {
       send(200, store.boardAcrossDays(FARM_PREFIX, 'farm', authenticate()?.id ?? null))
     } else if (req.method === 'POST' && url.pathname === '/api/farm/score') {
-      if (!authenticate()) {
+      const user = authenticate()
+      if (!user) {
         send(401, { error: '请先登录，再提交成绩。' })
         return
       }
+      // Before reading the body or replaying it: one account cannot loop uploads.
+      consumeAttempt(`score:${user.id}`, FARM_SCORE_LIMIT)
       let bytes = 0
       const chunks = []
       for await (const chunk of req) {
@@ -82,12 +93,12 @@ export async function handleFarmRequest(req, res, url, store, authenticate = () 
         return
       }
       // Recheck after receiving the body: another login may have revoked it.
-      const user = authenticate()
-      if (!user) {
+      const current = authenticate()
+      if (!current) {
         send(401, { error: '登录已失效或在别处登录，请重新登录。' })
         return
       }
-      const record = verifyFarm({ ...input, playerId: user.id })
+      const record = verifyFarm({ ...input, playerId: current.id })
       if (!record) {
         send(400, { error: '成绩未通过校验，完成一局生存挑战后再上榜吧。' })
         return
@@ -99,7 +110,15 @@ export async function handleFarmRequest(req, res, url, store, authenticate = () 
       })
     } else send(404, { error: '无限榜接口不存在。' })
   } catch (error) {
-    console.error('Farm leaderboard:', error)
-    if (!res.headersSent) send(500, { error: '无限榜暂时忙碌，稍后再试。' })
+    if (error instanceof AuthError)
+      send(
+        error.status,
+        { error: error.message },
+        error.status === 429 ? { 'Retry-After': '900' } : {},
+      )
+    else {
+      console.error('Farm leaderboard:', error)
+      if (!res.headersSent) send(500, { error: '无限榜暂时忙碌，稍后再试。' })
+    }
   }
 }

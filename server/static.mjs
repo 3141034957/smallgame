@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from 'node:fs'
+import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { extname, relative, resolve, sep } from 'node:path'
 import { brotliCompressSync, constants, gzipSync } from 'node:zlib'
 
@@ -51,6 +51,25 @@ export function createStaticHandler(clientDirectory) {
   const root = resolve(clientDirectory)
   const index = resolve(root, 'index.html')
   const encodedCache = new Map()
+  // Compare resolved paths against the resolved root: on some platforms the
+  // build directory itself sits behind a symlink (e.g. /tmp -> /private/tmp).
+  let realRoot = root
+  try {
+    realRoot = realpathSync(root)
+  } catch {
+    /* Keep the textual root when the build directory is missing. */
+  }
+  // A symlink inside the build directory must not resolve outside of it: the
+  // textual prefix check above cannot see where a link points.
+  const escapes = (target) => {
+    try {
+      const path = relative(realRoot, realpathSync(target))
+      return path === '..' || path.startsWith(`..${sep}`)
+    } catch {
+      // Missing files fall through to the 404 or SPA fallback below.
+      return false
+    }
+  }
 
   return function sendStatic(req, res, pathname) {
     const reject = (status, message, headers = {}) => {
@@ -82,6 +101,10 @@ export function createStaticHandler(clientDirectory) {
       reject(403, 'Forbidden')
       return
     }
+    if (escapes(filePath)) {
+      reject(403, 'Forbidden')
+      return
+    }
     const isAsset = path === 'assets' || path.startsWith(`assets${sep}`)
     let content, stat
     try {
@@ -96,6 +119,10 @@ export function createStaticHandler(clientDirectory) {
         return
       }
       filePath = index
+      if (escapes(index)) {
+        reject(404, 'Not found')
+        return
+      }
       try {
         stat = statSync(index)
         content = readFileSync(index)

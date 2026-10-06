@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { spawnSync } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
 
 import { createFarm, chooseTalent, stepFarm, replayFarm, FPS } from '../src/features/farm/rules.mjs'
@@ -190,6 +191,23 @@ it('preserves Chinese nicknames when request chunks split a UTF-8 character', as
   )
   expect(own.own).toMatchObject({ name: '快乐小猫', score: round.score, isYou: true })
   expect(board.own).toBeNull()
+})
+
+it('logs an uncaught startup failure and exits non-zero instead of dying silently', () => {
+  const broken = mkdtempSync(join(tmpdir(), 'smallgame-crash-'))
+  const blocker = join(broken, 'not-a-directory')
+  try {
+    writeFileSync(blocker, 'blocked')
+    const run = spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL('./index.mjs', import.meta.url))],
+      { env: { ...process.env, PORT: '0', DATA_DIR: blocker }, encoding: 'utf8' },
+    )
+    expect(run.status).not.toBe(0)
+    expect(run.stderr).toContain('Uncaught exception')
+  } finally {
+    rmSync(broken, { recursive: true, force: true })
+  }
 })
 
 it('uses one persistent session, inherits guest progress and protects account writes over IP', async () => {
