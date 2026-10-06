@@ -8,7 +8,7 @@ import {
   formatFarmTime,
 } from '@/features/farm/presentation'
 import { bindFarmControls, type FarmStick } from '@/features/farm/controls'
-import { MelodyAudio } from '@/features/melody/audio'
+import { FarmAudio } from '@/features/farm/audio'
 import {
   chooseTalent,
   clampPoint,
@@ -126,7 +126,7 @@ export default function MusicFarm() {
   const modal = useRef<HTMLElement>(null)
   const previousFocus = useRef<HTMLElement | null>(null)
   const field = useRef<HTMLDivElement>(null)
-  const audio = useRef<MelodyAudio | null>(null)
+  const audio = useRef<FarmAudio | null>(null)
   const pointerTarget = useRef<Point | null>(null)
   const stick = useRef<FarmStick | null>(null)
   const desired = useRef<Point>([...model.current.position])
@@ -154,7 +154,7 @@ export default function MusicFarm() {
   }
   const prepare = async (nextMuted = muted) => {
     const serial = ++audioSerial.current
-    if (!audio.current) audio.current = new MelodyAudio()
+    if (!audio.current) audio.current = new FarmAudio()
     const ok = await audio.current.prepare()
     if (serial !== audioSerial.current) return
     setAudioError(!ok)
@@ -310,7 +310,7 @@ export default function MusicFarm() {
     if (!next.offered.length) field.current?.focus({ preventScroll: true })
   }
   useEffect(() => {
-    const sound = new MelodyAudio()
+    const sound = new FarmAudio()
     audio.current = sound
     const element = canvas.current!,
       controlField = field.current!,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Readable } from 'node:stream'
-import { createMelodyStore } from './melody.mjs'
+import { createFarmStore } from './farm-store.mjs'
 import {
   farmKey,
   handleFarmRequest,
@@ -199,7 +199,7 @@ describe('replay-verified all-time farm leaderboard', () => {
   }, 120000)
 
   it('maps retired avatars in saved rankings without changing scores', () => {
-    const store = createMelodyStore(':memory:')
+    const store = createFarmStore(':memory:')
     try {
       const record = verifyFarm(input)
       store.submit({ ...record, characterId: 'burger-dog' })
@@ -220,7 +220,7 @@ describe('replay-verified all-time farm leaderboard', () => {
   }, 120000)
 
   it('submits, ranks two farmers, preserves each best score across dates and isolates games', async () => {
-    const store = createMelodyStore(':memory:')
+    const store = createFarmStore(':memory:')
     const request = createRequest(store)
     try {
       const accepted = await request(
@@ -266,7 +266,7 @@ describe('replay-verified all-time farm leaderboard', () => {
   })
 
   it('includes existing daily records, deduplicates players and returns the all-time best after submission', async () => {
-    const store = createMelodyStore(':memory:')
+    const store = createFarmStore(':memory:')
     const request = createRequest(store)
     const record = verifyFarm(input)
     try {
@@ -323,7 +323,7 @@ describe('replay-verified all-time farm leaderboard', () => {
   })
 
   it('breaks cross-day ties consistently and updates the personal best when a later day improves it', async () => {
-    const store = createMelodyStore(':memory:')
+    const store = createFarmStore(':memory:')
     const request = createRequest(store)
     const record = { ...verifyFarm(input), score: 1000, accuracy: 100, maxCombo: 10 }
     try {
@@ -350,7 +350,7 @@ describe('replay-verified all-time farm leaderboard', () => {
   })
 
   it('counts unique players and returns personal ranks beyond the first 50', async () => {
-    const store = createMelodyStore(':memory:')
+    const store = createFarmStore(':memory:')
     const request = createRequest(store)
     const record = verifyFarm(input)
     try {
@@ -375,7 +375,7 @@ describe('replay-verified all-time farm leaderboard', () => {
   })
 
   it('returns useful HTTP errors for malformed, oversized, invalid and unknown requests', async () => {
-    const store = createMelodyStore(':memory:')
+    const store = createFarmStore(':memory:')
     const request = createRequest(store)
     try {
       expect((await request('GET', '/api/farm/leaderboard?day=2026-02-30')).status).toBe(200)

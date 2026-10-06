@@ -30,15 +30,6 @@ export default defineConfig({
       '@': resolve(import.meta.dirname, 'src'),
     },
   },
-  css: {
-    preprocessorOptions: {
-      less: {
-        // 支持 less 全局变量注入
-        additionalData: `@import "@/styles/global.less";`,
-        javascriptEnabled: true,
-      },
-    },
-  },
   test: {
     // Several suites simulate minutes of gameplay, which easily busts the 5s
     // default on a small deployment box. Heavy cases set their own budget too;

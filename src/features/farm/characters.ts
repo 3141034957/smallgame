@@ -1,10 +1,9 @@
-import { CHARACTERS, DEFAULT_CHARACTER_ID } from '../shop/catalog'
-import { loadLegacyProfile } from '@/utils/legacyProfile'
-import { BAND_CHARACTERS, migrateCharacterId } from '../shop/characterRoster.mjs'
+import { BAND_CHARACTERS, DEFAULT_CHARACTER_ID, migrateCharacterId } from './characterRoster.mjs'
 
-export const FARM_CHARACTERS = CHARACTERS.map((character) => ({
+export const FARM_CHARACTERS = BAND_CHARACTERS.map(({ coinPrice, ...character }) => ({
   ...character,
-  price: BAND_CHARACTERS.find((item) => item.id === character.id)!.coinPrice,
+  price: coinPrice,
+  glow: character.color + '99',
 }))
 export const FARM_DEFAULT_CHARACTER = DEFAULT_CHARACTER_ID
 export const FARM_PROFILE_KEY = 'farm-character-profile-v1'
@@ -37,11 +36,11 @@ export function loadFarmProfile(): FarmProfile {
   try {
     const stored = readJSON(FARM_PROFILE_KEY)
     // Honor characters already unlocked in the original project on this browser.
-    const legacy = loadLegacyProfile()
-    const legacyOwned = [...ids(readJSON('character-unlocks-v1')), ...ids(legacy.unlocks)]
+    const legacy = readJSON('clockwork-player-profile-v1')
+    const legacyOwned = [...ids(readJSON('character-unlocks-v1')), ...ids(legacy?.unlocks)]
     const owned = [...new Set([FARM_DEFAULT_CHARACTER, ...ids(stored?.owned), ...legacyOwned])]
     const candidate = migrateCharacterId(
-      stored?.selected ?? localStorage.getItem('character-selected-v1') ?? legacy.selected,
+      stored?.selected ?? localStorage.getItem('character-selected-v1') ?? legacy?.selected,
     )
     return {
       coins: Number.isSafeInteger(stored?.coins) && stored.coins >= 0 ? stored.coins : 0,

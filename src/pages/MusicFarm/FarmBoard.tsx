@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { melodyRequest } from '@/features/melody/leaderboard'
-import type { Board } from '@/features/melody/leaderboard'
+import { farmRequest } from '@/features/farm/leaderboard'
+import type { Board } from '@/features/farm/leaderboard'
 import { FARM_CHARACTERS } from '@/features/farm/characters'
 import type { FarmRound } from '@/features/farm/rules.mjs'
-import { migrateCharacterId } from '@/features/shop/characterRoster.mjs'
+import { migrateCharacterId } from '@/features/farm/characterRoster.mjs'
 import './FarmBoard.css'
 
 import {
@@ -57,12 +57,7 @@ export function FarmBoard({
     boardRef.current = controller
     setError('')
     setBoard(null)
-    void melodyRequest<Board>(
-      `leaderboard?${new URLSearchParams({ playerId })}`,
-      controller.signal,
-      undefined,
-      'farm',
-    )
+    void farmRequest<Board>(`leaderboard?${new URLSearchParams({ playerId })}`, controller.signal)
       .then((value) => {
         if (!controller.signal.aborted) setBoard(value)
       })
@@ -99,7 +94,7 @@ export function FarmBoard({
         name: next,
         characterId: characterId ?? '',
       }
-      void melodyRequest<Board>('score', controller.signal, submission, 'farm')
+      void farmRequest<Board>('score', controller.signal, submission)
         .then((value) => {
           if (!controller.signal.aborted) {
             setBoard(value)

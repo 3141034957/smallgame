@@ -32,8 +32,6 @@ beforeEach(() => {
   )
   Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: vi.fn() })
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
-  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
-  vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
 })
 afterEach(() => {
   cleanup()
@@ -42,18 +40,18 @@ afterEach(() => {
 })
 
 it.each([
-  ['/', '怪潮乐队历险记'],
-  ['/farm', '怪潮乐队历险记'],
-  ['/wave', '音浪'],
-  ['/bounce?mode=classic', '小兔'],
-  ['/bounce?mode=tour', '弹一首歌'],
-  ['/island', '点亮声音'],
-  ['/rhythm', '把心情'],
-  ['/echo', '种一首歌'],
-  ['/mochi', '冲吧！小伙子'],
-  ['/shop', '角色工坊'],
-  ['/missing', '怪潮乐队历险记'],
-])('loads and unmounts %s with real effects under StrictMode', async (path, title) => {
+  '/',
+  '/farm',
+  '/wave',
+  '/bounce?mode=tour',
+  '/island',
+  '/rhythm',
+  '/echo',
+  '/mochi',
+  '/shop',
+  '/missing',
+])('loads and unmounts %s with real effects under StrictMode', async (path) => {
+  const title = '怪潮乐队历险记'
   const view = render(
     <StrictMode>
       <MemoryRouter initialEntries={[path]}>

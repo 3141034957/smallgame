@@ -1,4 +1,4 @@
-import { routeSeed } from '../island/rules.mjs'
+import { routeSeed } from './calendar.mjs'
 import { awardFarmCoins } from './characters'
 import { evolved, type FarmRound } from './rules.mjs'
 

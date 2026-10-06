@@ -1,4 +1,4 @@
-import { routeSeed, todayRoute, validDay } from '../island/rules.mjs'
+import { routeSeed, todayRoute, validDay } from './calendar.mjs'
 export { todayRoute, validDay }
 export const FPS = 16
 export const MOVE_STEP = 3

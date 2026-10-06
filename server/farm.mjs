@@ -1,10 +1,10 @@
 import { FPS, replayFarm } from '../src/features/farm/rules.mjs'
-import { normalizeCharacterId, normalizePlayerId } from './leaderboard.mjs'
+import { normalizeCharacterId, normalizePlayerId } from './identity.mjs'
 export const MAX_FARM_BODY_BYTES = 1024 * 1024
 // Ten minutes of simulation: enough for any real run, and it keeps a forged
 // body from blocking the event loop during replay verification.
 export const MAX_FARM_FRAMES = 10 * 60 * FPS
-const FARM_PREFIX = 'farm:v4:endless:'
+export const FARM_PREFIX = 'farm:v4:endless:'
 export const farmKey = (day) => `${FARM_PREFIX}${day}`
 export function verifyFarm(input) {
   const playerId = normalizePlayerId(input?.playerId)

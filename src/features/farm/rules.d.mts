@@ -1,5 +1,5 @@
-import type { Lane } from '../melody/engine'
-export { todayRoute, validDay } from '../island/rules.mjs'
+export type Lane = 0 | 1 | 2 | 3
+export { todayRoute, validDay } from './calendar.mjs'
 export const FPS: number
 export type FarmModifier = {
   id: string

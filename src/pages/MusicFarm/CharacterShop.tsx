@@ -62,7 +62,7 @@ export function CharacterShop({
           </div>
           <div
             className="farm-shop-preview"
-            style={{ '--character-glow': character.colors.glow } as React.CSSProperties}
+            style={{ '--character-glow': character.glow } as React.CSSProperties}
           >
             <div className="farm-shop-halo" aria-hidden="true" />
             <img key={character.id} src={character.image} alt={character.name} />

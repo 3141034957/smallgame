@@ -8,6 +8,8 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 
+import { createFarm, chooseTalent, stepFarm, replayFarm, FPS } from '../src/features/farm/rules.mjs'
+
 let child, closed, directory, port
 beforeAll(async () => {
   directory = mkdtempSync(join(tmpdir(), 'smallgame-http-'))
@@ -89,11 +91,27 @@ it('returns JSON 404 for unknown APIs instead of a page or cached asset', async 
 })
 
 it('preserves Chinese nicknames when request chunks split a UTF-8 character', async () => {
+  const day = '2026-10-04'
+  let state = createFarm(day)
+  const frames = [],
+    choices = []
+  while (state.hp > 0 && frames.length < FPS * 600) {
+    while (state.offered.length) {
+      const id = state.offered[0]
+      choices.push({ tick: state.tick, id })
+      state = chooseTalent(state, id)
+    }
+    const point = [...state.position]
+    frames.push(point)
+    state = stepFarm(state, point, false).state
+  }
+  const round = replayFarm(day, frames, choices, [])
+  expect(round).not.toBeNull()
   const body = Buffer.from(
     JSON.stringify({
+      ...round,
       playerId: 'http-test-player',
       name: '快乐小猫',
-      score: 123,
       characterId: 'bear-drums',
     }),
   )
@@ -104,7 +122,7 @@ it('preserves Chinese nicknames when request chunks split a UTF-8 character', as
       {
         hostname: '127.0.0.1',
         port,
-        path: '/api/score',
+        path: '/api/farm/score',
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Content-Length': body.length },
         agent: false,
@@ -122,6 +140,37 @@ it('preserves Chinese nicknames when request chunks split a UTF-8 character', as
   await delay(30)
   req.end(body.subarray(split))
   expect(await submitted).toBe(200)
-  const board = JSON.parse((await get('/api/leaderboard')).text)
-  expect(board.data).toContainEqual(expect.objectContaining({ name: '快乐小猫', score: 123 }))
+  const board = JSON.parse((await get('/api/farm/leaderboard')).text)
+  expect(board.data).toContainEqual(
+    expect.objectContaining({ name: '快乐小猫', score: round.score }),
+  )
+})
+
+it.each([
+  '/api/score',
+  '/api/leaderboard',
+  '/api/melody/score',
+  '/api/melody/leaderboard',
+  '/api/island/score',
+  '/api/island/leaderboard',
+  '/api/wave/score',
+  '/api/wave/leaderboard',
+  '/api/bounce/score',
+  '/api/bounce/leaderboard',
+])('removes retired API %s', async (path) => {
+  const result = await get(path)
+  expect(result.status).toBe(404)
+  expect(JSON.parse(result.text).error).toBe('API not found')
+  const posted = await new Promise((resolve, reject) => {
+    const req = request(
+      { hostname: '127.0.0.1', port, path, method: 'POST', agent: false },
+      (res) => {
+        res.resume()
+        res.on('end', () => resolve(res.statusCode))
+      },
+    )
+    req.on('error', reject)
+    req.end('{}')
+  })
+  expect(posted).toBe(404)
 })

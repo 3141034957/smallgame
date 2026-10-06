@@ -1,8 +1,8 @@
 # 乐队集结角色素材
 
-参照 [乐队集结海报](../design-assets/posters/poster-band-lineup.png)，使用内置 imagegen 的 background-extraction 模式生成九张透明 PNG。游戏运行素材位于 `public/assets/band-lineup/`；两处商店、游戏角色和排行榜共用 `src/features/shop/characterRoster.mjs`。
+参照 [乐队集结海报](../design-assets/posters/poster-band-lineup.png)，使用内置 imagegen 的 background-extraction 模式生成九张透明 PNG。游戏运行素材位于 `public/assets/band-lineup/`；角色商店、游戏角色和排行榜共用 `src/features/farm/characterRoster.mjs`。
 
-海报文字写“十位成员”，实际可见九位；商店对应这九位，不新增海报之外的形象。旧角色图片已移除；旧存档 ID 通过迁移别名转换，保留金币、星星、已解锁角色、选择与奖励去重记录。别名不出现在商店中。
+海报文字写“十位成员”，实际可见九位；商店对应这九位，不新增海报之外的形象。旧角色图片已移除；旧存档 ID 通过迁移别名转换，保留当前游戏的金币、已解锁角色、选择与奖励去重记录；旧星星商店已删除。别名不出现在商店中。
 
 | 新角色 ID | 素材文件 | 旧 ID |
 | --- | --- | --- |

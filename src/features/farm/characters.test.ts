@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { buyCharacter } from '../shop/storage'
 import {
   awardFarmCoins,
   FARM_CHARACTERS,
@@ -52,7 +51,10 @@ describe('survivor character shop', () => {
     expect(selectFarmCharacter('robot-dj').profile.coins).toBe(2345)
   })
   it('also honors ownership saved by the original shop atomic profile', () => {
-    buyCharacter('bird-vocals')
+    data.set(
+      'clockwork-player-profile-v1',
+      JSON.stringify({ unlocks: ['neon'], selected: 'neon', stars: 2 }),
+    )
     expect(loadFarmProfile().owned).toContain('bird-vocals')
     expect(selectFarmCharacter('bird-vocals').profile.coins).toBe(0)
   })
