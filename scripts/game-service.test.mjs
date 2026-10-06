@@ -6,20 +6,25 @@ import { spawnSync } from 'node:child_process'
 
 // Execute the actual Bash workflow against isolated command doubles. Nothing
 // touches /etc, invokes real sudo, opens ports or changes the host services.
-function runService(action = 'install', mode = '') {
+function runService(action = 'install', mode = '', supervisor = 'systemd') {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'smallgame-service-')))
   const bin = join(root, 'bin'), log = join(root, 'calls')
   for (const folder of ['bin', 'scripts', 'server']) mkdirSync(join(root, folder))
   copyFileSync(new URL('./game-service.sh', import.meta.url), join(root, 'scripts/game-service.sh'))
+  copyFileSync(new URL('./game-service-daemon.sh', import.meta.url), join(root, 'scripts/game-service-daemon.sh'))
   writeFileSync(join(root, 'package-lock.json'), '{}')
   writeFileSync(join(root, 'server/index.mjs'), '')
+  writeFileSync(join(root, 'hold'), '')
   writeFileSync(log, '')
   const command = (name, script) => writeFileSync(join(bin, name), '#!/bin/bash\nset -eu\n' + script, { mode: 0o755 })
   command('uname', 'echo Linux\n')
   command('id', 'if [[ "$1" == -u ]]; then echo 1000; else echo ubuntu; fi\n')
   // macOS readlink does not consistently provide -f; our fixture paths have no links.
   command('readlink', 'echo "$2"\n')
-  command('node', 'exit 0\n')
+  // In daemon mode the watchdog expects a long-lived server process. Block on a
+  // real command so the shortened `sleep` double cannot end it prematurely.
+  command('node', 'case "$1" in *server/index.mjs) exec tail -f "$SERVICE_TEST_ROOT/hold" ;; esac\n')
+  command('crontab', `printf 'crontab %s\\n' "$*" >> "$SERVICE_TEST_ROOT/calls"\ncat > "$SERVICE_TEST_ROOT/crontab"\n`)
   command('ss', 'exit 89\n')
   command('systemctl', 'exit 89\n')
   command('sudo', `printf 'sudo %s\n' "$*" >> "$SERVICE_TEST_ROOT/calls"
@@ -52,10 +57,21 @@ if [[ "$*" == 'run build' ]]; then mkdir -p dist/client; echo '<html></html>' > 
   command('sleep', 'exit 0\n')
   try {
     const result = spawnSync('bash', [join(root, 'scripts/game-service.sh'), action], {
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, SERVICE_TEST_ROOT: root, SERVICE_TEST_MODE: mode },
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, SERVICE_TEST_ROOT: root, SERVICE_TEST_MODE: mode, GAME_SUPERVISOR: supervisor },
       encoding: 'utf8', timeout: 30000,
     })
-    return { ...result, calls: readFileSync(log, 'utf8'), unit: existsSync(join(root, 'unit')) ? readFileSync(join(root, 'unit'), 'utf8') : '', root }
+    const runtime = join(root, '.service')
+    const pidFile = (name) => join(runtime, name)
+    const state = {
+      runtime: existsSync(runtime),
+      daemon: existsSync(pidFile('daemon.pid')) ? readFileSync(pidFile('daemon.pid'), 'utf8').trim() : '',
+      server: existsSync(pidFile('server.pid')) ? readFileSync(pidFile('server.pid'), 'utf8').trim() : '',
+    }
+    // The watchdog and its server outlive this call; stop both before cleanup.
+    for (const pid of [state.daemon, state.server]) {
+      if (pid) { try { process.kill(Number(pid), 'SIGKILL') } catch { /* already gone */ } }
+    }
+    return { ...result, calls: readFileSync(log, 'utf8'), unit: existsSync(join(root, 'unit')) ? readFileSync(join(root, 'unit'), 'utf8') : '', root, state }
   } finally { rmSync(root, { recursive: true, force: true }) }
 }
 
@@ -72,8 +88,8 @@ describe('server service installation workflow', () => {
     expect(result.unit).toContain('AmbientCapabilities=CAP_NET_BIND_SERVICE')
     expect(result.unit).toContain('Restart=always')
     expect(result.calls).toContain('sudo systemctl enable smallgame.service')
-    expect(result.calls).toContain('http://127.0.0.1/ -o /dev/null')
-    expect(result.calls).toContain('http://127.0.0.1/api/farm/leaderboard')
+    expect(result.calls).toContain('http://127.0.0.1:80/ -o /dev/null')
+    expect(result.calls).toContain('http://127.0.0.1:80/api/farm/leaderboard')
     expect(result.stdout).toContain('检查通过')
   }, 30000)
   it('leaves service configuration and process untouched when update tests fail', () => {
@@ -103,5 +119,17 @@ describe('server service installation workflow', () => {
     expect(result.status).toBe(0)
     expect(result.calls).toBe('sudo systemctl stop smallgame.service\n')
     expect(result.stdout).toContain('已停止')
+  }, 30000)
+  it('falls back to the bundled watchdog on hosts without systemd', () => {
+    const result = runService('install', '', 'daemon')
+    expect(result.status, result.stderr + result.stdout).toBe(0)
+    // Build still gates the deployment, but no unit file or systemctl is used.
+    expect(result.calls).toContain('npm ci\nnpm test\nnpm run lint\nnpm run build\n')
+    expect(result.unit).toBe('')
+    expect(result.calls).not.toContain('sudo systemctl enable smallgame.service')
+    expect(result.state.runtime).toBe(true)
+    expect(result.state.daemon).not.toBe('')
+    expect(result.state.server).not.toBe('')
+    expect(result.stdout).toContain('自带常驻守护进程')
   }, 30000)
 })

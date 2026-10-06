@@ -1,6 +1,22 @@
-# Ubuntu 服务器进程守护
+# 服务器进程守护
 
-所有命令都在服务器上，以 `ubuntu` 用户执行。项目目录为 `/home/ubuntu/smallgame`；不要对整个脚本使用 `sudo`。脚本内部会在安装 systemd 服务等必要步骤调用 `sudo`。
+所有命令都在服务器上，以 `ubuntu` 等普通部署用户执行（不要 `sudo bash`）。项目目录为 `/home/ubuntu/smallgame`；脚本内部会在需要权限的步骤自行调用 `sudo`。
+
+## 守护方式自动选择
+
+脚本会检测运行环境并自动选择守护方式：
+
+- **有 systemd**（Ubuntu/CVM 等）：写入 `/etc/systemd/system/smallgame.service`，`Restart=always`、开机自启、用 `AmbientCapabilities` 授予绑定 80 端口的能力。
+- **没有 systemd**（容器、EAP 开发机等）：退化为自带的常驻守护进程 `scripts/game-service-daemon.sh`——每 5 秒检查一次，服务退出即自动拉起；用 `setcap` 让普通用户也能绑定 80 端口；通过当前用户的 `crontab` `@reboot` 实现开机自启。运行状态和日志放在项目内的 `.service/`（已加入 `.gitignore`）。
+
+`status` 会显示当前使用的守护方式。需要固定某一种时用环境变量指定：
+
+```bash
+GAME_SUPERVISOR=systemd bash scripts/game-service.sh install   # 强制 systemd
+GAME_SUPERVISOR=daemon  bash scripts/game-service.sh install   # 强制常驻守护进程
+```
+
+端口默认 80，可用 `GAME_PORT=8080 bash scripts/game-service.sh install` 指定。
 
 ## 首次安装
 
@@ -60,5 +76,8 @@ sudo systemctl disable --now smallgame.service
 - **`npm ci` 失败**：检查服务器访问 npm 源的网络与权限，修复后重试。
 - **数据库权限错误**：服务使用执行脚本的普通用户，确保该用户能够写入 `server/data` 及其中的数据库文件。
 - **启动失败或接口失败**：执行 `logs` 查看具体原因；修复后再次执行 `install` 或 `update`，脚本会清除失败计数并重新启动。
+- **无 systemd 时报 EACCES（绑定 80 端口失败）**：`setcap` 未生效（多见于 `nosuid` 挂载或只读文件系统）。改用高位端口 `GAME_PORT=8080 ... install` 并让网关转发，或修复挂载选项后重跑。
+- **无 systemd 且没有 crontab**：脚本会提示无法配置开机自启；手动把 `scripts/game-service-daemon.sh` 加入容器的启动命令即可。
+- **无 systemd 时想取消开机自启**：`crontab -e` 删除包含 `game-service-daemon.sh` 的那一行，再执行 `bash scripts/game-service.sh stop`。
 
 配置依据：[Ubuntu systemd.service](https://manpages.ubuntu.com/manpages/noble/man5/systemd.service.5.html)、[Ubuntu systemd.exec](https://manpages.ubuntu.com/manpages/noble/man5/systemd.exec.5.html)。

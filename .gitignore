@@ -23,3 +23,6 @@ server/data/*.db*
 *.njsproj
 *.sln
 *.sw?
+
+# Local service runtime (no-systemd watchdog state)
+.service/
