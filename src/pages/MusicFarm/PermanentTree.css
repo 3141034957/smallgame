@@ -98,6 +98,7 @@
   gap: 24px;
 }
 .farm-growth-branch {
+  min-width: 0;
   --branch-color: #38775b;
 }
 .farm-growth-branch.is-power {
@@ -264,8 +265,23 @@
 }
 @media (max-width: 850px) {
   .farm-growth-tree {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;
+    gap: 14px;
+  }
+  .farm-growth-node {
+    padding: 12px;
+  }
+  .farm-growth-node-title {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 6px;
+  }
+  .farm-growth-node b {
+    grid-column: 1 / -1;
+    margin-left: 0;
+  }
+  .farm-growth-node dl > div {
+    display: grid;
+    gap: 3px;
   }
 }
 @media (max-width: 560px) {
@@ -273,7 +289,56 @@
     padding: 16px 14px 30px;
   }
   .farm-growth-tree {
-    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .farm-growth-branch > header {
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  .farm-growth-branch > header > span {
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+  }
+  .farm-growth-branch h3 {
+    font-size: 14px;
+  }
+  .farm-growth-nodes {
+    gap: 12px;
+  }
+  .farm-growth-node {
+    padding: 10px 8px;
+    border-radius: 12px;
+    overflow-wrap: anywhere;
+  }
+  .farm-growth-node-title {
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 4px;
+  }
+  .farm-growth-node-title > span {
+    font-size: 18px;
+  }
+  .farm-growth-node h4 {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .farm-growth-node b {
+    font-size: 11px;
+  }
+  .farm-growth-node p,
+  .farm-growth-node dl {
+    font-size: 11px;
+    line-height: 1.6;
+  }
+  .farm-growth-node > button {
+    padding: 10px 4px;
+    font-size: 11px;
+    line-height: 1.6;
+  }
+  .farm-growth-shortfall {
+    font-size: 10px;
   }
   .farm-growth-intro {
     align-items: start;
