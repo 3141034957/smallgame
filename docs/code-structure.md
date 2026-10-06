@@ -1,0 +1,37 @@
+# 代码结构与维护
+
+## 入口与职责
+
+- `src/App.tsx`：HashRouter 路由及旧分享链接兼容；默认游戏是 `MusicFarm`，`Home` 是 `/mochi` 的旧跳跃游戏。
+- `src/pages/MusicFarm/index.tsx`：串联对局生命周期、动画循环、输入、音频与本地结算。可变的逐帧状态在 ref 中，界面状态在 React state 中。
+- `src/pages/MusicFarm/UpgradeChoices.tsx`、`FarmHelp.tsx`：升级选项与玩法说明，接收数据和回调，不修改存档或推进游戏。
+- `src/pages/MusicFarm/FarmBoard.tsx`：生存榜读取、提交与重试。
+- `src/pages/MusicFarm/render.ts`、`background.ts`：绘图和背景；不改变游戏规则。
+- `src/features/farm/`：战斗规则、控制器、本地角色钱包、成就、任务、生涯统计等独立模块。
+- `src/features/game/leaderboard.ts`：旧跳跃游戏的排行榜请求，使用当前站点的 `/api`；页面不直接保存另一套请求实现。
+- `src/utils/playerIdentity.ts`：跳跃游戏与生存榜共用的身份、昵称和旧存档迁移。
+- `src/utils/localScores.ts`：最佳成绩的存档校验和容错读写；`starCurrency.ts` 管理旧跳跃游戏的星星。
+- `server/`：HTTP 接口与 SQLite 存储；每种游戏的接口独立，客户端成绩由共享规则回放校验。
+- `scripts/game-service.sh`：部署与守护管理；运行状态文件位于 `.service/`，不提交到 Git。
+
+## 修改时的约定
+
+1. 游戏判分、战斗与回放规则放在 `src/features/*` 的共享 `.mjs` 中，同时维护旁边的 `.d.mts` 类型声明。页面与服务端使用同一份规则。
+2. 纯展示组件只接收数据和回调；网络、存档、结算等副作用集中在对应模块，避免复制进多个页面。
+3. 每日任务结算传入对局 `runId`。重试只能补领奖励，不能再次累计这局进度；先保存进度再付款，钱包使用奖励 ID 去重。旧版任务存档会自动补齐对局记录。
+4. 新增读写存档时处理损坏数据、浏览器禁用存储和容量不足。失败时不能让动画循环抛出异常或显示未到账的奖励。
+5. 本地存档是玩家本机进度，不作为服务端榜单判分依据。
+
+## 格式与验证
+
+项目使用 Prettier 的统一配置；只整理本次修改的文件，例如：
+
+```bash
+npm run format -- src/pages/MusicFarm/index.tsx src/features/farm/quests.ts
+git diff --check
+npm test
+npm run lint
+npm run build
+```
+
+这次统一整理了农场主页面、排行榜、任务和控制模块以及涉及的旧游戏页面。其余页面保持原有格式，后续随实际修改逐步整理。农场动画循环仍在主页面中；以后调整它时，应先保留固定步长模拟、显示插值、暂停和回放日志之间的关系，再决定是否抽出 hook。

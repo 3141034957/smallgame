@@ -39,6 +39,8 @@ nvm use
 
 ## 本地开发
 
+模块职责、存档和结算约定、格式化命令见 [代码结构与维护](docs/code-structure.md)。
+
 ```bash
 npm ci
 npm run dev

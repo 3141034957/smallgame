@@ -4,24 +4,74 @@ import { farmWorldBounds } from './presentation'
 import type { Point } from './rules.mjs'
 
 function harness(pointerEvents = true) {
-  const field = new EventTarget() as EventTarget & { ownerDocument: object; setPointerCapture: (id: number) => void; hasPointerCapture: (id: number) => boolean; releasePointerCapture: (id: number) => void }
+  const field = new EventTarget() as EventTarget & {
+    ownerDocument: object
+    setPointerCapture: (id: number) => void
+    hasPointerCapture: (id: number) => boolean
+    releasePointerCapture: (id: number) => void
+  }
   field.ownerDocument = { defaultView: pointerEvents ? { PointerEvent: class {} } : {} }
   const captures = new Set<number>()
-  field.setPointerCapture = (id) => { captures.add(id) }; field.hasPointerCapture = (id) => captures.has(id); field.releasePointerCapture = (id) => { captures.delete(id) }
-  const canvas = new EventTarget(), moves: Point[] = [], sticks: FarmStick[] = []
-  let playing = true, stops = 0
-  const controls = bindFarmControls(field as unknown as HTMLElement, canvas as unknown as HTMLCanvasElement, {
-    canMove: () => playing, bounds: () => ({ left: 10, top: 20, width: 360, height: 430 }), refreshBounds: () => {},
-    target: (point) => { moves.push(point) }, stick: (stick) => { sticks.push(stick) }, stop: () => { stops++ },
-  })
+  field.setPointerCapture = (id) => {
+    captures.add(id)
+  }
+  field.hasPointerCapture = (id) => captures.has(id)
+  field.releasePointerCapture = (id) => {
+    captures.delete(id)
+  }
+  const canvas = new EventTarget(),
+    moves: Point[] = [],
+    sticks: FarmStick[] = []
+  let playing = true,
+    stops = 0
+  const controls = bindFarmControls(
+    field as unknown as HTMLElement,
+    canvas as unknown as HTMLCanvasElement,
+    {
+      canMove: () => playing,
+      bounds: () => ({ left: 10, top: 20, width: 360, height: 430 }),
+      refreshBounds: () => {},
+      target: (point) => {
+        moves.push(point)
+      },
+      stick: (stick) => {
+        sticks.push(stick)
+      },
+      stop: () => {
+        stops++
+      },
+    },
+  )
   const send = (name: string, data: object = {}, target: EventTarget = field) => {
     const event = new Event(name, { cancelable: true })
-    Object.assign(event, { pointerId: 1, pointerType: 'mouse', isPrimary: true, clientX: 190, clientY: 235, buttons: 0 }, data)
+    Object.assign(
+      event,
+      {
+        pointerId: 1,
+        pointerType: 'mouse',
+        isPrimary: true,
+        clientX: 190,
+        clientY: 235,
+        buttons: 0,
+      },
+      data,
+    )
     Object.defineProperty(event, 'target', { value: target })
     field.dispatchEvent(event)
     return event
   }
-  return { send, moves, sticks, captures, controls, canvas, setPlaying: (value: boolean) => { playing = value }, stops: () => stops }
+  return {
+    send,
+    moves,
+    sticks,
+    captures,
+    controls,
+    canvas,
+    setPlaying: (value: boolean) => {
+      playing = value
+    },
+    stops: () => stops,
+  }
 }
 
 describe('farm controls across devices', () => {
@@ -34,7 +84,8 @@ describe('farm controls across devices', () => {
     expect(h.stops()).toBe(0)
     h.send('pointerleave')
     expect(h.stops()).toBe(1)
-    h.controls.dispose(); h.send('pointermove')
+    h.controls.dispose()
+    h.send('pointermove')
     expect(h.moves).toHaveLength(1)
   })
   it('steers touch as a stick anchored at the press point, ignoring extra fingers', () => {
@@ -57,7 +108,8 @@ describe('farm controls across devices', () => {
     h.send('pointermove', { pointerId: 2, pointerType: 'touch', isPrimary: false })
     expect(h.sticks).toHaveLength(3)
     h.send('pointercancel', { pointerType: 'touch' })
-    expect(h.stops()).toBe(1); expect(h.captures.has(1)).toBe(false)
+    expect(h.stops()).toBe(1)
+    expect(h.captures.has(1)).toBe(false)
     h.send('pointermove', { pointerType: 'touch' })
     expect(h.sticks).toHaveLength(3)
     h.send('pointerdown', { pointerId: 3, pointerType: 'touch' })
@@ -70,33 +122,58 @@ describe('farm controls across devices', () => {
     h.send('pointerdown', { pointerType: 'touch' }, new EventTarget())
     expect(h.moves).toHaveLength(0)
     expect(h.sticks).toHaveLength(0)
-    h.setPlaying(false); h.send('pointerdown'); h.send('pointermove')
+    h.setPlaying(false)
+    h.send('pointerdown')
+    h.send('pointermove')
     expect(h.moves).toHaveLength(0)
-    h.setPlaying(true); h.send('pointermove', { clientX: -1000, clientY: 2000 })
+    h.setPlaying(true)
+    h.send('pointermove', { clientX: -1000, clientY: 2000 })
     expect(h.moves[0][0]).toBeLessThan(0)
     expect(h.moves[0][1]).toBeGreaterThan(100)
     h.controls.dispose()
   })
   it('supports touch-only webviews with a non-scrolling stick and release behavior', () => {
-    const h = harness(false), touch = { identifier: 0, clientX: 190, clientY: 235 }
+    const h = harness(false),
+      touch = { identifier: 0, clientX: 190, clientY: 235 }
     expect(h.send('touchstart', { changedTouches: [touch] }).defaultPrevented).toBe(true)
-    expect(h.send('touchmove', { touches: [{ ...touch, clientX: 226 }] }).defaultPrevented).toBe(true)
+    expect(h.send('touchmove', { touches: [{ ...touch, clientX: 226 }] }).defaultPrevented).toBe(
+      true,
+    )
     expect(h.sticks.at(-1)!.vector![0]).toBeGreaterThan(0)
     expect(h.sticks.at(-1)!.base).toEqual([50, 50])
     h.send('touchend', { changedTouches: [touch] })
     h.send('touchmove', { touches: [touch] })
-    expect(h.sticks).toHaveLength(2); expect(h.stops()).toBe(1)
+    expect(h.sticks).toHaveLength(2)
+    expect(h.stops()).toBe(1)
     h.controls.dispose()
   })
+  it('releases captured touch on pause/reset and permits the next gesture', () => {
+    const h = harness()
+    h.send('pointerdown', { pointerType: 'touch' }, h.canvas)
+    expect(h.captures.has(1)).toBe(true)
+    h.controls.reset()
+    expect(h.captures.size).toBe(0)
+    expect(h.stops()).toBe(1)
+    h.send('lostpointercapture', { pointerType: 'touch' })
+    expect(h.stops()).toBe(1)
+    h.send('pointerdown', { pointerType: 'touch', pointerId: 2 }, h.canvas)
+    expect(h.captures.has(2)).toBe(true)
+    h.controls.dispose()
+    expect(h.captures.size).toBe(0)
+  })
   it('uses identical world proportions on phone and desktop instead of stretching input coordinates', () => {
-    for (const [width, height] of [[375, 380], [1661, 667], [844, 185]]) {
+    for (const [width, height] of [
+      [375, 380],
+      [1661, 667],
+      [844, 185],
+    ]) {
       const world = farmWorldBounds({ left: 12, top: 140, width, height })
       expect(world.width / world.height).toBeCloseTo(360 / 430)
       expect(world.left + world.width / 2).toBeCloseTo(12 + width / 2)
       expect(world.top + world.height / 2).toBeCloseTo(140 + height / 2)
       expect(world.width).toBeGreaterThan(0)
-      expect(width / world.width * 100).toBeLessThanOrEqual(250)
-      expect(height / world.height * 100).toBeLessThanOrEqual(198)
+      expect((width / world.width) * 100).toBeLessThanOrEqual(250)
+      expect((height / world.height) * 100).toBeLessThanOrEqual(198)
     }
   })
 })

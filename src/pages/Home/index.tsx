@@ -3,6 +3,8 @@ import './index.less'
 import { CHARACTERS } from '@/features/shop/catalog'
 import { getSelected } from '@/features/shop/storage'
 import { addStars, getStarBalance } from '@/utils/starCurrency'
+import { getOrCreatePlayerId, getStoredNickname, saveNickname } from '@/utils/playerIdentity'
+import { loadBestScore, saveBestScore } from '@/utils/localScores'
 import {
   BOTTOM_HORIZONTAL_SPREAD,
   DOUBLE_SCORE_DURATION,
@@ -30,7 +32,8 @@ import { GameHud } from '@/features/game/components/GameHud'
 import { GameScene } from '@/features/game/components/GameScene'
 import { GameFeedback } from '@/features/game/components/GameFeedback'
 import { ReadyOverlay } from '@/features/game/components/ReadyOverlay'
-import type { LeaderboardEntry } from '@/features/game/components/ReadyOverlay'
+import { fetchLeaderboard, submitScore } from '@/features/game/leaderboard'
+import type { LeaderboardEntry } from '@/features/game/leaderboard'
 import {
   AdDialog,
   CountdownOverlay,
@@ -46,92 +49,7 @@ import type {
   TempoEffect,
 } from '@/features/game/engine'
 
-const API_BASE = 'https://www.jumpajumpgame.online/api'
-const NICKNAME_STORAGE_KEY = 'clockwork-player-nickname-v1'
-const PLAYER_ID_STORAGE_KEY = 'clockwork-player-id-v1'
 const MAX_REVIVES_PER_RUN = 10
-
-function createCompatiblePlayerId() {
-  try {
-    if (typeof globalThis.crypto?.randomUUID === 'function') {
-      return globalThis.crypto.randomUUID()
-    }
-  } catch {
-    // Some browsers expose randomUUID but block it on non-HTTPS origins.
-  }
-
-  const bytes = new Uint8Array(16)
-  if (typeof globalThis.crypto?.getRandomValues === 'function') {
-    globalThis.crypto.getRandomValues(bytes)
-  } else {
-    for (let index = 0; index < bytes.length; index += 1) {
-      bytes[index] = Math.floor(Math.random() * 256)
-    }
-  }
-  bytes[6] = (bytes[6] & 0x0f) | 0x40
-  bytes[8] = (bytes[8] & 0x3f) | 0x80
-  const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0'))
-  return [
-    hex.slice(0, 4).join(''),
-    hex.slice(4, 6).join(''),
-    hex.slice(6, 8).join(''),
-    hex.slice(8, 10).join(''),
-    hex.slice(10).join(''),
-  ].join('-')
-}
-
-function getOrCreatePlayerId() {
-  try {
-    const storedPlayerId = localStorage.getItem(PLAYER_ID_STORAGE_KEY)
-    if (storedPlayerId) return storedPlayerId
-  } catch {
-    // Continue with an in-memory ID when site storage is unavailable.
-  }
-
-  const playerId = createCompatiblePlayerId()
-  try {
-    localStorage.setItem(PLAYER_ID_STORAGE_KEY, playerId)
-  } catch {
-    // The current game session can still work without persistent storage.
-  }
-  return playerId
-}
-
-async function submitScore(
-  playerId: string,
-  name: string,
-  score: number,
-  characterId: string,
-  signal?: AbortSignal,
-): Promise<boolean> {
-  try {
-    const response = await fetch(`${API_BASE}/score`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId, name, score, characterId }),
-      signal,
-    })
-    return response.ok
-  } catch {
-    return false
-  }
-}
-
-async function fetchLeaderboard(
-  signal?: AbortSignal,
-): Promise<LeaderboardEntry[]> {
-  try {
-    const res = await fetch(`${API_BASE}/leaderboard`, {
-      cache: 'no-store',
-      signal,
-    })
-    if (!res.ok) return []
-    const json = await res.json()
-    return json.data || []
-  } catch {
-    return []
-  }
-}
 
 function Home() {
   const selectedCharacter =
@@ -189,7 +107,7 @@ function Home() {
   const [score, setScore] = useState(0)
   const [stars, setStars] = useState(getStarBalance)
   const [streak, setStreak] = useState(0)
-  const [best, setBest] = useState(() => Number(localStorage.getItem('cloud-cat-hop-best-v1') ?? 0))
+  const [best, setBest] = useState(() => loadBestScore('cloud-cat-hop-best-v1'))
   const bestRef = useRef(best)
   const [platformIndex, setPlatformIndex] = useState(0)
   const [feedback, setFeedback] = useState({ label: '', id: 0 })
@@ -213,9 +131,7 @@ function Home() {
   const [resumeCountdown, setResumeCountdown] = useState<number | null>(null)
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([])
   const [adCanSkip, setAdCanSkip] = useState(false)
-  const [nickname, setNickname] = useState(
-    () => localStorage.getItem(NICKNAME_STORAGE_KEY)?.trim() ?? '',
-  )
+  const [nickname, setNickname] = useState(getStoredNickname)
   const [nicknameDraft, setNicknameDraft] = useState('')
   const [showNicknamePrompt, setShowNicknamePrompt] = useState(false)
   const [shareStatus, setShareStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
@@ -238,23 +154,13 @@ function Home() {
       })
   }
 
-  const submitScoreAndRefresh = (
-    name: string,
-    nextScore: number,
-    characterId: string,
-  ) => {
+  const submitScoreAndRefresh = (name: string, nextScore: number, characterId: string) => {
     const controller = new AbortController()
     requestControllersRef.current.add(controller)
 
     void (async () => {
       try {
-        const success = await submitScore(
-          playerId,
-          name,
-          nextScore,
-          characterId,
-          controller.signal,
-        )
+        const success = await submitScore(playerId, name, nextScore, characterId, controller.signal)
         if (!success || controller.signal.aborted) return
         const data = await fetchLeaderboard(controller.signal)
         if (!controller.signal.aborted) setLeaderboardData(data)
@@ -276,10 +182,7 @@ function Home() {
     })
   }
 
-  const animateGame = (
-    keyframes: Keyframe[],
-    options: KeyframeAnimationOptions,
-  ) => {
+  const animateGame = (keyframes: Keyframe[], options: KeyframeAnimationOptions) => {
     const animation = gameRef.current?.animate(keyframes, options)
     if (!animation) return
 
@@ -359,8 +262,7 @@ function Home() {
     const hopArc = Math.sin(nextFrame.phase * Math.PI)
     const playerX = nextFrame.playerX * gameWidth * BOTTOM_HORIZONTAL_SPREAD
     const playerY = (hopArc * 0.26 - nextFrame.falling * 0.48) * gameHeight
-    const playerRotation =
-      (targetXRef.current - nextFrame.playerX) * 16 + nextFrame.falling * 85
+    const playerRotation = (targetXRef.current - nextFrame.playerX) * 16 + nextFrame.falling * 85
 
     if (playerRef.current) {
       playerRef.current.style.transform =
@@ -387,7 +289,7 @@ function Home() {
       const distance = index - nextFrame.phase
       const scale = slotScale(distance)
       const x = platform.x * gameWidth * slotHorizontalSpread(scale)
-      const y = slotY(distance) * gameHeight / 100
+      const y = (slotY(distance) * gameHeight) / 100
       const opacity = distance < 0 ? Math.max(0, 1 + distance * 14) : 1
       const treatScale = (0.55 + scale * 0.45) / scale
 
@@ -496,10 +398,9 @@ function Home() {
   }
 
   const saveNicknameAndReturnHome = () => {
-    const nextNickname = nicknameDraft.trim().replace(/\s+/g, ' ')
+    const nextNickname = saveNickname(nicknameDraft)
     if (!nextNickname) return
 
-    localStorage.setItem(NICKNAME_STORAGE_KEY, nextNickname)
     setNickname(nextNickname)
     setShowNicknamePrompt(false)
 
@@ -631,162 +532,152 @@ function Home() {
   }, [])
 
   const advanceGame = (delta: number) => {
-      if (statusRef.current === 'playing') {
-        if (feverTimeRef.current > 0) {
-          feverTimeRef.current = Math.max(0, feverTimeRef.current - delta)
-          if (feverTimeRef.current === 0) setIsFever(false)
+    if (statusRef.current === 'playing') {
+      if (feverTimeRef.current > 0) {
+        feverTimeRef.current = Math.max(0, feverTimeRef.current - delta)
+        if (feverTimeRef.current === 0) setIsFever(false)
+      }
+      if (tempoEffectRef.current) {
+        tempoEffectRef.current.remaining = Math.max(0, tempoEffectRef.current.remaining - delta)
+        if (tempoEffectRef.current.remaining === 0) {
+          tempoEffectRef.current = null
         }
-        if (tempoEffectRef.current) {
-          tempoEffectRef.current.remaining = Math.max(
-            0,
-            tempoEffectRef.current.remaining - delta,
-          )
-          if (tempoEffectRef.current.remaining === 0) {
-            tempoEffectRef.current = null
+      }
+      if (paintEffectTimeRef.current > 0) {
+        paintEffectTimeRef.current = Math.max(0, paintEffectTimeRef.current - delta)
+        if (paintEffectTimeRef.current === 0) setPaintEffectId(0)
+      }
+      if (doubleScoreTimeRef.current > 0) {
+        doubleScoreTimeRef.current = Math.max(0, doubleScoreTimeRef.current - delta)
+        if (doubleScoreTimeRef.current === 0) {
+          scoreMultiplierRef.current = 1
+          setIsDoubleScore(false)
+        }
+      }
+      if (freezeTimeRef.current > 0) {
+        freezeTimeRef.current = Math.max(0, freezeTimeRef.current - delta)
+        if (freezeTimeRef.current === 0) {
+          setIsFrozen(false)
+        }
+      }
+
+      // When frozen, skip all movement.
+      if (freezeTimeRef.current > 0) return
+
+      const hopDuration = getActiveHopDuration()
+      hopElapsedRef.current += delta
+      targetXRef.current = clamp(
+        targetXRef.current + moveDirectionRef.current * delta * 0.00155,
+        -1,
+        1,
+      )
+      playerXRef.current += (targetXRef.current - playerXRef.current) * Math.min(1, delta * 0.016)
+
+      if (hopElapsedRef.current >= hopDuration) {
+        hopElapsedRef.current -= hopDuration
+        const targetIndex = platformIndexRef.current + 1
+        ensurePlatformsThrough(platformsRef.current, targetIndex + VISIBLE_PLATFORMS - 1)
+        const target = platformsRef.current[targetIndex - platformOffsetRef.current]
+        const missDistance = Math.abs(playerXRef.current - target.x)
+        const landed = missDistance < target.width * PLATFORM_AREA_SCALE * 0.62
+
+        if (landed) {
+          platformIndexRef.current += 1
+          if (platformsRef.current.length > 200) {
+            const removed = platformsRef.current.length - 200
+            platformsRef.current.splice(0, removed)
+            platformOffsetRef.current += removed
           }
-        }
-        if (paintEffectTimeRef.current > 0) {
-          paintEffectTimeRef.current = Math.max(0, paintEffectTimeRef.current - delta)
-          if (paintEffectTimeRef.current === 0) setPaintEffectId(0)
-        }
-        if (doubleScoreTimeRef.current > 0) {
-          doubleScoreTimeRef.current = Math.max(0, doubleScoreTimeRef.current - delta)
-          if (doubleScoreTimeRef.current === 0) {
-            scoreMultiplierRef.current = 1
-            setIsDoubleScore(false)
+          setPlatformIndex(platformIndexRef.current)
+          setPaceMultiplier(progressionSpeed(platformIndexRef.current))
+          const perfect = missDistance < target.width * PLATFORM_AREA_SCALE * 0.2
+          const isSpecial = target.reward > 1 || target.treat === 'star' || Boolean(target.note)
+
+          if (isSpecial) {
+            bounceIdRef.current = target.id
+            setBounceId(target.id)
+            setImpact({
+              id: Date.now(),
+              x: 50 + playerXRef.current * 34,
+              perfect,
+              reward: target.reward,
+            })
           }
-        }
-        if (freezeTimeRef.current > 0) {
-          freezeTimeRef.current = Math.max(0, freezeTimeRef.current - delta)
-          if (freezeTimeRef.current === 0) {
-            setIsFrozen(false)
+          streakRef.current = perfect ? streakRef.current + 1 : 0
+          let feverActive = feverTimeRef.current > 0
+          if (perfect && streakRef.current >= 8 && !feverActive) {
+            feverTimeRef.current = FEVER_DURATION
+            feverActive = true
+            setIsFever(true)
           }
-        }
-
-        // When frozen, skip all movement.
-        if (freezeTimeRef.current > 0) return
-
-        const hopDuration = getActiveHopDuration()
-        hopElapsedRef.current += delta
-        targetXRef.current = clamp(
-          targetXRef.current + moveDirectionRef.current * delta * 0.00155,
-          -1,
-          1,
-        )
-        playerXRef.current += (targetXRef.current - playerXRef.current) * Math.min(1, delta * 0.016)
-
-        if (hopElapsedRef.current >= hopDuration) {
-          hopElapsedRef.current -= hopDuration
-          const targetIndex = platformIndexRef.current + 1
-          ensurePlatformsThrough(
-            platformsRef.current,
-            targetIndex + VISIBLE_PLATFORMS - 1,
-          )
-          const target = platformsRef.current[targetIndex - platformOffsetRef.current]
-          const missDistance = Math.abs(playerXRef.current - target.x)
-          const landed = missDistance < target.width * PLATFORM_AREA_SCALE * 0.62
-
-          if (landed) {
-            platformIndexRef.current += 1
-            if (platformsRef.current.length > 200) {
-              const removed = platformsRef.current.length - 200
-              platformsRef.current.splice(0, removed)
-              platformOffsetRef.current += removed
-            }
-            setPlatformIndex(platformIndexRef.current)
-            setPaceMultiplier(progressionSpeed(platformIndexRef.current))
-            const perfect = missDistance < target.width * PLATFORM_AREA_SCALE * 0.2
-            const isSpecial = target.reward > 1 || target.treat === 'star' || Boolean(target.note)
-
-            if (isSpecial) {
-              bounceIdRef.current = target.id
-              setBounceId(target.id)
-              setImpact({
-                id: Date.now(),
-                x: 50 + playerXRef.current * 34,
-                perfect,
-                reward: target.reward,
-              })
-            }
-            streakRef.current = perfect ? streakRef.current + 1 : 0
-            let feverActive = feverTimeRef.current > 0
-            if (perfect && streakRef.current >= 8 && !feverActive) {
-              feverTimeRef.current = FEVER_DURATION
-              feverActive = true
-              setIsFever(true)
-            }
-            const baseScore = 100 + (perfect ? Math.min(streakRef.current, 8) * 25 : 0)
-            const feverMultiplier = feverActive ? 2 : 1
-            const doubleMultiplier = scoreMultiplierRef.current
-            const earned = Math.round(baseScore * target.reward * feverMultiplier * doubleMultiplier)
-            scoreRef.current += earned
-            setScore(scoreRef.current)
-            if (target.treat === 'star') {
-              setStars(addStars(1))
-            }
-            setStreak(streakRef.current)
-            setFeedback({
-              label: target.treat === 'star'
+          const baseScore = 100 + (perfect ? Math.min(streakRef.current, 8) * 25 : 0)
+          const feverMultiplier = feverActive ? 2 : 1
+          const doubleMultiplier = scoreMultiplierRef.current
+          const earned = Math.round(baseScore * target.reward * feverMultiplier * doubleMultiplier)
+          scoreRef.current += earned
+          setScore(scoreRef.current)
+          if (target.treat === 'star') {
+            setStars(addStars(1))
+          }
+          setStreak(streakRef.current)
+          setFeedback({
+            label:
+              target.treat === 'star'
                 ? '★ +1'
                 : perfect
                   ? 'Perfect'
                   : missDistance < target.width * PLATFORM_AREA_SCALE * 0.4
                     ? 'Great'
                     : 'Nice',
-              id: Date.now(),
-            })
-            if (target.note) playNoteSound(target, perfect, feverActive)
-            if (perfect && isSpecial) {
-              animateGame(
-                [
-                  { transform: 'translateX(0)' },
-                  { transform: 'translateX(-3px)' },
-                  { transform: 'translateX(3px)' },
-                  { transform: 'translateX(-2px)' },
-                  { transform: 'translateX(0)' },
-                ],
-                { duration: 145, easing: 'ease-out' },
-              )
-            }
-            if (target.note) triggerNoteEffect(target.note)
-          } else {
-            fallProgressRef.current = 0
-            const nextBest = Math.max(bestRef.current, scoreRef.current)
-            bestRef.current = nextBest
-            setBest(nextBest)
-            localStorage.setItem('cloud-cat-hop-best-v1', String(nextBest))
-            const storedNickname = localStorage.getItem(NICKNAME_STORAGE_KEY)?.trim()
-            if (storedNickname) {
-              pendingScoreRef.current = null
-              submitScoreAndRefresh(
-                storedNickname,
-                scoreRef.current,
-                selectedCharacter.id,
-              )
-            } else {
-              pendingScoreRef.current = scoreRef.current
-            }
-            changeStatus('over')
+            id: Date.now(),
+          })
+          if (target.note) playNoteSound(target, perfect, feverActive)
+          if (perfect && isSpecial) {
+            animateGame(
+              [
+                { transform: 'translateX(0)' },
+                { transform: 'translateX(-3px)' },
+                { transform: 'translateX(3px)' },
+                { transform: 'translateX(-2px)' },
+                { transform: 'translateX(0)' },
+              ],
+              { duration: 145, easing: 'ease-out' },
+            )
           }
+          if (target.note) triggerNoteEffect(target.note)
+        } else {
+          fallProgressRef.current = 0
+          const nextBest = Math.max(bestRef.current, scoreRef.current)
+          bestRef.current = nextBest
+          setBest(nextBest)
+          saveBestScore('cloud-cat-hop-best-v1', nextBest)
+          const storedNickname = getStoredNickname()
+          if (storedNickname) {
+            pendingScoreRef.current = null
+            submitScoreAndRefresh(storedNickname, scoreRef.current, selectedCharacter.id)
+          } else {
+            pendingScoreRef.current = scoreRef.current
+          }
+          changeStatus('over')
         }
-
-        const activeHopDuration = getActiveHopDuration()
-        const nextFrame = {
-          phase: hopElapsedRef.current / activeHopDuration,
-          platformIndex: platformIndexRef.current,
-          playerX: playerXRef.current,
-          falling: 0,
-          fever: feverTimeRef.current / FEVER_DURATION,
-        }
-        frameRef.current = nextFrame
-        paintFrame(nextFrame)
-      } else if (statusRef.current === 'over' && fallProgressRef.current < 1) {
-        fallProgressRef.current = Math.min(1, fallProgressRef.current + delta / 650)
-        const nextFrame = { ...frameRef.current, falling: fallProgressRef.current }
-        frameRef.current = nextFrame
-        paintFrame(nextFrame)
       }
 
+      const activeHopDuration = getActiveHopDuration()
+      const nextFrame = {
+        phase: hopElapsedRef.current / activeHopDuration,
+        platformIndex: platformIndexRef.current,
+        playerX: playerXRef.current,
+        falling: 0,
+        fever: feverTimeRef.current / FEVER_DURATION,
+      }
+      frameRef.current = nextFrame
+      paintFrame(nextFrame)
+    } else if (statusRef.current === 'over' && fallProgressRef.current < 1) {
+      fallProgressRef.current = Math.min(1, fallProgressRef.current + delta / 650)
+      const nextFrame = { ...frameRef.current, falling: fallProgressRef.current }
+      frameRef.current = nextFrame
+      paintFrame(nextFrame)
+    }
   }
 
   useGameLoop(advanceGame)
@@ -839,12 +730,7 @@ function Home() {
 
   return (
     <main className="game-shell">
-      <audio
-        ref={backgroundMusicRef}
-        src="./assets/clockwork-cavern-bgm.mp3"
-        preload="auto"
-        loop
-      />
+      <audio ref={backgroundMusicRef} src="./assets/clockwork-cavern-bgm.mp3" preload="auto" loop />
       <div
         ref={gameRef}
         className={`game game--${status}${isFever ? ' game--fever' : ''}${isDoubleScore ? ' game--double-score' : ''}${isFrozen ? ' game--frozen' : ''}`}
@@ -913,7 +799,9 @@ function Home() {
           <ReadyOverlay
             entries={leaderboardData}
             onStart={startGame}
-            onOpenShop={() => { window.location.hash = '#/shop' }}
+            onOpenShop={() => {
+              window.location.hash = '#/shop'
+            }}
           />
         )}
 
@@ -929,7 +817,9 @@ function Home() {
               setResumeCountdown(1)
               focusGameWithoutScrolling()
             }}
-            onShare={() => { void copyCurrentLink() }}
+            onShare={() => {
+              void copyCurrentLink()
+            }}
             onRevive={requestAdPlay}
             onReturnHome={returnToHome}
           />
@@ -947,13 +837,9 @@ function Home() {
           />
         )}
 
-        {showingAd && (
-          <AdDialog countdown={adCountdown} canSkip={adCanSkip} onSkip={skipAd} />
-        )}
+        {showingAd && <AdDialog countdown={adCountdown} canSkip={adCanSkip} onSkip={skipAd} />}
 
-        {resumeCountdown !== null && (
-          <CountdownOverlay mode="resume" value={resumeCountdown} />
-        )}
+        {resumeCountdown !== null && <CountdownOverlay mode="resume" value={resumeCountdown} />}
 
         {status === 'reviving' && reviveCountdown !== null && (
           <CountdownOverlay mode="revive" value={reviveCountdown} />

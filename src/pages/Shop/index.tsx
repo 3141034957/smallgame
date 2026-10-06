@@ -47,11 +47,14 @@ function Shop() {
     }, 2000)
   }
 
-  useEffect(() => () => {
-    if (messageTimerRef.current !== null) {
-      window.clearTimeout(messageTimerRef.current)
-    }
-  }, [])
+  useEffect(
+    () => () => {
+      if (messageTimerRef.current !== null) {
+        window.clearTimeout(messageTimerRef.current)
+      }
+    },
+    [],
+  )
 
   const handleBuy = (char: Character) => {
     if (unlocks.includes(char.id)) {
@@ -64,7 +67,13 @@ function Shop() {
       showMessage(`星星不足！还需 ${char.price - stars} 颗`)
       return
     }
-    const newStars = saveStarBalance(stars - char.price)
+    let newStars: number
+    try {
+      newStars = saveStarBalance(stars - char.price)
+    } catch {
+      showMessage('暂时无法保存，请允许浏览器存储后重试。')
+      return
+    }
     setStars(newStars)
     const newUnlocks = [...unlocks, char.id]
     saveUnlocks(newUnlocks)
@@ -112,11 +121,7 @@ function Shop() {
       <main className="shop-showcase">
         <div className="shop-preview-status">
           <span>{previewOwned ? (previewActive ? '当前装备' : '已拥有') : '待解锁角色'}</span>
-          <strong>
-            {previewOwned
-              ? previewCharacter.name
-              : `★ ${previewCharacter.price}`}
-          </strong>
+          <strong>{previewOwned ? previewCharacter.name : `★ ${previewCharacter.price}`}</strong>
         </div>
 
         <section className="shop-stage">
@@ -188,11 +193,7 @@ function Shop() {
                 aria-label={`预览${character.name}`}
               >
                 <span className="shop-card-badge">
-                  {active
-                    ? '使用中'
-                    : owned
-                      ? '已拥有'
-                      : `★${character.price}`}
+                  {active ? '使用中' : owned ? '已拥有' : `★${character.price}`}
                 </span>
                 <span className="shop-card-image">
                   <img src={character.image} alt="" />

@@ -1,17 +1,10 @@
 import { CHARACTERS } from '@/features/shop/catalog'
 
-export type LeaderboardEntry = {
-  rank: number
-  characterId: string
-  name: string
-  score: number
-}
+import type { LeaderboardEntry } from '../leaderboard'
 
 const DEFAULT_LEADERBOARD_CHARACTER =
   CHARACTERS.find((character) => character.id === 'burger-dog') ?? CHARACTERS[0]
-const LEADERBOARD_CHARACTERS = new Map(
-  CHARACTERS.map((character) => [character.id, character]),
-)
+const LEADERBOARD_CHARACTERS = new Map(CHARACTERS.map((character) => [character.id, character]))
 
 type ReadyOverlayProps = {
   entries: LeaderboardEntry[]
@@ -21,7 +14,10 @@ type ReadyOverlayProps = {
 
 export function ReadyOverlay({ entries, onStart, onOpenShop }: ReadyOverlayProps) {
   return (
-    <div className="game-overlay game-overlay--ready" onPointerDown={(event) => event.stopPropagation()}>
+    <div
+      className="game-overlay game-overlay--ready"
+      onPointerDown={(event) => event.stopPropagation()}
+    >
       <div className="ready-panel">
         <div className="overlay-ready-title">
           <span className="eyebrow">THE CLOCKWORK CAVERN</span>
@@ -34,13 +30,15 @@ export function ReadyOverlay({ entries, onStart, onOpenShop }: ReadyOverlayProps
             <span className="leaderboard-subtitle">TOP 100</span>
           </div>
           <div className="leaderboard-columns" aria-hidden="true">
-            <span>角色</span><span>名次</span><span>玩家</span><span>分数</span>
+            <span>角色</span>
+            <span>名次</span>
+            <span>玩家</span>
+            <span>分数</span>
           </div>
           <div className="leaderboard-list" onPointerDown={(event) => event.stopPropagation()}>
             {entries.map((entry) => {
               const character =
-                LEADERBOARD_CHARACTERS.get(entry.characterId) ??
-                DEFAULT_LEADERBOARD_CHARACTER
+                LEADERBOARD_CHARACTERS.get(entry.characterId) ?? DEFAULT_LEADERBOARD_CHARACTER
 
               return (
                 <div
@@ -48,10 +46,7 @@ export function ReadyOverlay({ entries, onStart, onOpenShop }: ReadyOverlayProps
                   key={entry.name}
                 >
                   <span className="leaderboard-character">
-                    <img
-                      src={character.image}
-                      alt={`${entry.name}使用的角色：${character.name}`}
-                    />
+                    <img src={character.image} alt={`${entry.name}使用的角色：${character.name}`} />
                   </span>
                   <span className="leaderboard-rank">
                     {entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : entry.rank}
@@ -64,7 +59,9 @@ export function ReadyOverlay({ entries, onStart, onOpenShop }: ReadyOverlayProps
           </div>
         </div>
         <div className="overlay-ready-action">
-          <button className="primary-button" type="button" onClick={onStart}>开始跳跃</button>
+          <button className="primary-button" type="button" onClick={onStart}>
+            开始跳跃
+          </button>
           <div className="overlay-ready-row">
             <button className="shop-entry-button" type="button" onClick={onOpenShop}>
               ⚙ 角色工坊
