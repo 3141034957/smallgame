@@ -15,7 +15,9 @@ npm ci
 npm run dev:server
 ```
 
-另一个终端运行 `npm run dev`，访问 `http://localhost:5173`。Vite 将 `/api` 请求转发至 3001 端口的后端。
+另一个终端运行 `npm run dev`，访问 `http://127.0.0.1:5173`。Vite 将 `/api` 请求直接转发至 `127.0.0.1:3001`。
+
+需要连接远程 IP 后端时，将 `.env.example` 复制为 `.env.local`，填入实际的 `GAME_API_IP` 和 `GAME_API_PORT`，重启开发/预览服务。代理目标只接受 IP 地址，页面仍同源请求 `/api`，登录 Cookie 不需要跨域。生产直接访问 `http://服务器IP:端口/`，由同一个 Node 服务提供页面、账号和排行榜接口；无需设置域名或编译固定的外网地址。
 
 ```bash
 npm test

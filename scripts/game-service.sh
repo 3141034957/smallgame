@@ -238,4 +238,4 @@ fi
 
 wait_service
 bash "$0" status
-printf '%s\n' '守护服务已启动，页面和排行榜接口检查通过。' '域名解析和 TCP 80 放行后可访问：http://yueduigameyuedui.site/'
+printf '%s\n' '守护服务已启动，页面和排行榜接口检查通过。' "通过服务器 IP 访问：http://<服务器IP>:${GAME_PORT}/（不依赖域名）"

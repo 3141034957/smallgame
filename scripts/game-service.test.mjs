@@ -155,6 +155,8 @@ describe('server service installation workflow', () => {
     expect(result.calls).toContain('http://127.0.0.1:80/ -o /dev/null')
     expect(result.calls).toContain('http://127.0.0.1:80/api/farm/leaderboard')
     expect(result.stdout).toContain('检查通过')
+    expect(result.stdout).toContain('http://<服务器IP>:80/')
+    expect(result.stdout).not.toContain('yueduigameyuedui.site')
   }, 30000)
   it('leaves service configuration and process untouched when update tests fail', () => {
     const result = runService('update', 'test-fails')
