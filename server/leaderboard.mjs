@@ -1,18 +1,9 @@
 export const MAX_SCORE = 2_000_000
-export const DEFAULT_CHARACTER_ID = 'burger-dog'
-
-const CHARACTER_IDS = new Set([
-  'default',
-  'steampunk',
-  'penguin',
-  'neon',
-  'golden',
-  'shadow',
-  'burger-dog',
-])
+import { DEFAULT_CHARACTER_ID, migrateCharacterId } from '../src/features/shop/characterRoster.mjs'
+export { DEFAULT_CHARACTER_ID }
 
 export function normalizeCharacterId(value) {
-  return typeof value === 'string' && CHARACTER_IDS.has(value) ? value : DEFAULT_CHARACTER_ID
+  return migrateCharacterId(value) ?? DEFAULT_CHARACTER_ID
 }
 
 export function normalizePlayerId(value) {

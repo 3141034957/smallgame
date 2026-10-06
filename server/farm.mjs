@@ -1,5 +1,5 @@
 import { FPS, replayFarm } from '../src/features/farm/rules.mjs'
-import { normalizePlayerId } from './leaderboard.mjs'
+import { normalizeCharacterId, normalizePlayerId } from './leaderboard.mjs'
 export const MAX_FARM_BODY_BYTES = 1024 * 1024
 // Ten minutes of simulation: enough for any real run, and it keeps a forged
 // body from blocking the event loop during replay verification.
@@ -22,11 +22,7 @@ export function verifyFarm(input) {
   const round = replayFarm(input.day, input.frames, input.choices, input.surges)
   if (!round || !Number.isInteger(input.score) || input.score !== round.score || !round.score)
     return null
-  // The avatar is cosmetic: keep the id only when it looks like one.
-  const characterId =
-    typeof input.characterId === 'string' && /^[a-z0-9_-]{1,32}$/.test(input.characterId)
-      ? input.characterId
-      : ''
+  const characterId = normalizeCharacterId(input.characterId)
   return {
     playerId,
     name,

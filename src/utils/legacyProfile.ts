@@ -1,4 +1,5 @@
 import { CHARACTERS, DEFAULT_CHARACTER_ID } from '@/features/shop/catalog'
+import { migrateCharacterId } from '@/features/shop/characterRoster.mjs'
 
 export const LEGACY_PROFILE_KEY = 'clockwork-player-profile-v1'
 export const STAR_CURRENCY_KEY = 'clockwork-star-currency-v1'
@@ -15,14 +16,20 @@ function normalize(value: Partial<LegacyProfile>): LegacyProfile {
     ...new Set([
       DEFAULT_CHARACTER_ID,
       ...(Array.isArray(value.unlocks)
-        ? value.unlocks.filter((id) => CHARACTERS.some((character) => character.id === id))
+        ? value.unlocks
+            .map(migrateCharacterId)
+            .filter(
+              (id): id is string => !!id && CHARACTERS.some((character) => character.id === id),
+            )
         : []),
     ]),
   ]
   return {
     stars: balance(value.stars),
     unlocks,
-    selected: unlocks.includes(value.selected ?? '') ? value.selected! : DEFAULT_CHARACTER_ID,
+    selected: unlocks.includes(migrateCharacterId(value.selected) ?? '')
+      ? migrateCharacterId(value.selected)!
+      : DEFAULT_CHARACTER_ID,
   }
 }
 

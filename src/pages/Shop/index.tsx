@@ -188,7 +188,7 @@ function Shop() {
                   {active ? '使用中' : owned ? '已拥有' : `★${character.price}`}
                 </span>
                 <span className="shop-card-image">
-                  <img src={character.image} alt="" />
+                  <img src={character.image} alt="" loading="lazy" decoding="async" />
                 </span>
                 <strong>{character.name}</strong>
               </button>

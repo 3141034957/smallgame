@@ -94,7 +94,7 @@ it('preserves Chinese nicknames when request chunks split a UTF-8 character', as
       playerId: 'http-test-player',
       name: '快乐小猫',
       score: 123,
-      characterId: 'steampunk',
+      characterId: 'bear-drums',
     }),
   )
   const split = body.indexOf(Buffer.from('快')) + 1

@@ -92,8 +92,8 @@ describe('daily survivor quests', () => {
   it('never announces a goal that the wallet did not actually pay', () => {
     const paid = {
       coins: 99999,
-      owned: ['steampunk'],
-      selected: 'steampunk',
+      owned: ['bear-drums'],
+      selected: 'bear-drums',
       rewardedRuns: [
         'quest:2026-10-04:harvest',
         'quest:2026-10-04:hunt',

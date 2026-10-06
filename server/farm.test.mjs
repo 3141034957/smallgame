@@ -133,11 +133,15 @@ describe('replay-verified all-time farm leaderboard', () => {
       maxCombo: round.maxCombo,
       stars: round.stars,
       seconds: Math.round(round.seconds),
-      characterId: '',
+      characterId: 'bear-drums',
     })
     // The avatar id is cosmetic and never influences the verified score.
-    expect(verifyFarm({ ...input, characterId: 'burger-dog' }).characterId).toBe('burger-dog')
-    expect(verifyFarm({ ...input, characterId: 'DROP TABLE melody_scores' }).characterId).toBe('')
+    expect(verifyFarm({ ...input, characterId: 'crocodile-beat' }).characterId).toBe(
+      'crocodile-beat',
+    )
+    expect(verifyFarm({ ...input, characterId: 'DROP TABLE melody_scores' }).characterId).toBe(
+      'bear-drums',
+    )
     expect(Math.round(round.seconds)).toBeGreaterThan(60)
   }, 120000)
 
@@ -194,6 +198,27 @@ describe('replay-verified all-time farm leaderboard', () => {
       expect(verifyFarm(bad)).toBeNull()
   }, 120000)
 
+  it('maps retired avatars in saved rankings without changing scores', () => {
+    const store = createMelodyStore(':memory:')
+    try {
+      const record = verifyFarm(input)
+      store.submit({ ...record, characterId: 'burger-dog' })
+      const board = store.boardAcrossDays(
+        farmKey(day).slice(0, -day.length),
+        'farm',
+        input.playerId,
+      )
+      expect(board.own).toMatchObject({
+        characterId: 'crocodile-beat',
+        score: round.score,
+        rank: 1,
+      })
+      expect(board.data[0].characterId).toBe('crocodile-beat')
+    } finally {
+      store.close()
+    }
+  }, 120000)
+
   it('submits, ranks two farmers, preserves each best score across dates and isolates games', async () => {
     const store = createMelodyStore(':memory:')
     const request = createRequest(store)
@@ -201,7 +226,7 @@ describe('replay-verified all-time farm leaderboard', () => {
       const accepted = await request(
         'POST',
         '/api/farm/score',
-        JSON.stringify({ ...input, characterId: 'burger-dog' }),
+        JSON.stringify({ ...input, characterId: 'crocodile-beat' }),
       )
       expect(Buffer.byteLength(JSON.stringify(input))).toBeGreaterThan(32768)
       expect(accepted.status).toBe(200)
@@ -228,8 +253,8 @@ describe('replay-verified all-time farm leaderboard', () => {
       const board = await request('GET', `/api/farm/leaderboard?playerId=${input.playerId}`)
       expect(board.data.data.map((entry) => entry.score)).toEqual([round.score, lowerRound.score])
       // The row avatar comes from the id sent with the run.
-      expect(board.data.data[0].characterId).toBe('burger-dog')
-      expect(board.data.own.characterId).toBe('burger-dog')
+      expect(board.data.data[0].characterId).toBe('crocodile-beat')
+      expect(board.data.own.characterId).toBe('crocodile-beat')
       expect(board.data.own.rank).toBe(1)
       expect((await request('GET', '/api/farm/leaderboard?day=2026-10-05')).data.total).toBe(2)
       expect(store.board(`wave:v1:${day}`, 'wave').total).toBe(0)

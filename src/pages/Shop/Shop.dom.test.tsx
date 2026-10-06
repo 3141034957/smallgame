@@ -22,7 +22,7 @@ it('does not spend stars or report success when the purchase cannot be saved', (
       <Shop />
     </MemoryRouter>,
   )
-  fireEvent.click(screen.getByRole('button', { name: '预览汉堡小狗' }))
+  fireEvent.click(screen.getByRole('button', { name: '预览节拍鳄小绿' }))
   const original = localStorage.setItem
   vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
     if (key !== STAR_CURRENCY_KEY) throw new DOMException('quota', 'QuotaExceededError')
@@ -32,5 +32,5 @@ it('does not spend stars or report success when the purchase cannot be saved', (
   expect(screen.queryByText(/🎉 解锁/)).toBeNull()
   expect(screen.getByText(/暂时无法保存/)).toBeTruthy()
   expect(getStarBalance()).toBe(3)
-  expect(getUnlocks()).not.toContain('burger-dog')
+  expect(getUnlocks()).not.toContain('crocodile-beat')
 })

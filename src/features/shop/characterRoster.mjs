@@ -1,0 +1,90 @@
+// Shared by both shops and the server; legacy IDs only survive as migration aliases.
+export const BAND_CHARACTERS = [
+  {
+    id: 'bear-drums',
+    name: '鼓手咚咚',
+    desc: '戴上贝雷帽，用热闹的鼓点为乐队开场。',
+    coinPrice: 0,
+    image: './assets/band-lineup/bear.png',
+    color: '#c79265',
+  },
+  {
+    id: 'cat-guitar',
+    name: '吉他手弦弦',
+    desc: '橘色小猫抱着电吉他，把勇气弹进每一拍。',
+    coinPrice: 600,
+    image: './assets/band-lineup/cat.png',
+    color: '#e7ad62',
+  },
+  {
+    id: 'lion-bass',
+    name: '贝斯手阿低',
+    desc: '紫色狮子拉起大提琴，用低音守住整支乐队。',
+    coinPrice: 4200,
+    image: './assets/band-lineup/lion.png',
+    color: '#ad91c0',
+  },
+  {
+    id: 'bird-vocals',
+    name: '主唱啾啾',
+    desc: '粉色小鸟站上麦克风，把舞台唱得暖暖的。',
+    coinPrice: 1800,
+    image: './assets/band-lineup/bird.png',
+    color: '#e9a0aa',
+  },
+  {
+    id: 'crocodile-beat',
+    name: '节拍鳄小绿',
+    desc: '戴着大耳机的小鳄鱼，摇着尾巴跟上你的节奏。',
+    coinPrice: 1200,
+    image: './assets/band-lineup/crocodile.png',
+    color: '#9dbf75',
+  },
+  {
+    id: 'hamster-keys',
+    name: '键盘手叮当',
+    desc: '小仓鼠按下彩色琴键，奏出闪闪发光的和弦。',
+    coinPrice: 4800,
+    image: './assets/band-lineup/hamster.png',
+    color: '#c4a073',
+  },
+  {
+    id: 'rabbit-flute',
+    name: '长笛手呼呼',
+    desc: '奶白小兔吹起金色长笛，让轻柔旋律穿过怪潮。',
+    coinPrice: 3000,
+    image: './assets/band-lineup/rabbit.png',
+    color: '#d7b9b7',
+  },
+  {
+    id: 'fox-sax',
+    name: '萨克斯阿鸣',
+    desc: '狐狸抱着金色萨克斯，用一段独奏点亮舞台。',
+    coinPrice: 3600,
+    image: './assets/band-lineup/fox.png',
+    color: '#d99565',
+  },
+  {
+    id: 'robot-dj',
+    name: '打碟机哔哔',
+    desc: '青蓝眼睛的机器人转动唱片，让整场演出沸腾。',
+    coinPrice: 2400,
+    image: './assets/band-lineup/robot.png',
+    color: '#99b9cf',
+  },
+]
+export const DEFAULT_CHARACTER_ID = 'bear-drums'
+export const LEGACY_CHARACTER_IDS = {
+  steampunk: 'bear-drums',
+  default: 'cat-guitar',
+  'burger-dog': 'crocodile-beat',
+  neon: 'bird-vocals',
+  shadow: 'robot-dj',
+  penguin: 'rabbit-flute',
+  golden: 'fox-sax',
+}
+export function migrateCharacterId(value) {
+  if (typeof value !== 'string') return null
+  if (BAND_CHARACTERS.some((character) => character.id === value)) return value
+  return Object.hasOwn(LEGACY_CHARACTER_IDS, value) ? LEGACY_CHARACTER_IDS[value] : null
+}

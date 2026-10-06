@@ -7,7 +7,7 @@ it('reads and submits scores to the deployed server on the current origin', asyn
   const fetchMock = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({
-      data: [{ rank: 1, characterId: 'steampunk', name: '小猫', score: 100 }],
+      data: [{ rank: 1, characterId: 'bear-drums', name: '小猫', score: 100 }],
     }),
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -17,13 +17,13 @@ it('reads and submits scores to the deployed server on the current origin', asyn
   const signal = fetchMock.mock.calls[0][1].signal as AbortSignal
   controller.abort()
   expect(signal.aborted).toBe(true)
-  expect(await submitScore('player-0001', '小猫', 100, 'steampunk')).toBe(true)
+  expect(await submitScore('player-0001', '小猫', 100, 'bear-drums')).toBe(true)
   expect(fetchMock.mock.calls[1][0]).toBe('/api/score')
   expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
     playerId: 'player-0001',
     name: '小猫',
     score: 100,
-    characterId: 'steampunk',
+    characterId: 'bear-drums',
   })
 })
 
@@ -33,5 +33,5 @@ it('survives malformed boards and failed requests', async () => {
   expect(await fetchLeaderboard()).toEqual([])
   fetchMock.mockRejectedValue(new TypeError('offline'))
   expect(await fetchLeaderboard()).toEqual([])
-  expect(await submitScore('player-0001', '小猫', 100, 'steampunk')).toBe(false)
+  expect(await submitScore('player-0001', '小猫', 100, 'bear-drums')).toBe(false)
 })

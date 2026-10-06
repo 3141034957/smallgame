@@ -136,7 +136,7 @@ describe('farm screens render', () => {
     expect(stats).toContain('性能诊断')
   })
   it('renders the shop and the leaderboard without a board response', () => {
-    const profile = { coins: 500, owned: ['steampunk'], selected: 'steampunk', rewardedRuns: [] }
+    const profile = { coins: 500, owned: ['bear-drums'], selected: 'bear-drums', rewardedRuns: [] }
     const shop = renderToStaticMarkup(
       <CharacterShop profile={profile as never} onChange={() => {}} />,
     )

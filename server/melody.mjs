@@ -9,7 +9,7 @@ import {
   runAccuracy,
   runStars,
 } from '../src/features/melody/rules.mjs'
-import { normalizePlayerId } from './leaderboard.mjs'
+import { normalizeCharacterId, normalizePlayerId } from './leaderboard.mjs'
 
 export function validBoard(songId, difficulty) {
   return (
@@ -110,7 +110,10 @@ export function createMelodyStore(databasePath) {
           maxCombo: row.max_combo,
           stars: row.stars,
           seconds: row.seconds ?? 0,
-          characterId: row.character_id ?? '',
+          characterId:
+            row.difficulty === 'farm'
+              ? normalizeCharacterId(row.character_id)
+              : (row.character_id ?? ''),
           isYou: row.player_id === playerId,
         }
       : null

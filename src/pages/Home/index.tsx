@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import './index.less'
-import { CHARACTERS } from '@/features/shop/catalog'
+import { CHARACTERS, DEFAULT_CHARACTER_ID } from '@/features/shop/catalog'
 import { getSelected } from '@/features/shop/storage'
 import { addStars, getStarBalance } from '@/utils/starCurrency'
 import { getOrCreatePlayerId, getStoredNickname, saveNickname } from '@/utils/playerIdentity'
@@ -54,7 +54,7 @@ const MAX_REVIVES_PER_RUN = 10
 function Home() {
   const selectedCharacter =
     CHARACTERS.find((character) => character.id === getSelected()) ??
-    CHARACTERS.find((character) => character.id === 'steampunk') ??
+    CHARACTERS.find((character) => character.id === DEFAULT_CHARACTER_ID) ??
     CHARACTERS[0]
   const gameRef = useRef<HTMLDivElement>(null)
   const platformsRef = useRef(createPlatforms())

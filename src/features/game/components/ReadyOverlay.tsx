@@ -1,9 +1,10 @@
-import { CHARACTERS } from '@/features/shop/catalog'
+import { CHARACTERS, DEFAULT_CHARACTER_ID } from '@/features/shop/catalog'
+import { migrateCharacterId } from '@/features/shop/characterRoster.mjs'
 
 import type { LeaderboardEntry } from '../leaderboard'
 
 const DEFAULT_LEADERBOARD_CHARACTER =
-  CHARACTERS.find((character) => character.id === 'burger-dog') ?? CHARACTERS[0]
+  CHARACTERS.find((character) => character.id === DEFAULT_CHARACTER_ID) ?? CHARACTERS[0]
 const LEADERBOARD_CHARACTERS = new Map(CHARACTERS.map((character) => [character.id, character]))
 
 type ReadyOverlayProps = {
@@ -38,7 +39,8 @@ export function ReadyOverlay({ entries, onStart, onOpenShop }: ReadyOverlayProps
           <div className="leaderboard-list" onPointerDown={(event) => event.stopPropagation()}>
             {entries.map((entry) => {
               const character =
-                LEADERBOARD_CHARACTERS.get(entry.characterId) ?? DEFAULT_LEADERBOARD_CHARACTER
+                LEADERBOARD_CHARACTERS.get(migrateCharacterId(entry.characterId) ?? '') ??
+                DEFAULT_LEADERBOARD_CHARACTER
 
               return (
                 <div

@@ -1,28 +1,10 @@
 import { CHARACTERS, DEFAULT_CHARACTER_ID } from '../shop/catalog'
 import { loadLegacyProfile } from '@/utils/legacyProfile'
+import { BAND_CHARACTERS, migrateCharacterId } from '../shop/characterRoster.mjs'
 
-const prices: Record<string, number> = {
-  steampunk: 0,
-  default: 600,
-  'burger-dog': 1200,
-  neon: 1800,
-  shadow: 2400,
-  penguin: 3000,
-  golden: 3600,
-}
-const descriptions: Record<string, string> = {
-  steampunk: '举杯开场，优雅地穿过每一波怪潮。',
-  default: '给每一次冒险，一个充满能量的拥抱。',
-  'burger-dog': '快乐加倍，带着满满元气奔向舞台。',
-  neon: '跟着自己的节拍，唱出最特别的声音。',
-  shadow: '聚光灯亮起，今天轮到你拯救舞台。',
-  penguin: '披上勇气出发，把每一场战斗变成演出。',
-  golden: '刀盾在手，为你的乐队守住最后一拍。',
-}
 export const FARM_CHARACTERS = CHARACTERS.map((character) => ({
   ...character,
-  price: prices[character.id],
-  desc: descriptions[character.id],
+  price: BAND_CHARACTERS.find((item) => item.id === character.id)!.coinPrice,
 }))
 export const FARM_DEFAULT_CHARACTER = DEFAULT_CHARACTER_ID
 export const FARM_PROFILE_KEY = 'farm-character-profile-v1'
@@ -35,7 +17,8 @@ export type FarmProfile = {
 export type ProfileResult = { profile: FarmProfile; error?: string; paid: boolean }
 const validId = (id: unknown): id is string =>
   typeof id === 'string' && FARM_CHARACTERS.some((character) => character.id === id)
-const ids = (value: unknown): string[] => (Array.isArray(value) ? value.filter(validId) : [])
+const ids = (value: unknown): string[] =>
+  Array.isArray(value) ? value.map(migrateCharacterId).filter(validId) : []
 const defaults = (): FarmProfile => ({
   coins: 0,
   owned: [FARM_DEFAULT_CHARACTER],
@@ -57,8 +40,9 @@ export function loadFarmProfile(): FarmProfile {
     const legacy = loadLegacyProfile()
     const legacyOwned = [...ids(readJSON('character-unlocks-v1')), ...ids(legacy.unlocks)]
     const owned = [...new Set([FARM_DEFAULT_CHARACTER, ...ids(stored?.owned), ...legacyOwned])]
-    const candidate =
-      stored?.selected ?? localStorage.getItem('character-selected-v1') ?? legacy.selected
+    const candidate = migrateCharacterId(
+      stored?.selected ?? localStorage.getItem('character-selected-v1') ?? legacy.selected,
+    )
     return {
       coins: Number.isSafeInteger(stored?.coins) && stored.coins >= 0 ? stored.coins : 0,
       owned,

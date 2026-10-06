@@ -3,6 +3,7 @@ import { melodyRequest } from '@/features/melody/leaderboard'
 import type { Board } from '@/features/melody/leaderboard'
 import { FARM_CHARACTERS } from '@/features/farm/characters'
 import type { FarmRound } from '@/features/farm/rules.mjs'
+import { migrateCharacterId } from '@/features/shop/characterRoster.mjs'
 import './FarmBoard.css'
 
 import {
@@ -14,7 +15,8 @@ import {
 } from '@/utils/playerIdentity'
 
 const avatarFor = (characterId: string | undefined) =>
-  FARM_CHARACTERS.find((character) => character.id === characterId) ?? FARM_CHARACTERS[0]
+  FARM_CHARACTERS.find((character) => character.id === migrateCharacterId(characterId)) ??
+  FARM_CHARACTERS[0]
 
 // `compact` renders the read-only board that greets players on the start screen:
 // heading, scrollable top list — no submit form.

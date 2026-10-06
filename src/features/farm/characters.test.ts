@@ -22,13 +22,42 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('survivor character shop', () => {
-  it('also honors ownership saved by the original shop atomic profile', () => {
-    buyCharacter('neon')
-    expect(loadFarmProfile().owned).toContain('neon')
-    expect(selectFarmCharacter('neon').profile.coins).toBe(0)
+  it('maps the retired roster while preserving coins, selection and reward deduplication', () => {
+    const retired = ['steampunk', 'default', 'burger-dog', 'neon', 'shadow', 'penguin', 'golden']
+    data.set(
+      FARM_PROFILE_KEY,
+      JSON.stringify({
+        coins: 2345,
+        owned: retired,
+        selected: 'shadow',
+        rewardedRuns: ['old-round'],
+      }),
+    )
+    const profile = loadFarmProfile()
+    expect(profile.coins).toBe(2345)
+    expect(profile.selected).toBe('robot-dj')
+    expect(profile.owned).toHaveLength(7)
+    expect(profile.owned).toEqual(
+      expect.arrayContaining([
+        'bear-drums',
+        'cat-guitar',
+        'crocodile-beat',
+        'bird-vocals',
+        'robot-dj',
+        'rabbit-flute',
+        'fox-sax',
+      ]),
+    )
+    expect(awardFarmCoins('old-round', 500).profile.coins).toBe(2345)
+    expect(selectFarmCharacter('robot-dj').profile.coins).toBe(2345)
   })
-  it('provides seven characters and a free starter with no unexplained currency', () => {
-    expect(FARM_CHARACTERS).toHaveLength(7)
+  it('also honors ownership saved by the original shop atomic profile', () => {
+    buyCharacter('bird-vocals')
+    expect(loadFarmProfile().owned).toContain('bird-vocals')
+    expect(selectFarmCharacter('bird-vocals').profile.coins).toBe(0)
+  })
+  it('provides nine characters and a free starter with no unexplained currency', () => {
+    expect(FARM_CHARACTERS).toHaveLength(9)
     for (const character of FARM_CHARACTERS) expect(character.price).toBeGreaterThanOrEqual(0)
     expect(loadFarmProfile()).toEqual({
       coins: 0,
@@ -39,7 +68,7 @@ describe('survivor character shop', () => {
   })
 
   it('awards a round once, buys and equips a character, and never charges for switching owned characters', () => {
-    const character = FARM_CHARACTERS.find((item) => item.id === 'burger-dog')!
+    const character = FARM_CHARACTERS.find((item) => item.id === 'crocodile-beat')!
     expect(awardFarmCoins('round-1', 1800).profile.coins).toBe(1800)
     expect(awardFarmCoins('round-1', 1800).profile.coins).toBe(1800)
     const purchased = selectFarmCharacter(character.id)
@@ -53,7 +82,7 @@ describe('survivor character shop', () => {
   })
 
   it('rejects insufficient funds, unknown characters and invalid rewards without deducting coins', () => {
-    expect(selectFarmCharacter('golden').error).toContain('还差')
+    expect(selectFarmCharacter('fox-sax').error).toContain('还差')
     expect(selectFarmCharacter('missing').error).toBeTruthy()
     for (const amount of [-1, NaN, Infinity, 1.2])
       expect(awardFarmCoins('invalid', amount).error).toBeTruthy()
@@ -62,16 +91,19 @@ describe('survivor character shop', () => {
   })
 
   it('imports original character ownership and rejects locked or missing selected characters', () => {
-    data.set('character-unlocks-v1', JSON.stringify(['burger-dog', 'missing', 'burger-dog']))
-    data.set('character-selected-v1', 'burger-dog')
+    data.set(
+      'character-unlocks-v1',
+      JSON.stringify(['crocodile-beat', 'missing', 'crocodile-beat']),
+    )
+    data.set('character-selected-v1', 'crocodile-beat')
     expect(loadFarmProfile()).toMatchObject({
-      owned: [FARM_DEFAULT_CHARACTER, 'burger-dog'],
-      selected: 'burger-dog',
+      owned: [FARM_DEFAULT_CHARACTER, 'crocodile-beat'],
+      selected: 'crocodile-beat',
     })
-    expect(selectFarmCharacter('burger-dog').profile.coins).toBe(0)
+    expect(selectFarmCharacter('crocodile-beat').profile.coins).toBe(0)
     data.set(
       FARM_PROFILE_KEY,
-      JSON.stringify({ coins: 42, selected: 'golden', owned: ['missing'], rewardedRuns: null }),
+      JSON.stringify({ coins: 42, selected: 'fox-sax', owned: ['missing'], rewardedRuns: null }),
     )
     expect(loadFarmProfile()).toMatchObject({ coins: 42, selected: FARM_DEFAULT_CHARACTER })
   })
@@ -86,10 +118,10 @@ describe('survivor character shop', () => {
         throw new Error('quota')
       },
     })
-    const failed = selectFarmCharacter('burger-dog')
+    const failed = selectFarmCharacter('crocodile-beat')
     expect(failed.error).toContain('无法保存')
     expect(failed.profile.coins).toBe(1200)
-    expect(failed.profile.owned).not.toContain('burger-dog')
+    expect(failed.profile.owned).not.toContain('crocodile-beat')
     expect(awardFarmCoins('round-2', 100).error).toContain('无法保存')
     expect(loadFarmProfile().coins).toBe(1200)
     data.set(FARM_PROFILE_KEY, '{broken')

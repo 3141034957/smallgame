@@ -4,8 +4,8 @@ import { resolve } from 'node:path'
 import { FARM_CHARACTERS } from './characters'
 
 describe('survivor character assets', () => {
-  it('ships seven real PNG images', () => {
-    expect(FARM_CHARACTERS).toHaveLength(7)
+  it('ships nine real PNG images', () => {
+    expect(FARM_CHARACTERS).toHaveLength(9)
     for (const character of FARM_CHARACTERS) {
       const path = resolve('public', character.image.replace(/^\.\//, ''))
       expect(existsSync(path)).toBe(true)
