@@ -7,6 +7,7 @@ import {
   installAccountSave,
   resetGuestProgress,
 } from '@/utils/accountStorage'
+import { BAND_CHARACTERS } from '@/features/farm/characterRoster.mjs'
 import { ACCOUNT_HINT, PASSWORD_HINT, normalizeAccount, validPassword } from './validation.mjs'
 import { AccountContext, AUTH_FORM_EVENT } from './context'
 import { createProgressSync, loadAccountProgress, type SyncStatus } from './cloud'
@@ -19,6 +20,10 @@ import {
   type AccountUser,
 } from './client'
 import './style.css'
+
+const welcomeBand = ['cat-guitar', 'bear-drums', 'bird-vocals'].map((id) =>
+  BAND_CHARACTERS.find((character) => character.id === id)!,
+)
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AccountUser | null>(null)
@@ -364,6 +369,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
             }
           }}
         >
+          <div className="account-scene" aria-hidden="true">
+            {welcomeBand.map((character) => (
+              <img key={character.id} src={character.image} alt="" />
+            ))}
+            <span>♫</span>
+          </div>
           <section
             ref={dialog}
             className="account-card"
@@ -374,7 +385,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
             <button className="account-close" disabled={busy} onClick={closeForm}>
               返回游戏
             </button>
-            <span className="account-eyebrow">ECHO GARDEN · BAND CLUB</span>
+            <div className="account-band" aria-hidden="true">
+              {welcomeBand.map((character) => (
+                <img key={character.id} src={character.image} alt="" />
+              ))}
+            </div>
+            <span className="account-eyebrow">怪潮乐队历险记 · 乐手档案</span>
             <h2>{mode === 'register' ? '保存你的乐队进度' : '欢迎回到乐队'}</h2>
             <p className="account-intro">
               {mode === 'register'
