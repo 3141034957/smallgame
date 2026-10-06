@@ -9,6 +9,7 @@ import {
   ACCOUNT_HINT,
   PASSWORD_HINT,
 } from '../src/features/auth/validation.mjs'
+import { validProgress } from '../src/features/auth/progress.mjs'
 
 export const SESSION_TTL = 7 * 24 * 60 * 60 * 1000
 export const ATTEMPT_WINDOW = 15 * 60 * 1000
@@ -40,7 +41,7 @@ async function verifyPassword(password, stored) {
 export function createAuthStore(path, { now = Date.now } = {}) {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true })
   const db = new DatabaseSync(path)
-  db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
+  db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;
     CREATE TABLE IF NOT EXISTS accounts (
       id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, created_at INTEGER NOT NULL
     ) STRICT;
@@ -49,6 +50,10 @@ export function createAuthStore(path, { now = Date.now } = {}) {
     ) STRICT;
     CREATE TABLE IF NOT EXISTS auth_attempts (
       key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires_at INTEGER NOT NULL
+    ) STRICT;
+    CREATE TABLE IF NOT EXISTS account_progress (
+      account_id TEXT PRIMARY KEY REFERENCES accounts(id), data TEXT NOT NULL,
+      revision INTEGER NOT NULL, updated_at INTEGER NOT NULL
     ) STRICT;`)
   let busy = 0
   async function expensive(action) {
@@ -79,24 +84,69 @@ export function createAuthStore(path, { now = Date.now } = {}) {
       if (db.prepare('SELECT count FROM auth_attempts WHERE key=?').get(key).count > limit)
         throw new AuthError(429, '尝试次数过多，请 15 分钟后重试。')
     },
-    async register(account, password) {
+    async register(account, password, progress = {}) {
       const username = normalizeAccount(account)
       if (!username) throw new AuthError(400, ACCOUNT_HINT)
       if (!validPassword(password)) throw new AuthError(400, PASSWORD_HINT)
+      if (!validProgress(progress))
+        throw new AuthError(400, '进度格式错误或内容过大，原存档仍保留在本机。')
+      const progressJSON = JSON.stringify(progress)
       if (db.prepare('SELECT id FROM accounts WHERE username=?').get(username))
         throw new AuthError(409, '这个账号已被注册，请换一个账号或直接登录。')
       return expensive(async () => {
         const hash = await hashPassword(password)
         const user = { id: `account_${randomUUID()}`, username }
+        db.exec('BEGIN IMMEDIATE')
         try {
           db.prepare('INSERT INTO accounts VALUES(?,?,?,?)').run(user.id, username, hash, now())
+          db.prepare('INSERT INTO account_progress VALUES(?,?,1,?)').run(
+            user.id,
+            progressJSON,
+            now(),
+          )
+          const session = createSession(user)
+          db.exec('COMMIT')
+          return session
         } catch (error) {
+          db.exec('ROLLBACK')
           if (db.prepare('SELECT id FROM accounts WHERE username=?').get(username))
             throw new AuthError(409, '这个账号已被注册，请换一个账号或直接登录。')
           throw error
         }
-        return createSession(user)
       })
+    },
+    progress(id) {
+      const row = db
+        .prepare('SELECT data,revision FROM account_progress WHERE account_id=?')
+        .get(id)
+      return row
+        ? { data: JSON.parse(row.data), revision: row.revision }
+        : { data: {}, revision: 0 }
+    },
+    saveProgress(id, data, revision) {
+      if (!validProgress(data) || !Number.isSafeInteger(revision) || revision < 0)
+        throw new AuthError(400, '进度格式错误。')
+      const current = this.progress(id)
+      if (current.revision !== revision) {
+        // Retrying an acknowledged write after losing the response is harmless.
+        const keys = Object.keys(data)
+        if (
+          keys.length === Object.keys(current.data).length &&
+          keys.every((key) => data[key] === current.data[key])
+        )
+          return current
+        throw new AuthError(409, '云端进度已在另一处更新，本机进度已保留，请重新载入云端进度。')
+      }
+      const write = db
+        .prepare(
+          `INSERT INTO account_progress VALUES(?,?,?,?)
+        ON CONFLICT(account_id) DO UPDATE SET data=excluded.data,revision=excluded.revision,updated_at=excluded.updated_at
+        WHERE account_progress.revision=?`,
+        )
+        .run(id, JSON.stringify(data), revision + 1, now(), revision)
+      if (!write.changes)
+        throw new AuthError(409, '云端进度已更新，本机进度已保留，请重新载入云端进度。')
+      return { data, revision: revision + 1 }
     },
     async login(account, password) {
       const username = normalizeAccount(account)

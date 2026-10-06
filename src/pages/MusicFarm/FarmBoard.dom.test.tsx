@@ -6,6 +6,8 @@ import { FarmBoard } from './FarmBoard'
 import { farmRequest } from '@/features/farm/leaderboard'
 import type { FarmRound } from '@/features/farm/rules.mjs'
 import { NICKNAME_STORAGE_KEY } from '@/utils/playerIdentity'
+import { activateAccount, installAccountSave } from '@/utils/accountStorage'
+import { AccountContext } from '@/features/auth/context'
 import { testStorage } from '@/test/storage'
 
 vi.mock('@/features/farm/leaderboard', () => ({ farmRequest: vi.fn() }))
@@ -20,7 +22,12 @@ const round = {
 beforeEach(() => {
   vi.stubGlobal('localStorage', testStorage())
   localStorage.clear()
-  localStorage.setItem(NICKNAME_STORAGE_KEY, '小乐手')
+  activateAccount('account_board_test')
+  installAccountSave('account_board_test', {
+    data: { [NICKNAME_STORAGE_KEY]: '小乐手' },
+    revision: 1,
+    dirty: false,
+  })
   vi.mocked(farmRequest).mockImplementation(async (_path, signal) => {
     await Promise.resolve()
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
@@ -29,6 +36,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   cleanup()
+  activateAccount(null)
   vi.resetAllMocks()
   vi.unstubAllGlobals()
 })
@@ -66,4 +74,18 @@ it('submits a newly entered nickname only once', async () => {
   fireEvent.click(screen.getByRole('button', { name: '上榜 ↗' }))
   await screen.findByText(/上榜啦/)
   expect(vi.mocked(farmRequest).mock.calls.filter(([path]) => path === 'score')).toHaveLength(1)
+})
+
+it('lets guests register after a finished run without submitting an anonymous score', async () => {
+  activateAccount(null)
+  const openAccount = vi.fn()
+  render(
+    <AccountContext value={{ user: null, openAccount }}>
+      <FarmBoard round={round} />
+    </AccountContext>,
+  )
+  fireEvent.click(screen.getByRole('button', { name: '注册并保存本局进度' }))
+  expect(openAccount).toHaveBeenCalledWith('register')
+  await waitFor(() => expect(farmRequest).toHaveBeenCalled())
+  expect(vi.mocked(farmRequest).mock.calls.some(([path]) => path === 'score')).toBe(false)
 })

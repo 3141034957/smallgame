@@ -55,7 +55,7 @@ it('claims old coins, characters, upgrades, statistics and best scores exactly o
   activateAccount(a)
   expect(loadFarmProfile().coins).toBe(12100)
 })
-it('isolates all save keys and blocks stale writes after logout', () => {
+it('isolates accounts and allows separate guest progress after logout', () => {
   activateAccount(a)
   for (const key of [
     'farm-quests-v1',
@@ -73,7 +73,11 @@ it('isolates all save keys and blocks stale writes after logout', () => {
   ])
     expect(accountStorage.getItem(key)).toBeNull()
   activateAccount(null)
-  expect(() => accountStorage.setItem(FARM_PROFILE_KEY, 'stale')).toThrow('请先登录')
+  accountStorage.setItem(FARM_PROFILE_KEY, 'guest')
+  expect(accountStorage.getItem(FARM_PROFILE_KEY)).toBe('guest')
+  activateAccount(a)
+  expect(accountStorage.getItem(FARM_PROFILE_KEY)).toBeNull()
+  expect(accountStorage.getItem('farm-quests-v1')).toBe('a')
   expect(localStorage.getItem(FARM_PROFILE_KEY)).toBeNull()
 })
 it('never overwrites an established account save with legacy progress and fails atomically when storage is full', () => {

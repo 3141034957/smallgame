@@ -1,3 +1,4 @@
+import { accountStorage } from '@/utils/accountStorage'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   awardFarmCoins,
@@ -23,7 +24,7 @@ afterEach(() => vi.unstubAllGlobals())
 describe('survivor character shop', () => {
   it('maps the retired roster while preserving coins, selection and reward deduplication', () => {
     const retired = ['steampunk', 'default', 'burger-dog', 'neon', 'shadow', 'penguin', 'golden']
-    data.set(
+    accountStorage.setItem(
       FARM_PROFILE_KEY,
       JSON.stringify({
         coins: 2345,
@@ -103,7 +104,7 @@ describe('survivor character shop', () => {
       selected: 'crocodile-beat',
     })
     expect(selectFarmCharacter('crocodile-beat').profile.coins).toBe(0)
-    data.set(
+    accountStorage.setItem(
       FARM_PROFILE_KEY,
       JSON.stringify({ coins: 42, selected: 'fox-sax', owned: ['missing'], rewardedRuns: null }),
     )

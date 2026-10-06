@@ -9,6 +9,7 @@ import { QuestList } from './QuestList'
 import { RunTimeline } from './RunTimeline'
 import { FarmBoard } from './FarmBoard'
 import { UpgradeChoices } from './UpgradeChoices'
+import { activateAccount, installAccountSave } from '@/utils/accountStorage'
 import { FarmHelp } from './FarmHelp'
 import { loadFarmAchievements } from '@/features/farm/achievements'
 import { loadFarmCareer } from '@/features/farm/stats'
@@ -119,15 +120,24 @@ describe('farm screens render', () => {
       stars: 1,
       gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])),
     }
+    expect(renderToStaticMarkup(<FarmBoard round={round as never} />)).toContain(
+      '注册并保存本局进度',
+    )
+    activateAccount('account_ssr_test')
+    installAccountSave('account_ssr_test', { data: {}, revision: 1, dirty: false })
     const html = renderToStaticMarkup(<FarmBoard round={round as never} />)
     expect(html).toContain('上榜')
     expect(html).toContain('取个昵称，把这一局送上总榜')
     // A player who already saved a nickname goes straight onto the board: no input.
-    localStorage.setItem('clockwork-player-nickname-v1', '老乐手')
+    installAccountSave('account_ssr_test', {
+      data: { 'clockwork-player-nickname-v1': '老乐手' },
+      revision: 1,
+      dirty: false,
+    })
     expect(renderToStaticMarkup(<FarmBoard round={round as never} />)).not.toContain(
       'farm-player-name',
     )
-    localStorage.removeItem('clockwork-player-nickname-v1')
+    activateAccount(null)
     const stats = renderToStaticMarkup(
       <MemoryRouter initialEntries={[`/farm?day=${day}&stats=1`]}>
         <MusicFarm />

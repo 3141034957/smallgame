@@ -1,4 +1,5 @@
 import { AuthError, SESSION_TTL } from './auth-store.mjs'
+import { PROGRESS_LIMIT } from '../src/features/auth/progress.mjs'
 export const SESSION_COOKIE = 'echo_session'
 export const AUTH_BODY_LIMIT = 16 * 1024
 export function sendJson(res, status, body) {
@@ -70,7 +71,12 @@ export function createAuthHandler(store, { secure = process.env.AUTH_COOKIE_SECU
         const chunks = []
         for await (const chunk of req) {
           bytes += chunk.length
-          if (bytes > AUTH_BODY_LIMIT) {
+          if (
+            bytes >
+            (url.pathname.endsWith('/register')
+              ? PROGRESS_LIMIT + AUTH_BODY_LIMIT
+              : AUTH_BODY_LIMIT)
+          ) {
             sendJson(res, 413, { error: '账号请求过大。' })
             req.destroy()
             return
@@ -84,7 +90,7 @@ export function createAuthHandler(store, { secure = process.env.AUTH_COOKIE_SECU
           throw new AuthError(400, '账号请求格式错误。')
         }
         const result = url.pathname.endsWith('/register')
-          ? await store.register(input?.account, input?.password)
+          ? await store.register(input?.account, input?.password, input?.progress)
           : await store.login(input?.account, input?.password)
         res.setHeader('Set-Cookie', cookie(result.token, SESSION_TTL / 1000))
         sendJson(res, 200, { user: result.user })

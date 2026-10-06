@@ -192,11 +192,13 @@ it('preserves Chinese nicknames when request chunks split a UTF-8 character', as
   expect(board.own).toBeNull()
 })
 
-it('uses one persistent session, revokes earlier logins and protects account writes over IP', async () => {
+it('uses one persistent session, inherits guest progress and protects account writes over IP', async () => {
+  const progress = { 'farm-career-v1': '{"runs":7}', 'farm-character-profile-v1': '{"coins":1234}' }
   expect(JSON.parse((await get('/api/auth/session')).text)).toEqual({ user: null })
   const registered = await post('/api/auth/register', {
     account: 'single_http',
     password: 'Aa1!"<> &+/%',
+    progress,
   })
   expect(registered.status).toBe(200)
   expect(registered.headers['set-cookie'][0]).toContain('HttpOnly')
@@ -206,6 +208,22 @@ it('uses one persistent session, revokes earlier logins and protects account wri
   const login = await post('/api/auth/login', { account: 'SINGLE_HTTP', password: 'Aa1!"<> &+/%' })
   const second = login.headers['set-cookie'][0].split(';')[0]
   expect(second).not.toBe(first)
+  expect(
+    JSON.parse(
+      (await get('/api/progress', { Cookie: second, 'X-Echo-User': login.data.user.id })).text,
+    ),
+  ).toEqual({ data: progress, revision: 1 })
+  expect((await get('/api/progress', { Cookie: first })).status).toBe(401)
+  expect((await get('/api/progress')).status).toBe(401)
+  expect(
+    (
+      await post(
+        '/api/progress',
+        { data: progress, revision: 1 },
+        { Cookie: second, 'X-Echo-User': login.data.user.id },
+      )
+    ).data.revision,
+  ).toBe(2)
   expect((await get('/api/auth/session', { Cookie: first })).status).toBe(401)
   expect(JSON.parse((await get('/api/auth/session', { Cookie: second })).text).user).toEqual(
     login.data.user,

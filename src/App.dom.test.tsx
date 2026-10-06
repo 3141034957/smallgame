@@ -37,7 +37,9 @@ beforeEach(() => {
                     username: 'test_player',
                   },
                 }
-              : { data: [], total: 0, own: null },
+              : url.includes('/api/progress')
+                ? { data: {}, revision: 1 }
+                : { data: [], total: 0, own: null },
           ),
           { status: 200 },
         ),
@@ -87,7 +89,8 @@ it('opens and closes the farm help dialog', async () => {
       <App />
     </MemoryRouter>,
   )
-  fireEvent.click(await screen.findByRole('button', { name: '查看进化配方' }))
+  await screen.findByRole('button', { name: '退出登录' })
+  fireEvent.click(screen.getByRole('button', { name: '查看进化配方' }))
   expect(screen.getByRole('dialog')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: /懂啦，开战/ }))
   expect(screen.queryByRole('dialog')).toBeNull()

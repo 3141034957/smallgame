@@ -1,3 +1,4 @@
+import { accountStorage } from '@/utils/accountStorage'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   applyFarmQuests,
@@ -47,7 +48,10 @@ beforeEach(() => {
     },
   })
 })
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
 
 describe('daily survivor quests', () => {
   it('gives every day the same three goals and starts at zero', () => {
@@ -120,9 +124,9 @@ describe('daily survivor quests', () => {
   it('starts over on a new day and survives corrupt saves', () => {
     applyFarmQuests(day, round({ harvested: 50 }))
     expect(loadFarmQuests('2026-10-05').total).toEqual({})
-    data.set(FARM_QUEST_KEY, '{broken')
+    accountStorage.setItem(FARM_QUEST_KEY, '{broken')
     expect(loadFarmQuests(day).claimed).toEqual([])
-    data.set(
+    accountStorage.setItem(
       FARM_QUEST_KEY,
       JSON.stringify({ day, best: { hunt: -4 }, total: { hunt: 'x' }, claimed: [1, 'hunt'] }),
     )
@@ -143,19 +147,16 @@ describe('daily survivor quests', () => {
     expect(loadFarmProfile().coins).toBe(400)
   })
   it('retries a failed wallet payment without increasing progress', () => {
-    const setItem = (key: string, value: string) => {
+    const original = accountStorage.setItem
+    const write = vi.spyOn(accountStorage, 'setItem').mockImplementation((key, value) => {
       if (key === FARM_PROFILE_KEY) throw new Error('quota')
-      data.set(key, value)
-    }
-    vi.stubGlobal('localStorage', { getItem: (key: string) => data.get(key) ?? null, setItem })
+      original(key, value)
+    })
     const finished = round({ bosses: 6 })
     const failed = applyFarmQuests(day, finished, 'run-1')
     expect(failed.error).toBeTruthy()
     expect(failed.completed).toEqual([])
-    vi.stubGlobal('localStorage', {
-      getItem: (key: string) => data.get(key) ?? null,
-      setItem: (key: string, value: string) => data.set(key, value),
-    })
+    write.mockRestore()
     const retry = applyFarmQuests(day, finished, 'run-1')
     expect(retry.log.total.hunt).toBe(6)
     expect(retry.completed).toEqual(['hunt'])
@@ -163,12 +164,10 @@ describe('daily survivor quests', () => {
   })
   it('reconciles a paid quest when persisting its claimed status failed', () => {
     let writes = 0
-    vi.stubGlobal('localStorage', {
-      getItem: (key: string) => data.get(key) ?? null,
-      setItem: (key: string, value: string) => {
-        if (key === FARM_QUEST_KEY && ++writes === 2) throw new Error('quota')
-        data.set(key, value)
-      },
+    const original = accountStorage.setItem
+    vi.spyOn(accountStorage, 'setItem').mockImplementation((key, value) => {
+      if (key === FARM_QUEST_KEY && ++writes === 2) throw new Error('quota')
+      original(key, value)
     })
     const finished = round({ bosses: 6 })
     expect(applyFarmQuests(day, finished, 'run-1').error).toBeTruthy()

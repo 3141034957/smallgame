@@ -30,6 +30,7 @@ import {
 } from '@/features/farm/rules.mjs'
 import type { Choice, FarmEvent, FarmRound, Point, UpgradeId } from '@/features/farm/rules.mjs'
 import { selectFarmUpgrade } from '@/features/farm/upgradeSelection'
+import { AUTH_FORM_EVENT } from '@/features/auth/context'
 import { drawFarm } from './render'
 import { FarmBoard } from './FarmBoard'
 import { CharacterShop } from './CharacterShop'
@@ -333,6 +334,13 @@ export default function MusicFarm() {
   }
   const selectRef = useRef(select)
   selectRef.current = select
+  useEffect(() => {
+    const pauseForAccount = () => {
+      if (phaseRef.current === 'play') openPanel('pause')
+    }
+    window.addEventListener(AUTH_FORM_EVENT, pauseForAccount)
+    return () => window.removeEventListener(AUTH_FORM_EVENT, pauseForAccount)
+  }, [])
   useEffect(() => {
     const sound = new FarmAudio()
     audio.current = sound

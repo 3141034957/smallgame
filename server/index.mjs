@@ -6,6 +6,7 @@ import { handleFarmRequest } from './farm.mjs'
 import { createStaticHandler } from './static.mjs'
 import { createAuthStore } from './auth-store.mjs'
 import { createAuthHandler, allowAccountWrite } from './auth.mjs'
+import { handleProgressRequest } from './progress.mjs'
 
 const directory = dirname(fileURLToPath(import.meta.url))
 const databasePath = join(process.env.DATA_DIR || join(directory, 'data'), 'game.db')
@@ -33,6 +34,10 @@ const server = createServer((req, res) => {
   }
   if (url.pathname.startsWith('/api/auth/')) {
     void auth.handle(req, res, url)
+    return
+  }
+  if (url.pathname === '/api/progress') {
+    void handleProgressRequest(req, res, accounts, () => auth.authenticate(req))
     return
   }
   if (url.pathname.startsWith('/api/farm/')) {

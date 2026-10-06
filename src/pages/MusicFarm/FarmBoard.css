@@ -284,3 +284,23 @@
 .farm-board.is-compact .farm-board-error {
   font-size: 11px;
 }
+.farm-board-guest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 16px 0;
+}
+.farm-board-guest p,
+.farm-board-guest small {
+  width: 100%;
+  line-height: 1.6;
+}
+.farm-board-guest small {
+  color: var(--farm-muted, #809088);
+}
+.farm-board-guest button {
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: #dbe7b7;
+  color: #304235;
+}

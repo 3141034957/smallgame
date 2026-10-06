@@ -4,7 +4,6 @@ import {
   getOrCreatePlayerId,
   getStoredNickname,
   PLAYER_ID_STORAGE_KEY,
-  NICKNAME_STORAGE_KEY,
   saveNickname,
 } from './playerIdentity'
 
@@ -30,7 +29,7 @@ it('migrates a valid legacy player and nickname', () => {
   data.set('mochi-melody-player-v1', JSON.stringify({ id: 'melody-player-1', name: ' 小  猫 ' }))
   expect(getOrCreatePlayerId()).toBe('melody-player-1')
   expect(getStoredNickname()).toBe('小 猫')
-  data.set(NICKNAME_STORAGE_KEY, '现在的名字')
+  saveNickname('现在的名字')
   expect(getStoredNickname()).toBe('现在的名字')
 })
 it('survives corrupt legacy saves and unavailable storage', () => {

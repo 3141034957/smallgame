@@ -1,4 +1,6 @@
 import { FARM_RULESET } from '@/features/farm/monsters.mjs'
+import { useAccount } from '@/features/auth/context'
+import { activeAccountId } from '@/utils/accountStorage'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { farmRequest } from '@/features/farm/leaderboard'
 import type { Board } from '@/features/farm/leaderboard'
@@ -30,7 +32,10 @@ export function FarmBoard({
   characterId?: string
   compact?: boolean
 }) {
-  const [playerId] = useState(getOrCreatePlayerId)
+  const account = useAccount()
+  const authenticated = account ? !!account.user : !!activeAccountId()
+  const [guestId] = useState(getOrCreatePlayerId)
+  const playerId = account?.user?.id ?? activeAccountId() ?? guestId
   const [name, setName] = useState(getStoredNickname)
   const [draft, setDraft] = useState('')
   const [board, setBoard] = useState<Board | null>(null)
@@ -71,7 +76,7 @@ export function FarmBoard({
   const submitted = !!round && submittedRound === round
   const submit = useCallback(
     (nickname: string, target: FarmRound | null | undefined) => {
-      if (!target || submitRef.current) return
+      if (!authenticated || !target || submitRef.current) return
       const next = normalizeNickname(nickname)
       if (!next) {
         setError('给你的乐手取个昵称吧。')
@@ -115,7 +120,7 @@ export function FarmBoard({
           }
         })
     },
-    [playerId, characterId],
+    [playerId, characterId, authenticated],
   )
 
   // A player who already picked a nickname is on the board the moment the run
@@ -123,12 +128,12 @@ export function FarmBoard({
   const submitNow = useRef(submit)
   submitNow.current = submit
   useEffect(() => {
-    if (compact || !round || round.score <= 0 || !name) return
+    if (!authenticated || compact || !round || round.score <= 0 || !name) return
     if (attempted.current === round) return
     // Through a ref: the submission itself must not be cancelled by the state
     // updates it triggers.
     submitNow.current(name, round)
-  }, [round, name, compact])
+  }, [round, name, compact, authenticated, playerId])
 
   return (
     <section className={`farm-board${compact ? ' is-compact' : ''}`} aria-label="无限总榜">
@@ -148,9 +153,18 @@ export function FarmBoard({
         </button>
       </div>
       {!compact && <p className="farm-board-caption">历史总排名 · 每位乐手只保留最高分</p>}
+      {!compact && round && !authenticated && (
+        <div className="farm-board-guest">
+          <p>这一局的金币和成长已保存在本机。注册账号，把进度保存到云端。</p>
+          <button onClick={() => account?.openAccount('register')}>注册并保存本局进度</button>
+          <button onClick={() => account?.openAccount('login')}>已有账号，登录恢复</button>
+          <small>不注册也可以继续玩；上榜需要登录。</small>
+        </div>
+      )}
       {!compact &&
         round &&
         round.score > 0 &&
+        authenticated &&
         (submitted ? (
           <p role="status" className="farm-board-success">
             上榜啦！{board?.own && `总榜第 ${board.own.rank} 名`}，下次冲得更高 ♡
@@ -181,7 +195,7 @@ export function FarmBoard({
             </form>
           )
         ))}
-      {!compact && round && round.score > 0 && !submitted && name && error && (
+      {!compact && round && round.score > 0 && authenticated && !submitted && name && error && (
         <button
           type="button"
           className="farm-board-retry"
