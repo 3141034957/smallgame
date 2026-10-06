@@ -1,8 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { EXPERIENCE_STAGES, FPS, RECIPES, THRESHOLDS, UPGRADE_STEPS, UPGRADE_XP, chooseTalent, createFarm, stepFarm } from './rules.mjs'
+import {
+  EXPERIENCE_STAGES,
+  FPS,
+  RECIPES,
+  THRESHOLDS,
+  UPGRADE_STEPS,
+  UPGRADE_XP,
+  chooseTalent,
+  createFarm,
+  stepFarm,
+} from './rules.mjs'
 import { modifierDays, simulateFarm } from '../../../scripts/check-farm-balance.mjs'
 
-const arena = (tick = 0) => ({ ...createFarm('2026-10-04'), tick, crops: [], position: [50, 50], nextWave: Infinity, nextBoss: Infinity, nextBass: Infinity, lastPulse: tick, modifier: 'none' })
+const arena = (tick = 0) => ({
+  ...createFarm('2026-10-04'),
+  tick,
+  crops: [],
+  position: [50, 50],
+  nextWave: Infinity,
+  nextBoss: Infinity,
+  nextBass: Infinity,
+  lastPulse: tick,
+  modifier: 'none',
+})
 function spawn(tick) {
   const state = arena(tick)
   state.nextWave = tick
@@ -26,7 +46,9 @@ describe('farm experience progression', () => {
       expect(UPGRADE_XP[index]).toBeGreaterThan(UPGRADE_XP[index - 1] ?? 0)
       expect(THRESHOLDS[index] - (THRESHOLDS[index - 1] ?? 0)).toBe(UPGRADE_XP[index])
     }
-    expect(UPGRADE_XP.at(-1)).toBe(20 + 20 * (UPGRADE_XP.length - 1) + Math.round(0.55 * (UPGRADE_XP.length - 1) ** 2))
+    expect(UPGRADE_XP.at(-1)).toBe(
+      20 + 20 * (UPGRADE_XP.length - 1) + Math.round(0.55 * (UPGRADE_XP.length - 1) ** 2),
+    )
   })
 
   it('does not upgrade early and carries pickup overflow through consecutive choices', () => {
@@ -36,7 +58,8 @@ describe('farm experience progression', () => {
     expect(state.offered).toEqual([])
     state.loot = [{ id: 200, x: 50, y: 50, xp: THRESHOLDS[2] + 7 - state.xp, coins: 0 }]
     state = stepFarm(state, state.position).state
-    const xp = state.xp, tick = state.tick
+    const xp = state.xp,
+      tick = state.tick
     for (let index = 0; index < 3; index++) {
       expect(state.offered.length).toBeGreaterThan(0)
       expect(stepFarm(state, state.position)).toBeNull()
@@ -59,7 +82,12 @@ describe('farm experience progression', () => {
   })
 
   it('scales regular, elite and both boss rewards while preserving coin rewards and modifiers', () => {
-    const categories = [{ flags: {}, base: 5 }, { flags: { elite: true }, base: 30 }, { flags: { boss: true }, base: 60 }, { flags: { boss: true, bass: true }, base: 110 }]
+    const categories = [
+      { flags: {}, base: 5 },
+      { flags: { elite: true }, base: 30 },
+      { flags: { boss: true }, base: 60 },
+      { flags: { boss: true, bass: true }, base: 110 },
+    ]
     for (const { flags, base } of categories) {
       let previousXp = 0
       const first = reward({ ...spawn(0), ...flags }, 0)
@@ -104,14 +132,18 @@ describe('farm experience progression', () => {
     for (const timer of ['nextBoss', 'nextBass']) {
       state = arena(120 * FPS)
       state[timer] = state.tick
-      expect(stepFarm(state, state.position).state.crops.find((enemy) => enemy.boss).xpStage).toBe(3)
+      expect(stepFarm(state, state.position).state.crops.find((enemy) => enemy.boss).xpStage).toBe(
+        3,
+      )
     }
   })
 
   it('keeps all six builds playable across all daily modifiers without injected health or XP', () => {
     const days = modifierDays()
     expect(days).toHaveLength(6)
-    const runs = days.flatMap((day) => RECIPES.map(({ weapon }) => simulateFarm(day, weapon, true, 180)))
+    const runs = days.flatMap((day) =>
+      RECIPES.map(({ weapon }) => simulateFarm(day, weapon, true, 180)),
+    )
     for (const run of runs) {
       expect(run.upgrades[0], `${run.modifier}/${run.focus}: first choice`).toBeLessThan(12)
       expect(run.evolutions.length, `${run.modifier}/${run.focus}: no evolution`).toBeGreaterThan(0)

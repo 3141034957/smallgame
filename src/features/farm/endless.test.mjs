@@ -1,8 +1,27 @@
 import { describe, expect, it } from 'vitest'
-import { FPS, MAX_BOSSES, MAX_GEAR_LEVEL, THRESHOLDS, UPGRADE_STEPS, chooseTalent, createFarm, evolved, finishFarm, orbitPositions, stepFarm } from './rules.mjs'
+import {
+  FPS,
+  MAX_BOSSES,
+  MAX_GEAR_LEVEL,
+  THRESHOLDS,
+  UPGRADE_STEPS,
+  chooseTalent,
+  createFarm,
+  evolved,
+  finishFarm,
+  orbitPositions,
+  stepFarm,
+} from './rules.mjs'
 
 const day = '2026-10-04'
-const arena = (tick) => ({ ...createFarm(day), tick, crops: [], nextWave: Infinity, nextBoss: Infinity, lastPulse: tick })
+const arena = (tick) => ({
+  ...createFarm(day),
+  tick,
+  crops: [],
+  nextWave: Infinity,
+  nextBoss: Infinity,
+  lastPulse: tick,
+})
 
 describe('endless survival', () => {
   it('continues beyond thirty seconds, one minute and one hour with no timer-based finish', () => {
@@ -56,7 +75,9 @@ describe('endless survival', () => {
       state.gear = { ...state.gear, orbit }
       state = stepFarm(state, state.position).state
       const target = orbit ? orbitPositions(state)[0] : [state.position[0] + 20, state.position[1]]
-      state.shots = [{ id: 900, x: target[0], y: target[1], dx: 0, dy: 0, expires: state.tick + FPS * 5 }]
+      state.shots = [
+        { id: 900, x: target[0], y: target[1], dx: 0, dy: 0, expires: state.tick + FPS * 5 },
+      ]
       return stepFarm(state, state.position)
     }
     const guarded = fire(2)
@@ -76,7 +97,8 @@ describe('endless survival', () => {
       state.nextWave = state.tick
       return stepFarm(state, state.position).state
     }
-    const minute = spawn(60), late = spawn(240)
+    const minute = spawn(60),
+      late = spawn(240)
     expect(late.crops[0].maxHp).toBeGreaterThan(minute.crops[0].maxHp)
     const state = arena(3600 * FPS)
     state.crops = [{ id: 1, kind: 1, x: 10, y: 76, hp: 100, maxHp: 100, regrow: -1, boss: false }]

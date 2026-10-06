@@ -13,7 +13,9 @@ function MechanicalGear({ variant }: { variant: 'upper' | 'lower' | 'rear' }) {
           key={spoke}
         />
       ))}
-      <span className="gear-hub"><b /></span>
+      <span className="gear-hub">
+        <b />
+      </span>
     </div>
   )
 }
@@ -27,10 +29,14 @@ export function MechanicalDecor() {
       <div className="conduit conduit--left" />
       <div className="conduit conduit--right" />
       <div className="chain chain--left">
-        {CHAIN_LINKS.map((link) => <i key={link} />)}
+        {CHAIN_LINKS.map((link) => (
+          <i key={link} />
+        ))}
       </div>
       <div className="chain chain--right">
-        {CHAIN_LINKS.map((link) => <i key={link} />)}
+        {CHAIN_LINKS.map((link) => (
+          <i key={link} />
+        ))}
       </div>
       <MechanicalGear variant="rear" />
       <MechanicalGear variant="upper" />
@@ -39,9 +45,15 @@ export function MechanicalDecor() {
       <div className="rotor-arm rotor-arm--two" />
       <div className="rotor-joint rotor-joint--one" />
       <div className="rotor-joint rotor-joint--two" />
-      <div className="hanging-bell hanging-bell--one"><i /></div>
-      <div className="hanging-bell hanging-bell--two"><i /></div>
-      <div className="hanging-bell hanging-bell--three"><i /></div>
+      <div className="hanging-bell hanging-bell--one">
+        <i />
+      </div>
+      <div className="hanging-bell hanging-bell--two">
+        <i />
+      </div>
+      <div className="hanging-bell hanging-bell--three">
+        <i />
+      </div>
     </div>
   )
 }

@@ -72,39 +72,18 @@ describe('SQLite leaderboard store', () => {
     const catPlayerId = 'player-cat-0001'
     const dogPlayerId = 'player-dog-0001'
 
-    expect(
-      store.submitScore(
-        catPlayerId,
-        '猫猫',
-        100,
-        'burger-dog',
-        10,
-      ).becameBest,
-    ).toBe(true)
-    expect(
-      store.submitScore(catPlayerId, '猫猫', 90, 'neon', 20).becameBest,
-    ).toBe(false)
+    expect(store.submitScore(catPlayerId, '猫猫', 100, 'burger-dog', 10).becameBest).toBe(true)
+    expect(store.submitScore(catPlayerId, '猫猫', 90, 'neon', 20).becameBest).toBe(false)
     expect(store.getLeaderboard()[0]).toMatchObject({
       characterId: 'neon',
       name: '猫猫',
       score: 100,
     })
-    expect(
-      store.submitScore(catPlayerId, '猫猫', 120, 'golden', 30).becameBest,
-    ).toBe(true)
-    expect(
-      store.submitScore(catPlayerId, '猫猫', 110, 'penguin', 35).becameBest,
-    ).toBe(false)
-    expect(
-      store.submitScore(
-        dogPlayerId,
-        '狗狗',
-        50,
-        'shadow',
-        40,
-        '203.0.113.8',
-      ).becameBest,
-    ).toBe(true)
+    expect(store.submitScore(catPlayerId, '猫猫', 120, 'golden', 30).becameBest).toBe(true)
+    expect(store.submitScore(catPlayerId, '猫猫', 110, 'penguin', 35).becameBest).toBe(false)
+    expect(store.submitScore(dogPlayerId, '狗狗', 50, 'shadow', 40, '203.0.113.8').becameBest).toBe(
+      true,
+    )
 
     expect(store.getLeaderboard()).toEqual([
       { rank: 1, characterId: 'penguin', name: '猫猫', score: 120 },
@@ -119,11 +98,36 @@ describe('SQLite leaderboard store', () => {
       ],
     })
     expect(store.getRecentSubmissions()).toEqual([
-      expect.objectContaining({ nickname: '狗狗', score: 50, characterId: 'shadow', becameBest: true }),
-      expect.objectContaining({ nickname: '猫猫', score: 110, characterId: 'penguin', becameBest: false }),
-      expect.objectContaining({ nickname: '猫猫', score: 120, characterId: 'golden', becameBest: true }),
-      expect.objectContaining({ nickname: '猫猫', score: 90, characterId: 'neon', becameBest: false }),
-      expect.objectContaining({ nickname: '猫猫', score: 100, characterId: 'burger-dog', becameBest: true }),
+      expect.objectContaining({
+        nickname: '狗狗',
+        score: 50,
+        characterId: 'shadow',
+        becameBest: true,
+      }),
+      expect.objectContaining({
+        nickname: '猫猫',
+        score: 110,
+        characterId: 'penguin',
+        becameBest: false,
+      }),
+      expect.objectContaining({
+        nickname: '猫猫',
+        score: 120,
+        characterId: 'golden',
+        becameBest: true,
+      }),
+      expect.objectContaining({
+        nickname: '猫猫',
+        score: 90,
+        characterId: 'neon',
+        becameBest: false,
+      }),
+      expect.objectContaining({
+        nickname: '猫猫',
+        score: 100,
+        characterId: 'burger-dog',
+        becameBest: true,
+      }),
     ])
     expect(store.getSubmissionsInRange(20, 36)).toHaveLength(3)
     expect(store.getSubmissionsInRange(20, 36)[0]).toEqual(
@@ -185,18 +189,9 @@ describe('SQLite leaderboard store', () => {
     expect(store.getLeaderboard()).toEqual([
       { rank: 1, characterId: 'burger-dog', name: '旧玩家', score: 321 },
     ])
+    expect(store.submitScore('new-player-0001', '新玩家', 123, 'penguin', 20).becameBest).toBe(true)
     expect(
-      store.submitScore('new-player-0001', '新玩家', 123, 'penguin', 20)
-        .becameBest,
-    ).toBe(true)
-    expect(
-      store.submitScore(
-        'million-player-0001',
-        '百万玩家',
-        1_500_000,
-        'golden',
-        30,
-      ).becameBest,
+      store.submitScore('million-player-0001', '百万玩家', 1_500_000, 'golden', 30).becameBest,
     ).toBe(true)
     expect(store.getLeaderboard()[0]).toMatchObject({
       name: '百万玩家',

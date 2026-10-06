@@ -51,7 +51,18 @@ import { DailyTrail } from './DailyTrail'
 import { WelcomeScreen } from './WelcomeScreen'
 import './index.less'
 
-type Phase = 'welcome' | 'compose' | 'listening' | 'delivered' | 'final' | 'remix' | 'guest' | 'daily-compose' | 'daily-result' | 'relay' | 'relay-result'
+type Phase =
+  | 'welcome'
+  | 'compose'
+  | 'listening'
+  | 'delivered'
+  | 'final'
+  | 'remix'
+  | 'guest'
+  | 'daily-compose'
+  | 'daily-result'
+  | 'relay'
+  | 'relay-result'
 type ListeningKind = 'letter' | 'song' | 'daily' | 'relay' | 'original'
 
 const ALL_KINDS = SEEDS.map(({ kind }) => kind)
@@ -64,7 +75,9 @@ function todayInChina() {
 function validDateKey(value: string | null): string | null {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
   const timestamp = Date.parse(`${value}T00:00:00Z`)
-  return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === value ? value : null
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === value
+    ? value
+    : null
 }
 
 function seedInfo(kind: SeedKind) {
@@ -90,15 +103,21 @@ function EchoGarden() {
   const [searchParams, setSearchParams] = useSearchParams()
   const sharedBoardRef = useRef(decodeBoard(searchParams.get('song') ?? ''))
   const sharedDateRef = useRef(validDateKey(searchParams.get('daily')))
-  const sharedParentRef = useRef((() => {
-    const parent = decodeBoard(searchParams.get('from') ?? '')
-    return parent && sharedBoardRef.current && oneBeatApart(parent, sharedBoardRef.current) ? parent : null
-  })())
+  const sharedParentRef = useRef(
+    (() => {
+      const parent = decodeBoard(searchParams.get('from') ?? '')
+      return parent && sharedBoardRef.current && oneBeatApart(parent, sharedBoardRef.current)
+        ? parent
+        : null
+    })(),
+  )
   const [skin, setSkin] = useState<EchoSkin>(readSkin)
   const [muted, setMuted] = useState(readMuted)
   const [collection, setCollection] = useState<SavedSong[]>(readCollection)
   const [storyProgress, setStoryProgress] = useState<StoryProgress | null>(readStoryProgress)
-  const [dailyRecords, setDailyRecords] = useState<DailyRecord[]>(() => recentDailyBest(todayInChina()))
+  const [dailyRecords, setDailyRecords] = useState<DailyRecord[]>(() =>
+    recentDailyBest(todayInChina()),
+  )
   const [dailyStreakCount, setDailyStreakCount] = useState(() => dailyStreak(todayInChina()))
   const [nextDailyMs, setNextDailyMs] = useState(() => msUntilNextDaily())
   const [guestSource, setGuestSource] = useState<'link' | 'nightly' | 'collection'>('link')
@@ -106,10 +125,14 @@ function EchoGarden() {
   const [phase, setPhase] = useState<Phase>(sharedBoardRef.current ? 'guest' : 'welcome')
   const [dailyDate, setDailyDate] = useState(sharedDateRef.current ?? todayInChina)
   const [dailyRound, setDailyRound] = useState(0)
-  const [dailyBest, setDailyBest] = useState(() => readDailyBest(sharedDateRef.current ?? todayInChina()))
+  const [dailyBest, setDailyBest] = useState(() =>
+    readDailyBest(sharedDateRef.current ?? todayInChina()),
+  )
   const [dailyLastGain, setDailyLastGain] = useState('')
   const [relayParentBoard, setRelayParentBoard] = useState<Board | null>(sharedParentRef.current)
-  const [relayHop, setRelayHop] = useState(sharedParentRef.current ? relayNumber(searchParams.get('hop')) : 0)
+  const [relayHop, setRelayHop] = useState(
+    sharedParentRef.current ? relayNumber(searchParams.get('hop')) : 0,
+  )
   const [relayEditedSlot, setRelayEditedSlot] = useState<number | null>(null)
   const [compareBoard, setCompareBoard] = useState<Board | null>(null)
   const [chapter, setChapter] = useState(0)
@@ -178,10 +201,13 @@ function EchoGarden() {
     setMuted(next)
   }
 
-  useEffect(() => () => {
-    if (animationRef.current) cancelAnimationFrame(animationRef.current)
-    audioRef.current.stop()
-  }, [])
+  useEffect(
+    () => () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current)
+      audioRef.current.stop()
+    },
+    [],
+  )
 
   useEffect(() => {
     audioRef.current.setMuted(muted)
@@ -196,7 +222,8 @@ function EchoGarden() {
     const possibleParent = decodeBoard(searchParams.get('from') ?? '')
     stopPlayback()
     sharedDateRef.current = validDateKey(searchParams.get('daily'))
-    sharedParentRef.current = possibleParent && oneBeatApart(possibleParent, incoming) ? possibleParent : null
+    sharedParentRef.current =
+      possibleParent && oneBeatApart(possibleParent, incoming) ? possibleParent : null
     setDailyDate(sharedDateRef.current ?? todayInChina())
     setBoard(incoming)
     setRelayParentBoard(sharedParentRef.current)
@@ -342,7 +369,12 @@ function EchoGarden() {
     setPhase('relay')
   }
 
-  const runPlayback = (snapshot: Board, repeats: number, onFinish: () => void, kind: ListeningKind = 'letter') => {
+  const runPlayback = (
+    snapshot: Board,
+    repeats: number,
+    onFinish: () => void,
+    kind: ListeningKind = 'letter',
+  ) => {
     stopPlayback()
     const audioPlayback = audioRef.current.playLoop(snapshot, repeats)
     const fallbackStart = performance.now() / 1000 + 0.065
@@ -384,9 +416,9 @@ function EchoGarden() {
       const step = elapsed < 0 ? -1 : Math.floor(elapsed / STEP_SECONDS) % SLOT_COUNT
       if (repeats > 1 && elapsed >= 0) {
         const act = Math.min(repeats - 1, Math.floor(elapsed / (STEP_SECONDS * SLOT_COUNT)))
-        setSongAct((current) => current === act ? current : act)
+        setSongAct((current) => (current === act ? current : act))
       }
-      setPlayhead((current) => current === step ? current : step)
+      setPlayhead((current) => (current === step ? current : step))
       animationRef.current = requestAnimationFrame(animate)
     }
     animationRef.current = requestAnimationFrame(animate)
@@ -437,10 +469,15 @@ function EchoGarden() {
   const playOriginalSong = () => {
     if (!relayParentBoard) return
     const snapshot = [...relayParentBoard]
-    runPlayback(snapshot, 1, () => {
-      setCompareBoard(null)
-      setPhase('guest')
-    }, 'original')
+    runPlayback(
+      snapshot,
+      1,
+      () => {
+        setCompareBoard(null)
+        setPhase('guest')
+      },
+      'original',
+    )
     setCompareBoard(snapshot)
   }
 
@@ -480,7 +517,11 @@ function EchoGarden() {
     }
     setUndoDepth(historyRef.current.length)
     setBoard(previous)
-    setRelayEditedSlot(relayParentBoard && encodeBoard(previous) === encodeBoard(relayParentBoard) ? null : relayEditedSlot)
+    setRelayEditedSlot(
+      relayParentBoard && encodeBoard(previous) === encodeBoard(relayParentBoard)
+        ? null
+        : relayEditedSlot,
+    )
     setNotice('撤回了上一步。')
   }
 
@@ -496,27 +537,38 @@ function EchoGarden() {
       const before = scoreDailyGarden(board, dailyDate)
       const after = scoreDailyGarden(next, dailyDate)
       const newBonuses = after.bonuses.flatMap((bonus) => {
-        const previous = before.bonuses.find((item) => item.label === bonus.label || item.label.startsWith('错落相邻') && bonus.label.startsWith('错落相邻'))
+        const previous = before.bonuses.find(
+          (item) =>
+            item.label === bonus.label ||
+            (item.label.startsWith('错落相邻') && bonus.label.startsWith('错落相邻')),
+        )
         const earned = bonus.points - (previous?.points ?? 0)
         return earned > 0 ? [`${bonus.label} +${earned}`] : []
       })
       const nextRound = dailyRound + 1
       writeDailyProgress(dailyDate, next, nextRound)
       setBoard(next)
-      setDailyLastGain(`+${after.score - before.score} 分${newBonuses.length ? ` · ${newBonuses.join('、')}` : ''}`)
-      runPlayback(next, 1, () => {
-        setDailyRound(nextRound)
-        if (nextRound === DAILY_ROUNDS) {
-          setDailyBest(writeDailyBest(dailyDate, after.score))
-          refreshDailyHistory()
-          setNotice('六次选择结束，你的花谱已经装进信封。')
-          setPhase('daily-result')
-        } else {
-          setSelectedSeed(getDailyOffers(dailyDate, nextRound)[0])
-          setNotice(`第 ${nextRound} 颗已唱完。再选一颗声音，把花谱接着种下去。`)
-          setPhase('daily-compose')
-        }
-      }, 'daily')
+      setDailyLastGain(
+        `+${after.score - before.score} 分${newBonuses.length ? ` · ${newBonuses.join('、')}` : ''}`,
+      )
+      runPlayback(
+        next,
+        1,
+        () => {
+          setDailyRound(nextRound)
+          if (nextRound === DAILY_ROUNDS) {
+            setDailyBest(writeDailyBest(dailyDate, after.score))
+            refreshDailyHistory()
+            setNotice('六次选择结束，你的花谱已经装进信封。')
+            setPhase('daily-result')
+          } else {
+            setSelectedSeed(getDailyOffers(dailyDate, nextRound)[0])
+            setNotice(`第 ${nextRound} 颗已唱完。再选一颗声音，把花谱接着种下去。`)
+            setPhase('daily-compose')
+          }
+        },
+        'daily',
+      )
       return
     }
     if (phase === 'relay') {
@@ -524,9 +576,13 @@ function EchoGarden() {
       pushHistory(board)
       const next = plantSeed(board, index, selectedSeed)
       setBoard(next)
-      setRelayEditedSlot(encodeBoard(next) === encodeBoard(relayParentBoard ?? board) ? null : index)
+      setRelayEditedSlot(
+        encodeBoard(next) === encodeBoard(relayParentBoard ?? board) ? null : index,
+      )
       const delta = scoreGarden(next).score - scoreGarden(relayParentBoard ?? board).score
-      setNotice(`第 ${index + 1} 拍换成${next[index] ? seedInfo(next[index]).name : '留白'}。接力版${delta >= 0 ? '+' : ''}${delta} 分。`)
+      setNotice(
+        `第 ${index + 1} 拍换成${next[index] ? seedInfo(next[index]).name : '留白'}。接力版${delta >= 0 ? '+' : ''}${delta} 分。`,
+      )
       audioRef.current.previewSeed(selectedSeed)
       return
     }
@@ -535,9 +591,11 @@ function EchoGarden() {
     const next = plantSeed(board, index, selectedSeed)
     const added = next[index] !== null
     setBoard(next)
-    setNotice(added
-      ? `第 ${index + 1} 拍种下了${seedInfo(selectedSeed).name}。按「放唱针」听它和其他声音相遇。`
-      : `第 ${index + 1} 拍腾出了空位。`)
+    setNotice(
+      added
+        ? `第 ${index + 1} 拍种下了${seedInfo(selectedSeed).name}。按「放唱针」听它和其他声音相遇。`
+        : `第 ${index + 1} 拍腾出了空位。`,
+    )
     if (added) audioRef.current.previewSeed(selectedSeed)
     if (phase === 'compose') {
       writeStoryProgress(next, chapter)
@@ -547,7 +605,7 @@ function EchoGarden() {
 
   const applyHint = () => {
     if (!hint) return
-    const source = phase === 'relay' ? relayParentBoard ?? board : board
+    const source = phase === 'relay' ? (relayParentBoard ?? board) : board
     pushHistory(board)
     const next = [...source] as Board
     next[hint.index] = hint.kind
@@ -555,9 +613,13 @@ function EchoGarden() {
     if (phase === 'relay') {
       setRelayEditedSlot(hint.index)
       const delta = scoreGarden(next).score - scoreGarden(relayParentBoard ?? board).score
-      setNotice(`邮差建议第 ${hint.index + 1} 拍换成${hint.kind ? seedInfo(hint.kind).name : '留白'}：${delta >= 0 ? '+' : ''}${delta} 分。`)
+      setNotice(
+        `邮差建议第 ${hint.index + 1} 拍换成${hint.kind ? seedInfo(hint.kind).name : '留白'}：${delta >= 0 ? '+' : ''}${delta} 分。`,
+      )
     } else {
-      setNotice(`第 ${hint.index + 1} 拍换成${hint.kind ? seedInfo(hint.kind).name : '留白'}，多了 ${hint.gain} 分。`)
+      setNotice(
+        `第 ${hint.index + 1} 拍换成${hint.kind ? seedInfo(hint.kind).name : '留白'}，多了 ${hint.gain} 分。`,
+      )
     }
     if (hint.kind) audioRef.current.previewSeed(hint.kind)
   }
@@ -568,10 +630,15 @@ function EchoGarden() {
       return
     }
     const snapshot = [...board]
-    runPlayback(snapshot, 1, () => {
-      setNotice('这一拍已经唱出来了。把改过的花房寄给朋友吧。')
-      setPhase('relay-result')
-    }, 'relay')
+    runPlayback(
+      snapshot,
+      1,
+      () => {
+        setNotice('这一拍已经唱出来了。把改过的花房寄给朋友吧。')
+        setPhase('relay-result')
+      },
+      'relay',
+    )
   }
 
   const copySong = async (mode: 'song' | 'daily' | 'relay' = 'song') => {
@@ -585,11 +652,12 @@ function EchoGarden() {
       if (sharedDateRef.current) params.set('daily', sharedDateRef.current)
     }
     url.hash = `#/echo?${params.toString()}`
-    const message = mode === 'daily'
-      ? `月亮邮局 · ${dailyDate} 每日花谱，我种出了 ${scoreDailyGarden(board, dailyDate).score} 分。来挑战同一天的六颗声音：${url}`
-      : mode === 'relay' && relayParentBoard
-        ? `月亮邮局第 ${relayHop || 1} 次接力：${scoreGarden(relayParentBoard).score} → ${scoreGarden(board).score} 分。听听这一拍的新声音，再接力：${url}`
-        : `我给月亮种了一首歌。打开花房听一听，也可以接力改一拍：${url}`
+    const message =
+      mode === 'daily'
+        ? `月亮邮局 · ${dailyDate} 每日花谱，我种出了 ${scoreDailyGarden(board, dailyDate).score} 分。来挑战同一天的六颗声音：${url}`
+        : mode === 'relay' && relayParentBoard
+          ? `月亮邮局第 ${relayHop || 1} 次接力：${scoreGarden(relayParentBoard).score} → ${scoreGarden(board).score} 分。听听这一拍的新声音，再接力：${url}`
+          : `我给月亮种了一首歌。打开花房听一听，也可以接力改一拍：${url}`
     try {
       await navigator.clipboard.writeText(message)
       setShareNotice('邀请已复制，发给朋友就能一起玩。')
@@ -625,20 +693,31 @@ function EchoGarden() {
       setNotice(`「${result.title}」已经在收藏册里了。`)
       return
     }
-    setNotice(result.dropped > 0
-      ? `收进「${result.title}」。收藏册满了，最旧的一张被挤掉了。`
-      : `已经收进「${result.title}」，回到标题页就能再听到它。`)
+    setNotice(
+      result.dropped > 0
+        ? `收进「${result.title}」。收藏册满了，最旧的一张被挤掉了。`
+        : `已经收进「${result.title}」，回到标题页就能再听到它。`,
+    )
   }
 
-  const isEditing = phase === 'compose' || phase === 'remix' || phase === 'daily-compose' || phase === 'relay'
+  const isEditing =
+    phase === 'compose' || phase === 'remix' || phase === 'daily-compose' || phase === 'relay'
   const isFinal = phase === 'final' || phase === 'guest'
   const isComparingOriginal = phase === 'listening' && listeningKind === 'original'
-  const showingSong = isFinal || phase === 'remix' || phase === 'listening' && listeningKind === 'song'
-  const showingDaily = phase === 'daily-compose' || phase === 'daily-result' || phase === 'listening' && listeningKind === 'daily'
-  const showingRelay = phase === 'relay' || phase === 'relay-result' || phase === 'listening' && listeningKind === 'relay'
+  const showingSong =
+    isFinal || phase === 'remix' || (phase === 'listening' && listeningKind === 'song')
+  const showingDaily =
+    phase === 'daily-compose' ||
+    phase === 'daily-result' ||
+    (phase === 'listening' && listeningKind === 'daily')
+  const showingRelay =
+    phase === 'relay' ||
+    phase === 'relay-result' ||
+    (phase === 'listening' && listeningKind === 'relay')
   const guestDaily = phase === 'guest' && !!sharedDateRef.current && !relayParentBoard
   const guestRelay = phase === 'guest' && !!relayParentBoard
-  const isNightlyPick = phase === 'guest' && guestSource === 'nightly' && !relayParentBoard && !sharedDateRef.current
+  const isNightlyPick =
+    phase === 'guest' && guestSource === 'nightly' && !relayParentBoard && !sharedDateRef.current
   const guestSavedDaily = sharedDateRef.current ? readDailyProgress(sharedDateRef.current) : null
 
   useEffect(() => {
@@ -646,12 +725,18 @@ function EchoGarden() {
       setHint(null)
       return
     }
-    const source = phase === 'relay' ? relayParentBoard ?? board : board
+    const source = phase === 'relay' ? (relayParentBoard ?? board) : board
     setHint(suggestNextMove(source, { kinds: ALL_KINDS }))
   }, [board, phase, relayParentBoard])
 
   // The window listener is installed once, so it reads the newest handlers here.
-  const keyboardRef = useRef({ editing: false, undoEnabled: false, touch: touchSlot, undo: undoEdit, play: () => {} })
+  const keyboardRef = useRef({
+    editing: false,
+    undoEnabled: false,
+    touch: touchSlot,
+    undo: undoEdit,
+    play: () => {},
+  })
   keyboardRef.current.editing = isEditing
   keyboardRef.current.undoEnabled = phase === 'compose' || phase === 'remix' || phase === 'relay'
   keyboardRef.current.touch = touchSlot
@@ -695,54 +780,73 @@ function EchoGarden() {
   const activeChapter = CHAPTERS[chapter]
   const displayedBoard = compareBoard ?? board
   const plantedCount = displayedBoard.filter(Boolean).length
-  const allowedSeeds = phase === 'remix' || phase === 'relay'
-    ? ALL_KINDS
-    : showingDaily
-      ? getDailyOffers(dailyDate, Math.min(dailyRound, DAILY_ROUNDS - 1))
-      : activeChapter.allowed
+  const allowedSeeds =
+    phase === 'remix' || phase === 'relay'
+      ? ALL_KINDS
+      : showingDaily
+        ? getDailyOffers(dailyDate, Math.min(dailyRound, DAILY_ROUNDS - 1))
+        : activeChapter.allowed
   const dailyPattern = getDailyPattern(dailyDate)
   const dailyMission = `第 ${dailyPattern.featuredSlot + 1} 拍种${seedInfo(dailyPattern.featuredKind).name}，第 ${dailyPattern.quietSlot + 1} 拍留白`
-  const gardenScore = showingDaily || guestDaily ? scoreDailyGarden(board, dailyDate) : scoreGarden(board)
+  const gardenScore =
+    showingDaily || guestDaily ? scoreDailyGarden(board, dailyDate) : scoreGarden(board)
   const parentScore = relayParentBoard ? scoreGarden(relayParentBoard).score : null
-  const changedBeat = relayParentBoard ? board.findIndex((kind, index) => kind !== relayParentBoard[index]) : -1
-  const changedBeatCopy = changedBeat < 0 || !relayParentBoard ? '' : `第 ${changedBeat + 1} 拍：${relayParentBoard[changedBeat] ? seedInfo(relayParentBoard[changedBeat]).name : '留白'} → ${board[changedBeat] ? seedInfo(board[changedBeat]).name : '留白'}`
+  const changedBeat = relayParentBoard
+    ? board.findIndex((kind, index) => kind !== relayParentBoard[index])
+    : -1
+  const changedBeatCopy =
+    changedBeat < 0 || !relayParentBoard
+      ? ''
+      : `第 ${changedBeat + 1} 拍：${relayParentBoard[changedBeat] ? seedInfo(relayParentBoard[changedBeat]).name : '留白'} → ${board[changedBeat] ? seedInfo(board[changedBeat]).name : '留白'}`
   const songCode = encodeBoard(board)
   const isCollected = collection.some((song) => song.code === songCode)
   const dailyCeiling = useMemo(() => bestDailyScore(dailyDate), [dailyDate])
   const stageTitle = isComparingOriginal
     ? '这是改动之前的花房'
     : showingDaily
-    ? phase === 'daily-result' ? '今晚的花谱，已经写好' : `每日花谱 · 第 ${dailyRound + 1} 颗`
-    : showingRelay
-      ? phase === 'relay-result' ? `第 ${relayHop} 站，新的声音唱出来了` : '只改一拍，让故事继续'
-      : phase === 'guest'
-        ? relayParentBoard ? `朋友寄来的第 ${relayHop} 站` : isNightlyPick ? '今晚点播 · 月亮自己种的' : sharedDateRef.current ? '同一天的花谱' : '朋友寄来的花房'
-        : showingSong
-          ? '这一夜，终于有了自己的歌'
-          : phase === 'delivered'
-            ? '这一封信，送到了'
-            : activeChapter.title
+      ? phase === 'daily-result'
+        ? '今晚的花谱，已经写好'
+        : `每日花谱 · 第 ${dailyRound + 1} 颗`
+      : showingRelay
+        ? phase === 'relay-result'
+          ? `第 ${relayHop} 站，新的声音唱出来了`
+          : '只改一拍，让故事继续'
+        : phase === 'guest'
+          ? relayParentBoard
+            ? `朋友寄来的第 ${relayHop} 站`
+            : isNightlyPick
+              ? '今晚点播 · 月亮自己种的'
+              : sharedDateRef.current
+                ? '同一天的花谱'
+                : '朋友寄来的花房'
+          : showingSong
+            ? '这一夜，终于有了自己的歌'
+            : phase === 'delivered'
+              ? '这一封信，送到了'
+              : activeChapter.title
   const stageDescription = isComparingOriginal
     ? `原谱 ${parentScore} 分。等唱针走完，再听朋友改过的那一拍。`
     : showingDaily
-    ? phase === 'daily-result'
-      ? `${dailyDate} · ${gardenScore.score} 分。${dailyMission}，是今天独有的邮戳。`
-      : `同日同题，六次选择。${dailyMission}，可加 40 分。`
-    : showingRelay
-      ? parentScore === null ? '从朋友寄来的花房出发，只改动一个位置，再把这段新声音传下去。' : `原谱 ${parentScore} 分 → 现在 ${gardenScore.score} 分。${changedBeatCopy || '选一拍，再寄出去。'}`
-      : phase === 'guest'
-        ? relayParentBoard
-          ? `上一位 ${parentScore} 分 → 这一位 ${gardenScore.score} 分。${changedBeatCopy}。`
-          : isNightlyPick
-            ? `今晚月亮挑的这张唱片 ${gardenScore.score} 分，四封来信的线索它都满足。听完可以收进收藏册。`
-            : sharedDateRef.current
-            ? `朋友在 ${sharedDateRef.current} 的花谱得了 ${gardenScore.score} 分。${dailyMission}。`
-            : '每一颗声音都在唱片上留下了位置。按下唱针，听听它会怎样开花。'
-        : showingSong
-          ? '心跳是节拍，雨滴是呼吸，铃花和回声是你写下的旋律。'
-          : phase === 'delivered'
-            ? activeChapter.reply
-            : activeChapter.request
+      ? phase === 'daily-result'
+        ? `${dailyDate} · ${gardenScore.score} 分。${dailyMission}，是今天独有的邮戳。`
+        : `同日同题，六次选择。${dailyMission}，可加 40 分。`
+      : showingRelay
+        ? parentScore === null
+          ? '从朋友寄来的花房出发，只改动一个位置，再把这段新声音传下去。'
+          : `原谱 ${parentScore} 分 → 现在 ${gardenScore.score} 分。${changedBeatCopy || '选一拍，再寄出去。'}`
+        : phase === 'guest'
+          ? relayParentBoard
+            ? `上一位 ${parentScore} 分 → 这一位 ${gardenScore.score} 分。${changedBeatCopy}。`
+            : isNightlyPick
+              ? `今晚月亮挑的这张唱片 ${gardenScore.score} 分，四封来信的线索它都满足。听完可以收进收藏册。`
+              : sharedDateRef.current
+                ? `朋友在 ${sharedDateRef.current} 的花谱得了 ${gardenScore.score} 分。${dailyMission}。`
+                : '每一颗声音都在唱片上留下了位置。按下唱针，听听它会怎样开花。'
+          : showingSong
+            ? '心跳是节拍，雨滴是呼吸，铃花和回声是你写下的旋律。'
+            : phase === 'delivered'
+              ? activeChapter.reply
+              : activeChapter.request
 
   if (phase === 'welcome') {
     return (
@@ -772,25 +876,118 @@ function EchoGarden() {
   return (
     <main className={`echo-page echo-skin-${skin} echo-phase-${phase}`}>
       <header className="echo-game-header">
-        <button className="echo-home-button" type="button" onClick={goWelcome} aria-label="返回标题">↖</button>
-        <div className="echo-brand"><span className="echo-brand-icon">月</span><span>月亮邮局 <small>MOON RADIO / 112 BPM</small></span></div>
-        <div className="echo-header-tools">
-          <button className="echo-icon-button" type="button" onClick={toggleMuted} aria-pressed={muted} aria-label={muted ? '取消静音' : '静音'} title={muted ? '取消静音' : '静音'}>{muted ? '✕' : '♪'}</button>
-          <button className="echo-icon-button" type="button" onClick={toggleSkin} aria-label={skin === 'print' ? '换成夜间邮报皮肤' : '换成印刷封套皮肤'} title="换一种封面">{skin === 'print' ? '☾' : '▤'}</button>
+        <button
+          className="echo-home-button"
+          type="button"
+          onClick={goWelcome}
+          aria-label="返回标题"
+        >
+          ↖
+        </button>
+        <div className="echo-brand">
+          <span className="echo-brand-icon">月</span>
+          <span>
+            月亮邮局 <small>MOON RADIO / 112 BPM</small>
+          </span>
         </div>
-        <div className="echo-letter-count">{showingDaily ? `${String(Math.min(dailyRound + 1, DAILY_ROUNDS)).padStart(2, '0')} / 06` : showingRelay || isComparingOriginal ? '接力件' : showingSong ? 'SIDE A' : `${String(chapter + 1).padStart(2, '0')} / ${String(CHAPTERS.length).padStart(2, '0')}`}</div>
+        <div className="echo-header-tools">
+          <button
+            className="echo-icon-button"
+            type="button"
+            onClick={toggleMuted}
+            aria-pressed={muted}
+            aria-label={muted ? '取消静音' : '静音'}
+            title={muted ? '取消静音' : '静音'}
+          >
+            {muted ? '✕' : '♪'}
+          </button>
+          <button
+            className="echo-icon-button"
+            type="button"
+            onClick={toggleSkin}
+            aria-label={skin === 'print' ? '换成夜间邮报皮肤' : '换成印刷封套皮肤'}
+            title="换一种封面"
+          >
+            {skin === 'print' ? '☾' : '▤'}
+          </button>
+        </div>
+        <div className="echo-letter-count">
+          {showingDaily
+            ? `${String(Math.min(dailyRound + 1, DAILY_ROUNDS)).padStart(2, '0')} / 06`
+            : showingRelay || isComparingOriginal
+              ? '接力件'
+              : showingSong
+                ? 'SIDE A'
+                : `${String(chapter + 1).padStart(2, '0')} / ${String(CHAPTERS.length).padStart(2, '0')}`}
+        </div>
       </header>
 
       <section className="echo-letter-card" aria-live="polite">
-        <div className="echo-letter-top"><span>{showingDaily || guestDaily ? `每日邮戳 / ${dailyDate}` : showingRelay || isComparingOriginal || guestRelay ? `声波接力件 / 第 ${relayHop} 站` : isNightlyPick ? `月亮点播 / ${todayInChina()}` : showingSong ? '唱片 A 面 / 手工录制' : phase === 'delivered' ? '信件已投递' : `夜信编号 / 0${chapter + 1}`}</span><span className="echo-letter-stamp">{showingDaily || guestDaily ? gardenScore.score : showingRelay || isComparingOriginal || guestRelay ? String(relayHop).padStart(2, '0') : '月'}</span></div>
+        <div className="echo-letter-top">
+          <span>
+            {showingDaily || guestDaily
+              ? `每日邮戳 / ${dailyDate}`
+              : showingRelay || isComparingOriginal || guestRelay
+                ? `声波接力件 / 第 ${relayHop} 站`
+                : isNightlyPick
+                  ? `月亮点播 / ${todayInChina()}`
+                  : showingSong
+                    ? '唱片 A 面 / 手工录制'
+                    : phase === 'delivered'
+                      ? '信件已投递'
+                      : `夜信编号 / 0${chapter + 1}`}
+          </span>
+          <span className="echo-letter-stamp">
+            {showingDaily || guestDaily
+              ? gardenScore.score
+              : showingRelay || isComparingOriginal || guestRelay
+                ? String(relayHop).padStart(2, '0')
+                : '月'}
+          </span>
+        </div>
         <h2>{stageTitle}</h2>
         <p>{stageDescription}</p>
-        <div className="echo-progress" aria-label={showingDaily || guestDaily ? `已种下 ${showingDaily ? dailyRound : board.filter(Boolean).length} / ${DAILY_ROUNDS} 颗每日声音` : showingRelay || isComparingOriginal || guestRelay ? '只改动一拍' : `已完成 ${showingSong ? CHAPTERS.length : phase === 'delivered' ? chapter + 1 : chapter} 封来信`}>
-          {showingDaily || guestDaily
-            ? Array.from({ length: DAILY_ROUNDS }, (_, index) => <i key={index} className={guestDaily || index < dailyRound || phase === 'listening' && listeningKind === 'daily' && index === dailyRound ? 'is-lit' : ''} />)
-            : showingRelay || isComparingOriginal || guestRelay
-              ? <i className={relayEditedSlot !== null || guestRelay || isComparingOriginal ? 'is-lit' : ''} />
-              : CHAPTERS.map((letter, index) => <i key={letter.title} className={index < chapter || phase === 'delivered' && index <= chapter || showingSong ? 'is-lit' : ''} />)}
+        <div
+          className="echo-progress"
+          aria-label={
+            showingDaily || guestDaily
+              ? `已种下 ${showingDaily ? dailyRound : board.filter(Boolean).length} / ${DAILY_ROUNDS} 颗每日声音`
+              : showingRelay || isComparingOriginal || guestRelay
+                ? '只改动一拍'
+                : `已完成 ${showingSong ? CHAPTERS.length : phase === 'delivered' ? chapter + 1 : chapter} 封来信`
+          }
+        >
+          {showingDaily || guestDaily ? (
+            Array.from({ length: DAILY_ROUNDS }, (_, index) => (
+              <i
+                key={index}
+                className={
+                  guestDaily ||
+                  index < dailyRound ||
+                  (phase === 'listening' && listeningKind === 'daily' && index === dailyRound)
+                    ? 'is-lit'
+                    : ''
+                }
+              />
+            ))
+          ) : showingRelay || isComparingOriginal || guestRelay ? (
+            <i
+              className={
+                relayEditedSlot !== null || guestRelay || isComparingOriginal ? 'is-lit' : ''
+              }
+            />
+          ) : (
+            CHAPTERS.map((letter, index) => (
+              <i
+                key={letter.title}
+                className={
+                  index < chapter || (phase === 'delivered' && index <= chapter) || showingSong
+                    ? 'is-lit'
+                    : ''
+                }
+              />
+            ))
+          )}
         </div>
       </section>
 
@@ -799,18 +996,30 @@ function EchoGarden() {
         <div className="echo-record">
           <div className="echo-record-grooves" />
           <div className="echo-record-route" />
-          {playhead >= 0 && <div className="echo-record-needle" style={{ transform: `rotate(${playhead * 45}deg)` }}><i /></div>}
+          {playhead >= 0 && (
+            <div
+              className="echo-record-needle"
+              style={{ transform: `rotate(${playhead * 45}deg)` }}
+            >
+              <i />
+            </div>
+          )}
           {displayedBoard.map((kind, index) => {
-            const angle = (index * 45 - 90) * Math.PI / 180
-            const isRooted = phase === 'daily-compose' && kind !== null || phase === 'relay' && relayEditedSlot !== null && relayEditedSlot !== index
+            const angle = ((index * 45 - 90) * Math.PI) / 180
+            const isRooted =
+              (phase === 'daily-compose' && kind !== null) ||
+              (phase === 'relay' && relayEditedSlot !== null && relayEditedSlot !== index)
             const isFeatured = (showingDaily || guestDaily) && index === dailyPattern.featuredSlot
             const isQuiet = (showingDaily || guestDaily) && index === dailyPattern.quietSlot
-            const isChanged = changedBeat === index && (guestRelay || phase === 'relay' || phase === 'relay-result' || isComparingOriginal)
-            const dormant = phase === 'listening' && listeningKind === 'song' && (
-              kind === 'rain' && songAct === 0 ||
-              kind === 'bell' && songAct < 2 ||
-              kind === 'echo' && songAct < 3
-            )
+            const isChanged =
+              changedBeat === index &&
+              (guestRelay || phase === 'relay' || phase === 'relay-result' || isComparingOriginal)
+            const dormant =
+              phase === 'listening' &&
+              listeningKind === 'song' &&
+              ((kind === 'rain' && songAct === 0) ||
+                (kind === 'bell' && songAct < 2) ||
+                (kind === 'echo' && songAct < 3))
             const location = {
               left: `${50 + Math.cos(angle) * 38}%`,
               top: `${50 + Math.sin(angle) * 38}%`,
@@ -822,22 +1031,50 @@ function EchoGarden() {
                 type="button"
                 style={location}
                 onClick={() => touchSlot(index)}
-                disabled={!isEditing || phase === 'daily-compose' && kind !== null || phase === 'relay' && relayEditedSlot !== null && relayEditedSlot !== index}
+                disabled={
+                  !isEditing ||
+                  (phase === 'daily-compose' && kind !== null) ||
+                  (phase === 'relay' && relayEditedSlot !== null && relayEditedSlot !== index)
+                }
                 aria-label={`第 ${index + 1} 拍：${kind ? seedInfo(kind).name : '空格'}${isFeatured ? `，今日邮戳目标${seedInfo(dailyPattern.featuredKind).name}` : ''}${isQuiet ? '，今日留白目标' : ''}${isChanged ? '，接力改动的这一拍' : ''}`}
               >
                 <span className="echo-slot-number">{index + 1}</span>
                 <span className="echo-slot-symbol">{kind ? seedInfo(kind).icon : '+'}</span>
-                {(isFeatured || isQuiet) && <span className="echo-slot-badge" aria-hidden="true">{isFeatured ? '邮' : '空'}</span>}
+                {(isFeatured || isQuiet) && (
+                  <span className="echo-slot-badge" aria-hidden="true">
+                    {isFeatured ? '邮' : '空'}
+                  </span>
+                )}
               </button>
             )
           })}
           <div className={`echo-record-center bloom-${Math.min(4, Math.ceil(plantedCount / 2))}`}>
-            <div className="echo-center-flower" aria-hidden="true"><i /><i /><i /><i /><b /></div>
-            <strong>{playhead >= 0 && listeningKind === 'song' ? ['心跳', '雨声', '铃花', '合唱'][songAct] : playhead >= 0 ? `第 ${playhead + 1} 拍` : showingDaily ? `${gardenScore.score} 分` : showingSong || showingRelay ? '你的花房' : '声波花房'}</strong>
-            <small>{playhead >= 0 ? `第 ${playhead + 1} 拍 · 正在开花` : `${plantedCount} / 8 颗声音`}</small>
+            <div className="echo-center-flower" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+              <i />
+              <b />
+            </div>
+            <strong>
+              {playhead >= 0 && listeningKind === 'song'
+                ? ['心跳', '雨声', '铃花', '合唱'][songAct]
+                : playhead >= 0
+                  ? `第 ${playhead + 1} 拍`
+                  : showingDaily
+                    ? `${gardenScore.score} 分`
+                    : showingSong || showingRelay
+                      ? '你的花房'
+                      : '声波花房'}
+            </strong>
+            <small>
+              {playhead >= 0 ? `第 ${playhead + 1} 拍 · 正在开花` : `${plantedCount} / 8 颗声音`}
+            </small>
           </div>
         </div>
-        <div className="echo-garden-caption"><span>↻</span> 一圈八拍 · 每个位置都会发声</div>
+        <div className="echo-garden-caption">
+          <span>↻</span> 一圈八拍 · 每个位置都会发声
+        </div>
       </section>
 
       <section className="echo-controls">
@@ -845,8 +1082,14 @@ function EchoGarden() {
           <>
             {phase === 'remix' && (
               <div className="echo-daily-scoreline">
-                <span>当前 <strong>{gardenScore.score}</strong> 分</span>
-                <span>{gardenScore.bonuses.length ? `已点亮 ${gardenScore.bonuses.length} 项组合` : '还没有组合奖励'}</span>
+                <span>
+                  当前 <strong>{gardenScore.score}</strong> 分
+                </span>
+                <span>
+                  {gardenScore.bonuses.length
+                    ? `已点亮 ${gardenScore.bonuses.length} 项组合`
+                    : '还没有组合奖励'}
+                </span>
               </div>
             )}
             <div className="echo-seed-tray" aria-label="声音种子">
@@ -862,22 +1105,36 @@ function EchoGarden() {
                     aria-pressed={selectedSeed === seed.kind && available}
                     aria-label={`${seed.name}：${seed.description}${available ? '' : '，尚未解锁'}`}
                   >
-                    <span>{available ? seed.icon : '·'}</span><strong>{seed.name}</strong>
+                    <span>{available ? seed.icon : '·'}</span>
+                    <strong>{seed.name}</strong>
                   </button>
                 )
               })}
             </div>
-            <p className="echo-notice" role="status">{notice}</p>
-            <button className="echo-main-button" type="button" onClick={phase === 'remix' ? playFullSong : listenToLetter}>
+            <p className="echo-notice" role="status">
+              {notice}
+            </p>
+            <button
+              className="echo-main-button"
+              type="button"
+              onClick={phase === 'remix' ? playFullSong : listenToLetter}
+            >
               {phase === 'remix' ? '播放这段旋律' : '放唱针 · 送出这封信'} <span>▶</span>
             </button>
             <div className="echo-control-row">
-              <button type="button" onClick={undoEdit} disabled={!undoDepth}>撤销一步</button>
-              {phase === 'remix' && <button type="button" onClick={finishRemix}>改好了</button>}
+              <button type="button" onClick={undoEdit} disabled={!undoDepth}>
+                撤销一步
+              </button>
+              {phase === 'remix' && (
+                <button type="button" onClick={finishRemix}>
+                  改好了
+                </button>
+              )}
             </div>
             {phase === 'remix' && hint && (
               <button className="echo-hint-button" type="button" onClick={applyHint}>
-                邮差的提示：第 {hint.index + 1} 拍换{hint.kind ? seedInfo(hint.kind).name : '留白'}，+{hint.gain} 分 <span>↗</span>
+                邮差的提示：第 {hint.index + 1} 拍换{hint.kind ? seedInfo(hint.kind).name : '留白'}
+                ，+{hint.gain} 分 <span>↗</span>
               </button>
             )}
           </>
@@ -885,114 +1142,362 @@ function EchoGarden() {
 
         {phase === 'daily-compose' && (
           <>
-            <div className="echo-daily-scoreline"><span>当前 <strong>{gardenScore.score}</strong> 分</span><span>{dailyBest ? `本地最佳 ${dailyBest} 分` : '组合越巧，花开越盛'}</span></div>
+            <div className="echo-daily-scoreline">
+              <span>
+                当前 <strong>{gardenScore.score}</strong> 分
+              </span>
+              <span>{dailyBest ? `本地最佳 ${dailyBest} 分` : '组合越巧，花开越盛'}</span>
+            </div>
             <div className="echo-seed-tray is-daily" aria-label="本回合的三颗声音种子">
               {allowedSeeds.map((kind) => {
                 const seed = seedInfo(kind)
-                return <button className={`echo-seed-card is-${kind}${selectedSeed === kind ? ' is-selected' : ''}`} key={kind} type="button" onClick={() => selectSeed(kind)} aria-pressed={selectedSeed === kind} aria-label={`${seed.name}：${seed.description}`}><span>{seed.icon}</span><strong>{seed.name}</strong></button>
+                return (
+                  <button
+                    className={`echo-seed-card is-${kind}${selectedSeed === kind ? ' is-selected' : ''}`}
+                    key={kind}
+                    type="button"
+                    onClick={() => selectSeed(kind)}
+                    aria-pressed={selectedSeed === kind}
+                    aria-label={`${seed.name}：${seed.description}`}
+                  >
+                    <span>{seed.icon}</span>
+                    <strong>{seed.name}</strong>
+                  </button>
+                )
               })}
             </div>
-            <p className="echo-notice" role="status">{notice}</p>
-            <button className="echo-daily-hint" type="button" onClick={openRules}>每颗 +10 · 查看组合与今日邮戳 ↗</button>
+            <p className="echo-notice" role="status">
+              {notice}
+            </p>
+            <button className="echo-daily-hint" type="button" onClick={openRules}>
+              每颗 +10 · 查看组合与今日邮戳 ↗
+            </button>
           </>
         )}
 
         {phase === 'relay' && (
           <>
-            <div className="echo-daily-scoreline"><span>原谱 <strong>{parentScore}</strong> 分</span><span>接力版 <strong>{gardenScore.score}</strong> 分</span></div>
-            <div className="echo-seed-tray" aria-label="接力改谱的声音种子">
-              {SEEDS.map((seed) => <button className={`echo-seed-card is-${seed.kind}${selectedSeed === seed.kind ? ' is-selected' : ''}`} key={seed.kind} type="button" onClick={() => selectSeed(seed.kind)} aria-pressed={selectedSeed === seed.kind} aria-label={`${seed.name}：${seed.description}`}><span>{seed.icon}</span><strong>{seed.name}</strong></button>)}
+            <div className="echo-daily-scoreline">
+              <span>
+                原谱 <strong>{parentScore}</strong> 分
+              </span>
+              <span>
+                接力版 <strong>{gardenScore.score}</strong> 分
+              </span>
             </div>
-            <p className="echo-notice" role="status">{notice}</p>
-            <button className="echo-main-button" type="button" onClick={finishRelay} disabled={relayEditedSlot === null}>听这一拍 · 完成接力 <span>▶</span></button>
+            <div className="echo-seed-tray" aria-label="接力改谱的声音种子">
+              {SEEDS.map((seed) => (
+                <button
+                  className={`echo-seed-card is-${seed.kind}${selectedSeed === seed.kind ? ' is-selected' : ''}`}
+                  key={seed.kind}
+                  type="button"
+                  onClick={() => selectSeed(seed.kind)}
+                  aria-pressed={selectedSeed === seed.kind}
+                  aria-label={`${seed.name}：${seed.description}`}
+                >
+                  <span>{seed.icon}</span>
+                  <strong>{seed.name}</strong>
+                </button>
+              ))}
+            </div>
+            <p className="echo-notice" role="status">
+              {notice}
+            </p>
+            <button
+              className="echo-main-button"
+              type="button"
+              onClick={finishRelay}
+              disabled={relayEditedSlot === null}
+            >
+              听这一拍 · 完成接力 <span>▶</span>
+            </button>
             {hint && (
               <button className="echo-hint-button" type="button" onClick={applyHint}>
-                邮差的提示：第 {hint.index + 1} 拍换{hint.kind ? seedInfo(hint.kind).name : '留白'}，可 +{hint.gain} 分 <span>↗</span>
+                邮差的提示：第 {hint.index + 1} 拍换{hint.kind ? seedInfo(hint.kind).name : '留白'}
+                ，可 +{hint.gain} 分 <span>↗</span>
               </button>
             )}
           </>
         )}
 
-        {phase === 'listening' && <div className="echo-listening-actions"><div className="echo-playing-caption"><span>♫</span> {audioUnavailable ? '正在静音走谱 · 设备暂不支持播放' : listeningKind === 'song' ? `第 ${songAct + 1} 段 · ${['心跳独奏', '雨声加入', '铃花点亮', '整座花房合唱'][songAct]}` : listeningKind === 'daily' ? `花谱正在生长 ${dailyLastGain}` : listeningKind === 'relay' ? '一拍之差，听听花房怎样回应……' : listeningKind === 'original' ? '正在听接力前的原谱……' : '唱针正沿着你的选择旅行……'}</div>{canSkipPlayback && <button className="echo-skip-button" type="button" onClick={skipPlayback}>跳过试听 ↗</button>}</div>}
+        {phase === 'listening' && (
+          <div className="echo-listening-actions">
+            <div className="echo-playing-caption">
+              <span>♫</span>{' '}
+              {audioUnavailable
+                ? '正在静音走谱 · 设备暂不支持播放'
+                : listeningKind === 'song'
+                  ? `第 ${songAct + 1} 段 · ${['心跳独奏', '雨声加入', '铃花点亮', '整座花房合唱'][songAct]}`
+                  : listeningKind === 'daily'
+                    ? `花谱正在生长 ${dailyLastGain}`
+                    : listeningKind === 'relay'
+                      ? '一拍之差，听听花房怎样回应……'
+                      : listeningKind === 'original'
+                        ? '正在听接力前的原谱……'
+                        : '唱针正沿着你的选择旅行……'}
+            </div>
+            {canSkipPlayback && (
+              <button className="echo-skip-button" type="button" onClick={skipPlayback}>
+                跳过试听 ↗
+              </button>
+            )}
+          </div>
+        )}
 
         {phase === 'delivered' && (
           <>
-            <p className="echo-notice is-success" role="status">{notice}</p>
-            <button className="echo-main-button" type="button" onClick={continueLetter}>打开下一封信 <span>↗</span></button>
+            <p className="echo-notice is-success" role="status">
+              {notice}
+            </p>
+            <button className="echo-main-button" type="button" onClick={continueLetter}>
+              打开下一封信 <span>↗</span>
+            </button>
           </>
         )}
 
         {isFinal && (
           <>
-            <p className="echo-song-code">谱子 <strong>{songCode}</strong></p>
+            <p className="echo-song-code">
+              谱子 <strong>{songCode}</strong>
+            </p>
             <div className="echo-final-actions">
-              <button className="echo-main-button" type="button" onClick={playFullSong}>回放我的花房 <span>▶</span></button>
+              <button className="echo-main-button" type="button" onClick={playFullSong}>
+                回放我的花房 <span>▶</span>
+              </button>
               <div>
-                {guestRelay && <button type="button" onClick={playOriginalSong}>听原谱 ▶</button>}
-                <button type="button" onClick={phase === 'guest' ? beginRelay : beginRemix}>{phase === 'guest' ? '接力改一拍' : '自由改谱'}</button>
-                <button type="button" onClick={collectSong} disabled={isCollected}>{isCollected ? '已收进收藏册' : '收进收藏册'}</button>
+                {guestRelay && (
+                  <button type="button" onClick={playOriginalSong}>
+                    听原谱 ▶
+                  </button>
+                )}
+                <button type="button" onClick={phase === 'guest' ? beginRelay : beginRemix}>
+                  {phase === 'guest' ? '接力改一拍' : '自由改谱'}
+                </button>
+                <button type="button" onClick={collectSong} disabled={isCollected}>
+                  {isCollected ? '已收进收藏册' : '收进收藏册'}
+                </button>
               </div>
               <div>
-                <button type="button" onClick={() => void copySong(guestRelay ? 'relay' : guestDaily ? 'daily' : 'song')}>寄给朋友 ↗</button>
-                <button type="button" onClick={goWelcome}>回到标题</button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void copySong(guestRelay ? 'relay' : guestDaily ? 'daily' : 'song')
+                  }
+                >
+                  寄给朋友 ↗
+                </button>
+                <button type="button" onClick={goWelcome}>
+                  回到标题
+                </button>
               </div>
             </div>
-            {shareNotice && <p className="echo-share-notice" role="status">{shareNotice}</p>}
-            {phase === 'guest' && <button className="echo-inline-button" type="button" onClick={sharedDateRef.current ? () => startDaily(sharedDateRef.current!, guestSavedDaily?.round === DAILY_ROUNDS) : startNewGarden}>{sharedDateRef.current ? guestSavedDaily && guestSavedDaily.round > 0 && guestSavedDaily.round < DAILY_ROUNDS ? `继续 ${sharedDateRef.current} 的花谱` : `挑战 ${sharedDateRef.current} 的每日花谱` : '自己也种一首'}</button>}
+            {shareNotice && (
+              <p className="echo-share-notice" role="status">
+                {shareNotice}
+              </p>
+            )}
+            {phase === 'guest' && (
+              <button
+                className="echo-inline-button"
+                type="button"
+                onClick={
+                  sharedDateRef.current
+                    ? () =>
+                        startDaily(sharedDateRef.current!, guestSavedDaily?.round === DAILY_ROUNDS)
+                    : startNewGarden
+                }
+              >
+                {sharedDateRef.current
+                  ? guestSavedDaily &&
+                    guestSavedDaily.round > 0 &&
+                    guestSavedDaily.round < DAILY_ROUNDS
+                    ? `继续 ${sharedDateRef.current} 的花谱`
+                    : `挑战 ${sharedDateRef.current} 的每日花谱`
+                  : '自己也种一首'}
+              </button>
+            )}
           </>
         )}
 
         {phase === 'daily-result' && (
           <>
-            <div className="echo-result-score"><span>本次得分</span><strong>{gardenScore.score}</strong><small>分 · 本地最佳 {dailyBest}</small></div>
-            <div className="echo-bonuses" aria-label="本次花谱的组合奖励">{gardenScore.bonuses.length ? gardenScore.bonuses.map((bonus) => <span key={bonus.label}>{bonus.label} +{bonus.points}</span>) : <span>试试让种子组成新的关系</span>}</div>
+            <div className="echo-result-score">
+              <span>本次得分</span>
+              <strong>{gardenScore.score}</strong>
+              <small>分 · 本地最佳 {dailyBest}</small>
+            </div>
+            <div className="echo-bonuses" aria-label="本次花谱的组合奖励">
+              {gardenScore.bonuses.length ? (
+                gardenScore.bonuses.map((bonus) => (
+                  <span key={bonus.label}>
+                    {bonus.label} +{bonus.points}
+                  </span>
+                ))
+              ) : (
+                <span>试试让种子组成新的关系</span>
+              )}
+            </div>
             <DailyTrail records={dailyRecords} streak={dailyStreakCount} />
-            <p className="echo-garden-caption">今天这副牌的上限约 {dailyCeiling} 分 · 距明天的新题还有 {countdownLabel(nextDailyMs)}</p>
-            <button className="echo-daily-hint" type="button" onClick={openRules}>看看每一项如何计分 ↗</button>
-            <div className="echo-final-actions"><button className="echo-main-button" type="button" onClick={() => void copySong('daily')}>分享比分 · 邀请同题 <span>↗</span></button><div><button type="button" onClick={playFullSong}>听完整花谱 ▶</button><button type="button" onClick={collectSong} disabled={isCollected}>{isCollected ? '已收进收藏册' : '收进收藏册'}</button></div><div><button type="button" onClick={() => startDaily(dailyDate, true)}>重种这一天</button><button type="button" onClick={goWelcome}>回到标题</button></div></div>
-            {shareNotice && <p className="echo-share-notice" role="status">{shareNotice}</p>}
+            <p className="echo-garden-caption">
+              今天这副牌的上限约 {dailyCeiling} 分 · 距明天的新题还有 {countdownLabel(nextDailyMs)}
+            </p>
+            <button className="echo-daily-hint" type="button" onClick={openRules}>
+              看看每一项如何计分 ↗
+            </button>
+            <div className="echo-final-actions">
+              <button
+                className="echo-main-button"
+                type="button"
+                onClick={() => void copySong('daily')}
+              >
+                分享比分 · 邀请同题 <span>↗</span>
+              </button>
+              <div>
+                <button type="button" onClick={playFullSong}>
+                  听完整花谱 ▶
+                </button>
+                <button type="button" onClick={collectSong} disabled={isCollected}>
+                  {isCollected ? '已收进收藏册' : '收进收藏册'}
+                </button>
+              </div>
+              <div>
+                <button type="button" onClick={() => startDaily(dailyDate, true)}>
+                  重种这一天
+                </button>
+                <button type="button" onClick={goWelcome}>
+                  回到标题
+                </button>
+              </div>
+            </div>
+            {shareNotice && (
+              <p className="echo-share-notice" role="status">
+                {shareNotice}
+              </p>
+            )}
           </>
         )}
 
         {phase === 'relay-result' && (
           <>
-            <p className="echo-relay-delta">原谱 {parentScore} 分 <span>→</span> 接力版 <strong>{gardenScore.score} 分</strong><small>{changedBeatCopy}</small></p>
-            <div className="echo-final-actions"><button className="echo-main-button" type="button" onClick={() => void copySong('relay')}>寄回朋友 · 继续接力 <span>↗</span></button><div><button type="button" onClick={playFullSong}>听完整花房 ▶</button><button type="button" onClick={() => setPhase('relay')}>再调这一拍</button></div></div>
-            {shareNotice && <p className="echo-share-notice" role="status">{shareNotice}</p>}
+            <p className="echo-relay-delta">
+              原谱 {parentScore} 分 <span>→</span> 接力版 <strong>{gardenScore.score} 分</strong>
+              <small>{changedBeatCopy}</small>
+            </p>
+            <div className="echo-final-actions">
+              <button
+                className="echo-main-button"
+                type="button"
+                onClick={() => void copySong('relay')}
+              >
+                寄回朋友 · 继续接力 <span>↗</span>
+              </button>
+              <div>
+                <button type="button" onClick={playFullSong}>
+                  听完整花房 ▶
+                </button>
+                <button type="button" onClick={() => setPhase('relay')}>
+                  再调这一拍
+                </button>
+              </div>
+            </div>
+            {shareNotice && (
+              <p className="echo-share-notice" role="status">
+                {shareNotice}
+              </p>
+            )}
           </>
         )}
-        {shareFallbackUrl && <input className="echo-share-fallback" aria-label="可手动复制的邀请链接" readOnly value={shareFallbackUrl} onFocus={(event) => event.currentTarget.select()} />}
+        {shareFallbackUrl && (
+          <input
+            className="echo-share-fallback"
+            aria-label="可手动复制的邀请链接"
+            readOnly
+            value={shareFallbackUrl}
+            onFocus={(event) => event.currentTarget.select()}
+          />
+        )}
       </section>
 
-      {showRules && <div className="echo-rules-backdrop" onClick={closeRules}>
-        <section className="echo-rules-dialog" role="dialog" aria-modal="true" aria-label="每日花谱计分规则" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => {
-          if (event.key !== 'Tab') return
-          if (event.shiftKey && document.activeElement === rulesCloseRef.current) {
-            event.preventDefault()
-            rulesActionRef.current?.focus()
-          } else if (!event.shiftKey && document.activeElement === rulesActionRef.current) {
-            event.preventDefault()
-            rulesCloseRef.current?.focus()
-          }
-        }}>
-          <button ref={rulesCloseRef} className="echo-rules-close" type="button" onClick={closeRules} aria-label="关闭计分规则">×</button>
-          <span className="echo-rules-kicker">HOW THE GARDEN GROWS</span>
-          <h2>花谱如何得分？</h2>
-          <p>六次选择只看最终唱片。声音的位置，比声音的数量更有趣。</p>
-          <ul>
-            <li><span>每颗种子</span><strong>+10</strong></li>
-            <li><span>两颗心跳相隔四格</span><strong>+30</strong></li>
-            <li><span>雨声落在两颗对置心跳之间的两段路上</span><strong>+25</strong></li>
-            <li><span>铃声顺时针下一格是回声</span><strong>+25</strong></li>
-            <li><span>四种声音都出现</span><strong>+20</strong></li>
-            <li><span>不同声音相邻，每对 +4，最多三对</span><strong>+12</strong></li>
-            <li><span>今日邮戳：第 {dailyPattern.featuredSlot + 1} 拍放{seedInfo(dailyPattern.featuredKind).name}</span><strong>+25</strong></li>
-            <li><span>今日留白：六颗种下后，第 {dailyPattern.quietSlot + 1} 拍仍为空</span><strong>+15</strong></li>
-          </ul>
-          <small>同类图案只奖励一次；唱片是圆的，第 8 格与第 1 格也相邻。</small>
-          <button ref={rulesActionRef} className="echo-main-button" type="button" onClick={closeRules}>知道啦，继续种歌 <span>↗</span></button>
-        </section>
-      </div>}
+      {showRules && (
+        <div className="echo-rules-backdrop" onClick={closeRules}>
+          <section
+            className="echo-rules-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="每日花谱计分规则"
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              if (event.key !== 'Tab') return
+              if (event.shiftKey && document.activeElement === rulesCloseRef.current) {
+                event.preventDefault()
+                rulesActionRef.current?.focus()
+              } else if (!event.shiftKey && document.activeElement === rulesActionRef.current) {
+                event.preventDefault()
+                rulesCloseRef.current?.focus()
+              }
+            }}
+          >
+            <button
+              ref={rulesCloseRef}
+              className="echo-rules-close"
+              type="button"
+              onClick={closeRules}
+              aria-label="关闭计分规则"
+            >
+              ×
+            </button>
+            <span className="echo-rules-kicker">HOW THE GARDEN GROWS</span>
+            <h2>花谱如何得分？</h2>
+            <p>六次选择只看最终唱片。声音的位置，比声音的数量更有趣。</p>
+            <ul>
+              <li>
+                <span>每颗种子</span>
+                <strong>+10</strong>
+              </li>
+              <li>
+                <span>两颗心跳相隔四格</span>
+                <strong>+30</strong>
+              </li>
+              <li>
+                <span>雨声落在两颗对置心跳之间的两段路上</span>
+                <strong>+25</strong>
+              </li>
+              <li>
+                <span>铃声顺时针下一格是回声</span>
+                <strong>+25</strong>
+              </li>
+              <li>
+                <span>四种声音都出现</span>
+                <strong>+20</strong>
+              </li>
+              <li>
+                <span>不同声音相邻，每对 +4，最多三对</span>
+                <strong>+12</strong>
+              </li>
+              <li>
+                <span>
+                  今日邮戳：第 {dailyPattern.featuredSlot + 1} 拍放
+                  {seedInfo(dailyPattern.featuredKind).name}
+                </span>
+                <strong>+25</strong>
+              </li>
+              <li>
+                <span>今日留白：六颗种下后，第 {dailyPattern.quietSlot + 1} 拍仍为空</span>
+                <strong>+15</strong>
+              </li>
+            </ul>
+            <small>同类图案只奖励一次；唱片是圆的，第 8 格与第 1 格也相邻。</small>
+            <button
+              ref={rulesActionRef}
+              className="echo-main-button"
+              type="button"
+              onClick={closeRules}
+            >
+              知道啦，继续种歌 <span>↗</span>
+            </button>
+          </section>
+        </div>
+      )}
     </main>
   )
 }

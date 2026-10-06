@@ -23,7 +23,8 @@ export function GameFeedback({
     <>
       {feedback.label && (
         <div className="feedback" key={`feedback-${feedback.id}`}>
-          <strong>{feedback.label}</strong>{streak > 1 && <span>×{streak}</span>}
+          <strong>{feedback.label}</strong>
+          {streak > 1 && <span>×{streak}</span>}
         </div>
       )}
       {noteFeedback && (
@@ -31,7 +32,8 @@ export function GameFeedback({
           className={`note-effect-toast note-effect-toast--${noteFeedback.kind}`}
           key={`note-effect-${noteFeedback.id}`}
         >
-          <strong>{noteFeedback.symbol}</strong><span>{noteFeedback.label}</span>
+          <strong>{noteFeedback.symbol}</strong>
+          <span>{noteFeedback.label}</span>
         </div>
       )}
       {paintEffectId > 0 && (

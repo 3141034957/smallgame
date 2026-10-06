@@ -2,8 +2,8 @@ import { useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { CHARACTERS, DEFAULT_CHARACTER_ID } from '@/features/shop/catalog'
 import type { Character } from '@/features/shop/catalog'
-import { getSelected, getUnlocks, saveSelected, saveUnlocks } from '@/features/shop/storage'
-import { getStarBalance, saveStarBalance } from '@/utils/starCurrency'
+import { buyCharacter, getSelected, getUnlocks, selectCharacter } from '@/features/shop/storage'
+import { getStarBalance } from '@/utils/starCurrency'
 import './index.less'
 
 function CharacterPreview({ character }: { character: Character }) {
@@ -57,30 +57,22 @@ function Shop() {
   )
 
   const handleBuy = (char: Character) => {
-    if (unlocks.includes(char.id)) {
-      saveSelected(char.id)
-      setSelected(char.id)
-      showMessage(`已切换至 ${char.name}`)
-      return
-    }
-    if (stars < char.price) {
-      showMessage(`星星不足！还需 ${char.price - stars} 颗`)
-      return
-    }
-    let newStars: number
     try {
-      newStars = saveStarBalance(stars - char.price)
-    } catch {
-      showMessage('暂时无法保存，请允许浏览器存储后重试。')
-      return
+      const owned = unlocks.includes(char.id)
+      const profile = owned ? selectCharacter(char.id) : buyCharacter(char.id)
+      setStars(profile.stars)
+      setUnlocks(profile.unlocks)
+      setSelected(profile.selected)
+      showMessage(owned ? `已切换至 ${char.name}` : `🎉 解锁 ${char.name}！`)
+    } catch (reason) {
+      showMessage(
+        reason instanceof DOMException
+          ? '暂时无法保存，请允许浏览器存储后重试。'
+          : reason instanceof Error
+            ? reason.message
+            : '暂时无法保存，请稍后重试。',
+      )
     }
-    setStars(newStars)
-    const newUnlocks = [...unlocks, char.id]
-    saveUnlocks(newUnlocks)
-    setUnlocks(newUnlocks)
-    saveSelected(char.id)
-    setSelected(char.id)
-    showMessage(`🎉 解锁 ${char.name}！`)
   }
 
   return (

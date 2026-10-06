@@ -13,31 +13,52 @@ export class MelodyAudio {
   async prepare(): Promise<boolean> {
     try {
       if (!this.context || this.context.state === 'closed') {
-        const Constructor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+        const Constructor =
+          window.AudioContext ||
+          (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
         if (!Constructor) return false
         this.context = new Constructor()
         this.master = this.context.createGain()
         this.master.gain.value = this.muted ? 0 : 0.45
         this.master.connect(this.context.destination)
-        this.noise = this.context.createBuffer(1, Math.ceil(this.context.sampleRate * 0.06), this.context.sampleRate)
+        this.noise = this.context.createBuffer(
+          1,
+          Math.ceil(this.context.sampleRate * 0.06),
+          this.context.sampleRate,
+        )
         const samples = this.noise.getChannelData(0)
         for (let index = 0; index < samples.length; index++) samples[index] = Math.random() * 2 - 1
       }
       if (this.context.state === 'suspended') {
         let timer: ReturnType<typeof setTimeout> | undefined
-        await Promise.race([this.context.resume(), new Promise<void>((resolve) => { timer = setTimeout(resolve, 1200) })])
+        await Promise.race([
+          this.context.resume(),
+          new Promise<void>((resolve) => {
+            timer = setTimeout(resolve, 1200)
+          }),
+        ])
         clearTimeout(timer)
       }
       return this.context.state === 'running'
-    } catch { return false }
+    } catch {
+      return false
+    }
   }
 
   setMuted(muted: boolean) {
     this.muted = muted
-    if (this.master && this.context) this.master.gain.setTargetAtTime(muted ? 0 : 0.45, this.context.currentTime, 0.02)
+    if (this.master && this.context)
+      this.master.gain.setTargetAtTime(muted ? 0 : 0.45, this.context.currentTime, 0.02)
   }
 
-  private tone(midi: number, when: number, duration: number, volume: number, type: OscillatorType = 'sine', endFrequency?: number) {
+  private tone(
+    midi: number,
+    when: number,
+    duration: number,
+    volume: number,
+    type: OscillatorType = 'sine',
+    endFrequency?: number,
+  ) {
     const context = this.context
     if (!context || !this.master || context.state !== 'running') return
     const source = context.createOscillator()
@@ -52,7 +73,10 @@ export class MelodyAudio {
     gain.connect(this.master)
     const voice = { source, nodes: [source, gain] }
     this.voices.add(voice)
-    source.onended = () => { this.voices.delete(voice); voice.nodes.forEach((node) => node.disconnect()) }
+    source.onended = () => {
+      this.voices.delete(voice)
+      voice.nodes.forEach((node) => node.disconnect())
+    }
     source.start(when)
     source.stop(when + duration + 0.02)
   }
@@ -77,7 +101,12 @@ export class MelodyAudio {
   accompany(beat: number, delay: number, songIndex: number) {
     if (!this.context || this.context.state !== 'running') return
     const when = this.context.currentTime + Math.max(0.005, delay)
-    const chords = [[48, 52, 55], [45, 48, 52], [41, 45, 48], [43, 47, 50]]
+    const chords = [
+      [48, 52, 55],
+      [45, 48, 52],
+      [41, 45, 48],
+      [43, 47, 50],
+    ]
     if (beat % 4 === 0) {
       const chord = chords[(Math.floor(beat / 4) + songIndex) % 4]
       chord.forEach((midi) => this.tone(midi, when, 1.7, 0.027, 'triangle'))
@@ -89,7 +118,11 @@ export class MelodyAudio {
   stop() {
     for (const voice of this.voices) {
       voice.source.onended = null
-      try { voice.source.stop() } catch { /* Already ended. */ }
+      try {
+        voice.source.stop()
+      } catch {
+        /* Already ended. */
+      }
       voice.nodes.forEach((node) => node.disconnect())
     }
     this.voices.clear()

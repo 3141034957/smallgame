@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, rmSync, existsSync, realpathSync } from 'node:fs'
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  copyFileSync,
+  rmSync,
+  existsSync,
+  realpathSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -8,10 +17,14 @@ import { spawnSync } from 'node:child_process'
 // touches /etc, invokes real sudo, opens ports or changes the host services.
 function runService(action = 'install', mode = '', supervisor = 'systemd') {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'smallgame-service-')))
-  const bin = join(root, 'bin'), log = join(root, 'calls')
+  const bin = join(root, 'bin'),
+    log = join(root, 'calls')
   for (const folder of ['bin', 'scripts', 'server']) mkdirSync(join(root, folder))
   copyFileSync(new URL('./game-service.sh', import.meta.url), join(root, 'scripts/game-service.sh'))
-  copyFileSync(new URL('./game-service-daemon.sh', import.meta.url), join(root, 'scripts/game-service-daemon.sh'))
+  copyFileSync(
+    new URL('./game-service-daemon.sh', import.meta.url),
+    join(root, 'scripts/game-service-daemon.sh'),
+  )
   writeFileSync(join(root, 'package-lock.json'), '{}')
   writeFileSync(join(root, 'server/index.mjs'), '')
   writeFileSync(join(root, 'hold'), '')
@@ -20,18 +33,27 @@ function runService(action = 'install', mode = '', supervisor = 'systemd') {
     writeFileSync(join(root, 'dist/client/index.html'), '<html></html>')
   }
   writeFileSync(log, '')
-  const command = (name, script) => writeFileSync(join(bin, name), '#!/bin/bash\nset -eu\n' + script, { mode: 0o755 })
+  const command = (name, script) =>
+    writeFileSync(join(bin, name), '#!/bin/bash\nset -eu\n' + script, { mode: 0o755 })
   command('uname', 'echo Linux\n')
   command('id', 'if [[ "$1" == -u ]]; then echo 1000; else echo ubuntu; fi\n')
   // macOS readlink does not consistently provide -f; our fixture paths have no links.
   command('readlink', 'echo "$2"\n')
   // In daemon mode the watchdog expects a long-lived server process. Block on a
   // real command so the shortened `sleep` double cannot end it prematurely.
-  command('node', 'case "$1" in *server/index.mjs) exec tail -f "$SERVICE_TEST_ROOT/hold" ;; esac\n')
-  command('crontab', `printf 'crontab %s\\n' "$*" >> "$SERVICE_TEST_ROOT/calls"\ncat > "$SERVICE_TEST_ROOT/crontab"\n`)
+  command(
+    'node',
+    'case "$1" in *server/index.mjs) exec tail -f "$SERVICE_TEST_ROOT/hold" ;; esac\n',
+  )
+  command(
+    'crontab',
+    `printf 'crontab %s\\n' "$*" >> "$SERVICE_TEST_ROOT/calls"\ncat > "$SERVICE_TEST_ROOT/crontab"\n`,
+  )
   command('ss', 'exit 89\n')
   command('systemctl', 'exit 89\n')
-  command('sudo', `printf 'sudo %s\n' "$*" >> "$SERVICE_TEST_ROOT/calls"
+  command(
+    'sudo',
+    `printf 'sudo %s\n' "$*" >> "$SERVICE_TEST_ROOT/calls"
 case "$1" in
   -v) exit 0 ;;
   ss) if [[ "$SERVICE_TEST_MODE" == busy ]]; then echo 'LISTEN 0 511 0.0.0.0:80 users:node'; fi ;;
@@ -47,37 +69,72 @@ case "$1" in
     esac ;;
   *) exit 88 ;;
 esac
-`)
-  command('npm', `printf 'npm %s\n' "$*" >> "$SERVICE_TEST_ROOT/calls"
+`,
+  )
+  command(
+    'npm',
+    `printf 'npm %s\n' "$*" >> "$SERVICE_TEST_ROOT/calls"
 if [[ "$*" == test && "$SERVICE_TEST_MODE" == test-fails ]]; then exit 1; fi
 if [[ "$*" == 'run build' ]]; then mkdir -p dist/client; echo '<html></html>' > dist/client/index.html; fi
-`)
-  command('systemd-analyze', `printf 'verify\n' >> "$SERVICE_TEST_ROOT/calls"
+`,
+  )
+  command(
+    'systemd-analyze',
+    `printf 'verify\n' >> "$SERVICE_TEST_ROOT/calls"
 [[ -s "$2" ]]
-`)
-  command('curl', `printf 'curl %s\n' "$*" >> "$SERVICE_TEST_ROOT/calls"
+`,
+  )
+  command(
+    'curl',
+    `printf 'curl %s\n' "$*" >> "$SERVICE_TEST_ROOT/calls"
 if [[ "$SERVICE_TEST_MODE" == unhealthy ]]; then exit 1; fi
 if [[ "$SERVICE_TEST_MODE" == api-fails && "$*" == *api/farm/leaderboard* ]]; then exit 1; fi
-`)
+`,
+  )
   command('sleep', '/bin/sleep 0.02\n')
   try {
     const result = spawnSync('bash', [join(root, 'scripts/game-service.sh'), action], {
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, SERVICE_TEST_ROOT: root, SERVICE_TEST_MODE: mode, GAME_SUPERVISOR: supervisor },
-      encoding: 'utf8', timeout: 30000,
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        SERVICE_TEST_ROOT: root,
+        SERVICE_TEST_MODE: mode,
+        GAME_SUPERVISOR: supervisor,
+      },
+      encoding: 'utf8',
+      timeout: 30000,
     })
     const runtime = join(root, '.service')
     const pidFile = (name) => join(runtime, name)
     const state = {
       runtime: existsSync(runtime),
-      daemon: existsSync(pidFile('daemon.pid')) ? readFileSync(pidFile('daemon.pid'), 'utf8').trim() : '',
-      server: existsSync(pidFile('server.pid')) ? readFileSync(pidFile('server.pid'), 'utf8').trim() : '',
+      daemon: existsSync(pidFile('daemon.pid'))
+        ? readFileSync(pidFile('daemon.pid'), 'utf8').trim()
+        : '',
+      server: existsSync(pidFile('server.pid'))
+        ? readFileSync(pidFile('server.pid'), 'utf8').trim()
+        : '',
     }
     // The watchdog and its server outlive this call; stop both before cleanup.
     for (const pid of [state.daemon, state.server]) {
-      if (pid) { try { process.kill(Number(pid), 'SIGKILL') } catch { /* already gone */ } }
+      if (pid) {
+        try {
+          process.kill(Number(pid), 'SIGKILL')
+        } catch {
+          /* already gone */
+        }
+      }
     }
-    return { ...result, calls: readFileSync(log, 'utf8'), unit: existsSync(join(root, 'unit')) ? readFileSync(join(root, 'unit'), 'utf8') : '', root, state }
-  } finally { rmSync(root, { recursive: true, force: true }) }
+    return {
+      ...result,
+      calls: readFileSync(log, 'utf8'),
+      unit: existsSync(join(root, 'unit')) ? readFileSync(join(root, 'unit'), 'utf8') : '',
+      root,
+      state,
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 }
 
 describe('server service installation workflow', () => {
@@ -87,7 +144,9 @@ describe('server service installation workflow', () => {
     expect(result.calls).toContain('npm ci\nnpm test\nnpm run lint\nnpm run build\nverify\n')
     expect(result.calls.indexOf('npm run build')).toBeLessThan(result.calls.indexOf('sudo install'))
     expect(result.unit).toContain(`WorkingDirectory=${result.root}`)
-    expect(result.unit).toContain(`ExecStart=${result.root}/bin/node ${result.root}/server/index.mjs`)
+    expect(result.unit).toContain(
+      `ExecStart=${result.root}/bin/node ${result.root}/server/index.mjs`,
+    )
     expect(result.unit).toContain('User=ubuntu')
     expect(result.unit).toContain('Environment=PORT=80')
     expect(result.unit).toContain('AmbientCapabilities=CAP_NET_BIND_SERVICE')

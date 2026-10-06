@@ -48,18 +48,18 @@ const SPEED_STEP_INTERVAL = 10
 const SPEED_STEP_AMOUNT = 0.05
 const MAX_PROGRESSION_SPEED = 1.7
 const ROUTE_PATTERN = [
-  -0.38, 0.38, -0.46, 0.46,
-  -0.52, -0.18, 0.18, 0.52,
-  0.44, 0.34, -0.28, -0.48,
-  0, 0.56, 0, -0.56,
+  -0.38, 0.38, -0.46, 0.46, -0.52, -0.18, 0.18, 0.52, 0.44, 0.34, -0.28, -0.48, 0, 0.56, 0, -0.56,
 ]
 const EASY_ROUTE_PATTERN = [0, 0.28, -0.25, 0.42, -0.38, 0.55, -0.5]
 
-export const NOTE_EFFECTS: Record<NoteKind, {
-  symbol: string
-  label: string
-  effect: TempoEffect | 'shake' | 'paint'
-}> = {
+export const NOTE_EFFECTS: Record<
+  NoteKind,
+  {
+    symbol: string
+    label: string
+    effect: TempoEffect | 'shake' | 'paint'
+  }
+> = {
   quarter: { symbol: '♩', label: '加速 · 5秒', effect: 'speed-up' },
   eighth: { symbol: '♪', label: '减速 · 5秒', effect: 'slow-down' },
   'double-eighth': { symbol: '♫', label: '机械震荡 · 0.7秒', effect: 'shake' },
@@ -74,12 +74,14 @@ export const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value))
 
 export function createPlatforms(random = Math.random): Platform[] {
-  const items: Platform[] = [{
-    id: 0,
-    x: 0,
-    width: 0.92,
-    reward: 1,
-  }]
+  const items: Platform[] = [
+    {
+      id: 0,
+      x: 0,
+      width: 0.92,
+      reward: 1,
+    },
+  ]
   let previousX = 0
 
   for (let id = 1; id < 80; id += 1) {
@@ -103,11 +105,7 @@ export function ensurePlatformsThrough(
   }
 }
 
-export function createPlatform(
-  id: number,
-  previousX: number,
-  random = Math.random,
-): Platform {
+export function createPlatform(id: number, previousX: number, random = Math.random): Platform {
   const easyStart = id <= 6
   const hasStar = id % 6 === 0
   const x = easyStart
@@ -127,9 +125,10 @@ export function createPlatform(
     width: easyStart ? 0.88 : 0.66 + ((id * 17) % 21) / 100,
     reward,
     treat: hasStar ? 'star' : undefined,
-    note: !hasStar && reward === 1 && random() < 0.1
-      ? NOTE_KINDS[Math.floor(random() * NOTE_KINDS.length)]
-      : undefined,
+    note:
+      !hasStar && reward === 1 && random() < 0.1
+        ? NOTE_KINDS[Math.floor(random() * NOTE_KINDS.length)]
+        : undefined,
   }
 }
 

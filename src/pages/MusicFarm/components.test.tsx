@@ -15,8 +15,8 @@ import { loadFarmCareer } from '@/features/farm/stats'
 import { farmQuests, loadFarmQuests } from '@/features/farm/quests'
 import { createFarm, MAX_GEAR_LEVEL, TALENTS } from '@/features/farm/rules.mjs'
 
-// The project has no DOM test environment, so this renders the screens once
-// with react-dom/server to catch crashes and missing copy in the new panels.
+// SSR catches missing copy without running effects; the *.dom.test.tsx suites
+// also mount the real screens and exercise lifecycle and player interactions.
 beforeAll(() => {
   const data = new Map<string, string>()
   const storage = {

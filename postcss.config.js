@@ -1,9 +1,11 @@
 // postcss-mobile-forever 配置
 // 将 px 自动转换为 vw/vh 单位，实现移动端适配
 // 设计稿宽度：375px (iPhone 标准)
+import mobileForever from 'postcss-mobile-forever'
+
 export default {
-  plugins: {
-    'postcss-mobile-forever': {
+  plugins: [
+    mobileForever({
       // 设计稿宽度（px）
       viewportWidth: 375,
       // PC 端保持 375px 的移动版心，不再继续按视口放大
@@ -17,6 +19,16 @@ export default {
       selectorBlackList: ['.norem'],
       // 根元素字体大小不转换
       rootContainingBlockSelectorList: ['html'],
+    }),
+    {
+      // Generated viewport rules need an importer for Vite's asset resolver.
+      postcssPlugin: 'mobile-generated-rule-source',
+      OnceExit(root) {
+        root.walk((node) => {
+          if (node.source) return
+          node.source = node.parent?.source ?? root.source
+        })
+      },
     },
-  },
+  ],
 }

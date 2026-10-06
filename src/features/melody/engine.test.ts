@@ -1,24 +1,51 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DIFFICULTIES, SONGS, advanceRun, blankPattern, decodePattern, emptyProgress, emptyRun,
-  encodePattern, hitNote, makeChart, parseProgress, presetPattern, runStars, saveRun, totalStars,
+  DIFFICULTIES,
+  SONGS,
+  advanceRun,
+  blankPattern,
+  decodePattern,
+  emptyProgress,
+  emptyRun,
+  encodePattern,
+  hitNote,
+  makeChart,
+  parseProgress,
+  presetPattern,
+  runStars,
+  saveRun,
+  totalStars,
 } from './engine'
 import type { MelodyNote } from './engine'
 
 describe('playable music charts', () => {
   it('keeps invitations deterministic and all notes inside the playable duration', () => {
-    for (const song of SONGS) for (const difficulty of DIFFICULTIES) {
-      const notes = makeChart(song, difficulty.id)
-      expect(notes).toEqual(makeChart(song, difficulty.id))
-      expect(notes.length).toBeGreaterThan(10)
-      expect(notes.map((note) => note.id)).toEqual(notes.map((_, index) => index))
-      expect(notes.every((note, index) => note.lane >= 0 && note.lane < 4 && note.time >= 4 * 60 / song.bpm && note.time + 0.22 < song.beats * 60 / song.bpm && (index === 0 || note.time >= notes[index - 1].time))).toBe(true)
-      for (const lane of [0, 1, 2, 3]) {
-        const laneNotes = notes.filter((note) => note.lane === lane)
-        expect(laneNotes.length).toBeGreaterThan(0)
-        expect(laneNotes.every((note, index) => index === 0 || note.time - laneNotes[index - 1].time > 0.22)).toBe(true)
+    for (const song of SONGS)
+      for (const difficulty of DIFFICULTIES) {
+        const notes = makeChart(song, difficulty.id)
+        expect(notes).toEqual(makeChart(song, difficulty.id))
+        expect(notes.length).toBeGreaterThan(10)
+        expect(notes.map((note) => note.id)).toEqual(notes.map((_, index) => index))
+        expect(
+          notes.every(
+            (note, index) =>
+              note.lane >= 0 &&
+              note.lane < 4 &&
+              note.time >= (4 * 60) / song.bpm &&
+              note.time + 0.22 < (song.beats * 60) / song.bpm &&
+              (index === 0 || note.time >= notes[index - 1].time),
+          ),
+        ).toBe(true)
+        for (const lane of [0, 1, 2, 3]) {
+          const laneNotes = notes.filter((note) => note.lane === lane)
+          expect(laneNotes.length).toBeGreaterThan(0)
+          expect(
+            laneNotes.every(
+              (note, index) => index === 0 || note.time - laneNotes[index - 1].time > 0.22,
+            ),
+          ).toBe(true)
+        }
       }
-    }
   })
 
   it('introduces more notes and simultaneous lanes only in the party mode', () => {
@@ -33,7 +60,11 @@ describe('playable music charts', () => {
 })
 
 describe('rhythm judgement', () => {
-  const notes: MelodyNote[] = [{ id: 0, lane: 0, time: 2, midi: 48 }, { id: 1, lane: 1, time: 2, midi: 72 }, { id: 2, lane: 0, time: 3, midi: 48 }]
+  const notes: MelodyNote[] = [
+    { id: 0, lane: 0, time: 2, midi: 48 },
+    { id: 1, lane: 1, time: 2, midi: 72 },
+    { id: 2, lane: 0, time: 3, midi: 48 },
+  ]
 
   it('judges separate simultaneous notes and prevents scoring a note twice', () => {
     const first = hitNote(emptyRun(), notes, 0, 2.02)
@@ -64,7 +95,10 @@ describe('rhythm judgement', () => {
   it('does not award an early or late press and chooses the nearest available note', () => {
     expect(hitNote(emptyRun(), notes, 0, 1.77).note).toBeNull()
     expect(hitNote(emptyRun(), notes, 0, 2.23).note).toBeNull()
-    const nearby: MelodyNote[] = [{ id: 0, lane: 0, time: 1, midi: 48 }, { id: 1, lane: 0, time: 1.3, midi: 48 }]
+    const nearby: MelodyNote[] = [
+      { id: 0, lane: 0, time: 1, midi: 48 },
+      { id: 1, lane: 0, time: 1.3, midi: 48 },
+    ]
     expect(hitNote(emptyRun(), nearby, 0, 1.19).note?.id).toBe(1)
   })
 
@@ -110,8 +144,21 @@ describe('small songs and local progress', () => {
   it('recovers safely from malformed progress and rejects fake or out-of-range records', () => {
     expect(parseProgress('broken')).toEqual(emptyProgress())
     expect(parseProgress('null')).toEqual(emptyProgress())
-    expect(parseProgress(JSON.stringify({ offset: 400, lastMix: 'bad', records: { 'strawberry:cozy': { score: -1, stars: 99 }, other: { score: 3, stars: 3 } } }))).toEqual(emptyProgress())
-    const progress = { ...emptyProgress(), offset: -70, lastMix: encodePattern(presetPattern(0)), records: { 'cloud:party': { score: 3000, stars: 2 } } }
+    expect(
+      parseProgress(
+        JSON.stringify({
+          offset: 400,
+          lastMix: 'bad',
+          records: { 'strawberry:cozy': { score: -1, stars: 99 }, other: { score: 3, stars: 3 } },
+        }),
+      ),
+    ).toEqual(emptyProgress())
+    const progress = {
+      ...emptyProgress(),
+      offset: -70,
+      lastMix: encodePattern(presetPattern(0)),
+      records: { 'cloud:party': { score: 3000, stars: 2 } },
+    }
     expect(parseProgress(JSON.stringify(progress))).toEqual(progress)
   })
 })

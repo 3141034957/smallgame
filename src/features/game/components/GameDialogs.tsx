@@ -28,14 +28,19 @@ export function ResultDialog({
   const remainingRevives = Math.max(0, maxRevives - reviveCount)
 
   return (
-    <div className={`game-overlay game-overlay--${mode}`} onPointerDown={(event) => event.stopPropagation()}>
+    <div
+      className={`game-overlay game-overlay--${mode}`}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
       <div className="overlay-card">
         {mode === 'paused' ? (
           <>
             <span className="pause-paw">🐾</span>
             <h2>休息一下</h2>
             <p>小小巡检员正在平台上等你</p>
-            <button className="primary-button" type="button" onClick={onResume}>继续游戏</button>
+            <button className="primary-button" type="button" onClick={onResume}>
+              继续游戏
+            </button>
           </>
         ) : (
           <>
@@ -45,11 +50,18 @@ export function ResultDialog({
               onClick={onShare}
               aria-label="复制当前网页链接"
             >
-              {shareStatus === 'copied' ? '已复制' : shareStatus === 'failed' ? '复制失败' : '↗ 分享'}
+              {shareStatus === 'copied'
+                ? '已复制'
+                : shareStatus === 'failed'
+                  ? '复制失败'
+                  : '↗ 分享'}
             </button>
             <span className="eyebrow">GOOD TRY!</span>
             <h2>差一点点</h2>
-            <div className="result-score"><span>本次得分</span><strong>{formatScore(score)}</strong></div>
+            <div className="result-score">
+              <span>本次得分</span>
+              <strong>{formatScore(score)}</strong>
+            </div>
             <div className="result-best">最佳记录 {formatScore(best)}</div>
             <p className="revive-notice">
               {remainingRevives > 0
@@ -64,7 +76,9 @@ export function ResultDialog({
             >
               {remainingRevives > 0 ? '看广告免费复活' : '复活次数已达上限'}
             </button>
-            <button className="text-button" type="button" onClick={onReturnHome}>返回主页</button>
+            <button className="text-button" type="button" onClick={onReturnHome}>
+              返回主页
+            </button>
           </>
         )}
       </div>
@@ -106,7 +120,9 @@ export function NicknameDialog({ value, onChange, onSave, onCancel }: NicknameDi
         <button className="primary-button" type="button" onClick={onSave} disabled={!value.trim()}>
           保存并返回主页
         </button>
-        <button className="text-button" type="button" onClick={onCancel}>暂不返回</button>
+        <button className="text-button" type="button" onClick={onCancel}>
+          暂不返回
+        </button>
       </div>
     </div>
   )
@@ -130,9 +146,13 @@ export function AdDialog({
           <p>观看广告获取免费复活机会</p>
           <small>广告还有 {countdown} 秒</small>
         </div>
-        <div className="ad-countdown-bar"><i style={{ width: `${(countdown / 10) * 100}%` }} /></div>
+        <div className="ad-countdown-bar">
+          <i style={{ width: `${(countdown / 10) * 100}%` }} />
+        </div>
         {canSkip ? (
-          <button className="ad-skip-button" type="button" onClick={onSkip}>跳过广告</button>
+          <button className="ad-skip-button" type="button" onClick={onSkip}>
+            跳过广告
+          </button>
         ) : (
           <span className="ad-skip-hint">剩余 {countdown - 7}s 后可跳过</span>
         )}

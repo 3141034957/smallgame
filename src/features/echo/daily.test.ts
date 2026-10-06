@@ -20,16 +20,24 @@ function boardWith(...slots: [number, SeedKind][]): Board {
 
 describe('daily offers', () => {
   it('offers three distinct seeds per round and shows all four over six rounds', () => {
-    const rounds = Array.from({ length: DAILY_ROUNDS }, (_, index) => getDailyOffers('2026-09-24', index))
+    const rounds = Array.from({ length: DAILY_ROUNDS }, (_, index) =>
+      getDailyOffers('2026-09-24', index),
+    )
     expect(DAILY_ROUNDS).toBe(6)
     expect(rounds.every((offers) => offers.length === 3 && new Set(offers).size === 3)).toBe(true)
     expect(new Set(rounds.flat())).toEqual(new Set(['heart', 'rain', 'bell', 'echo']))
   })
 
   it('is stable for the same date and changes between adjacent dates', () => {
-    const firstDay = Array.from({ length: DAILY_ROUNDS }, (_, index) => getDailyOffers('2026-09-24', index))
-    const firstDayAgain = Array.from({ length: DAILY_ROUNDS }, (_, index) => getDailyOffers('2026-09-24', index))
-    const nextDay = Array.from({ length: DAILY_ROUNDS }, (_, index) => getDailyOffers('2026-09-25', index))
+    const firstDay = Array.from({ length: DAILY_ROUNDS }, (_, index) =>
+      getDailyOffers('2026-09-24', index),
+    )
+    const firstDayAgain = Array.from({ length: DAILY_ROUNDS }, (_, index) =>
+      getDailyOffers('2026-09-24', index),
+    )
+    const nextDay = Array.from({ length: DAILY_ROUNDS }, (_, index) =>
+      getDailyOffers('2026-09-25', index),
+    )
     expect(firstDayAgain).toEqual(firstDay)
     expect(nextDay).not.toEqual(firstDay)
   })
@@ -89,25 +97,38 @@ describe('daily score', () => {
 
   it('awards the quiet beat only after all six seeds are planted', () => {
     const { featuredSlot, featuredKind, quietSlot } = getDailyPattern(date)
-    const slots = [featuredSlot, ...Array.from({ length: 8 }, (_, index) => index)
-      .filter((index) => index !== featuredSlot && index !== quietSlot)].slice(0, DAILY_ROUNDS)
+    const slots = [
+      featuredSlot,
+      ...Array.from({ length: 8 }, (_, index) => index).filter(
+        (index) => index !== featuredSlot && index !== quietSlot,
+      ),
+    ].slice(0, DAILY_ROUNDS)
     const complete = emptyBoard()
     for (const slot of slots) complete[slot] = slot === featuredSlot ? featuredKind : 'heart'
     const partial = [...complete]
     partial[slots[1]] = null
 
-    expect(scoreDailyGarden(partial, date).bonuses.some((bonus) => bonus.label.startsWith('今日留白'))).toBe(false)
+    expect(
+      scoreDailyGarden(partial, date).bonuses.some((bonus) => bonus.label.startsWith('今日留白')),
+    ).toBe(false)
     const scored = scoreDailyGarden(complete, date)
     expect(scored.score).toBe(scoreGarden(complete).score + 40)
-    expect(scored.bonuses).toContainEqual({ label: `今日留白 · 第 ${quietSlot + 1} 拍`, points: 15 })
+    expect(scored.bonuses).toContainEqual({
+      label: `今日留白 · 第 ${quietSlot + 1} 拍`,
+      points: 15,
+    })
   })
 
   it('does not award the quiet beat when its specified slot is occupied', () => {
     const { quietSlot } = getDailyPattern(date)
-    const slots = [quietSlot, ...Array.from({ length: 8 }, (_, index) => index)
-      .filter((index) => index !== quietSlot)].slice(0, DAILY_ROUNDS)
+    const slots = [
+      quietSlot,
+      ...Array.from({ length: 8 }, (_, index) => index).filter((index) => index !== quietSlot),
+    ].slice(0, DAILY_ROUNDS)
     const board = boardWith(...slots.map((slot): [number, SeedKind] => [slot, 'heart']))
-    expect(scoreDailyGarden(board, date).bonuses.some((bonus) => bonus.label.startsWith('今日留白'))).toBe(false)
+    expect(
+      scoreDailyGarden(board, date).bonuses.some((bonus) => bonus.label.startsWith('今日留白')),
+    ).toBe(false)
   })
 })
 
@@ -119,7 +140,12 @@ describe('garden score', () => {
 
   it('awards each named composition bonus once for a six-seed complete song', () => {
     const garden = boardWith(
-      [0, 'heart'], [1, 'rain'], [2, 'bell'], [3, 'echo'], [4, 'heart'], [5, 'rain'],
+      [0, 'heart'],
+      [1, 'rain'],
+      [2, 'bell'],
+      [3, 'echo'],
+      [4, 'heart'],
+      [5, 'rain'],
     )
     expect(scoreGarden(garden)).toEqual({
       score: 172,
@@ -135,7 +161,12 @@ describe('garden score', () => {
 
   it('does not grant rain or echo bonuses for misplaced seeds', () => {
     const garden = boardWith(
-      [0, 'heart'], [1, 'rain'], [2, 'bell'], [3, 'rain'], [4, 'heart'], [7, 'echo'],
+      [0, 'heart'],
+      [1, 'rain'],
+      [2, 'bell'],
+      [3, 'rain'],
+      [4, 'heart'],
+      [7, 'echo'],
     )
     const labels = scoreGarden(garden).bonuses.map(({ label }) => label)
     expect(labels).toContain('对置心跳')
@@ -172,7 +203,9 @@ describe('nightly pick', () => {
       for (let chapter = 0; chapter < CHAPTERS.length; chapter += 1) {
         expect(evaluateStoryChapter(board, chapter).complete).toBe(true)
       }
-      expect(scoreGarden(board).score).toBeGreaterThanOrEqual(scoreGarden(getNightlyPick('2026-09-01')).score - 40)
+      expect(scoreGarden(board).score).toBeGreaterThanOrEqual(
+        scoreGarden(getNightlyPick('2026-09-01')).score - 40,
+      )
     }
     expect(seen.size).toBeGreaterThan(12)
   })
@@ -235,8 +268,14 @@ describe('garden hint', () => {
 
   it('returns nothing when the record cannot be improved in one beat', () => {
     const full = boardWith(
-      [0, 'heart'], [1, 'rain'], [2, 'bell'], [3, 'echo'],
-      [4, 'heart'], [5, 'rain'], [6, 'bell'], [7, 'echo'],
+      [0, 'heart'],
+      [1, 'rain'],
+      [2, 'bell'],
+      [3, 'echo'],
+      [4, 'heart'],
+      [5, 'rain'],
+      [6, 'bell'],
+      [7, 'echo'],
     )
     expect(suggestNextMove(full)).toBeNull()
     expect(suggestNextMove(full, { kinds: ['heart'] })).toBeNull()

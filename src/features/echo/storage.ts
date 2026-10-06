@@ -72,10 +72,12 @@ export function shiftDate(date: string, days: number): string {
 function isSavedSong(value: unknown): value is SavedSong {
   if (!value || typeof value !== 'object') return false
   const song = value as Partial<SavedSong>
-  return typeof song.code === 'string'
-    && typeof song.title === 'string'
-    && typeof song.savedAt === 'number'
-    && decodeBoard(song.code) !== null
+  return (
+    typeof song.code === 'string' &&
+    typeof song.title === 'string' &&
+    typeof song.savedAt === 'number' &&
+    decodeBoard(song.code) !== null
+  )
 }
 
 /** Songs are kept newest first, and the very first one adopts the legacy slot. */
@@ -114,7 +116,12 @@ function nextSongTitle(songs: SavedSong[]): string {
   return `花房 ${highest + 1}`
 }
 
-export function saveToCollection(board: Board): { collection: SavedSong[]; title: string; added: boolean; dropped: number } {
+export function saveToCollection(board: Board): {
+  collection: SavedSong[]
+  title: string
+  added: boolean
+  dropped: number
+} {
   const code = encodeBoard(board)
   const current = readCollection()
   const existing = current.find((song) => song.code === code)
@@ -135,7 +142,9 @@ export function renameSong(code: string, title: string): SavedSong[] {
   const current = readCollection()
   const target = current.find((song) => song.code === code)
   if (!target || !trimmed || trimmed === target.title) return current
-  return writeCollection(current.map((song) => song.code === code ? { ...song, title: trimmed } : song))
+  return writeCollection(
+    current.map((song) => (song.code === code ? { ...song, title: trimmed } : song)),
+  )
 }
 
 export function readSkin(): EchoSkin {
@@ -159,7 +168,8 @@ export function readStoryProgress(): StoryProgress | null {
   if (!raw) return null
   try {
     const parsed: unknown = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object' || !('code' in parsed) || !('chapter' in parsed)) return null
+    if (!parsed || typeof parsed !== 'object' || !('code' in parsed) || !('chapter' in parsed))
+      return null
     const { code, chapter } = parsed as { code: unknown; chapter: unknown }
     if (typeof code !== 'string' || typeof chapter !== 'number') return null
     if (!Number.isInteger(chapter) || chapter < 0 || chapter >= CHAPTERS.length) return null
@@ -184,7 +194,8 @@ export function readDailyProgress(date: string): DailyProgress | null {
   if (!raw) return null
   try {
     const parsed: unknown = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object' || !('code' in parsed) || !('round' in parsed)) return null
+    if (!parsed || typeof parsed !== 'object' || !('code' in parsed) || !('round' in parsed))
+      return null
     const { code, round } = parsed as { code: unknown; round: unknown }
     if (typeof code !== 'string' || typeof round !== 'number') return null
     if (!Number.isInteger(round) || round < 0 || round > DAILY_ROUNDS) return null

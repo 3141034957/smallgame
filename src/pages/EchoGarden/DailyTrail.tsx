@@ -23,7 +23,10 @@ export function DailyTrail({ records, streak }: DailyTrailProps) {
             key={record.date}
             className={`echo-trail-day${record.score > 0 ? ' is-planted' : ''}${record.score === best && best > 0 ? ' is-best' : ''}`}
           >
-            <i style={{ height: `${Math.max(3, Math.round(record.score / BAR_CEILING * 26))}px` }} aria-hidden="true" />
+            <i
+              style={{ height: `${Math.max(3, Math.round((record.score / BAR_CEILING) * 26))}px` }}
+              aria-hidden="true"
+            />
             <b>{record.score || '·'}</b>
             <small>{record.date.slice(5).replace('-', '/')}</small>
           </span>

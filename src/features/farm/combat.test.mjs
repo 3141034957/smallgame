@@ -1,12 +1,44 @@
 import { describe, it, expect } from 'vitest'
-import { createFarm, stepFarm, FPS, HEAL_COOLDOWN, HEAL_TTL, MAX_GEAR_LEVEL, SHIELD_COOLDOWN, SHIELD_LIMIT } from './rules.mjs'
-const enemy = (id, kind, x, y, boss = false) => ({ id, kind, x, y, hp: 100, maxHp: 100, boss, regrow: -1 })
-const arena = (enemies, tick = 100) => ({ ...createFarm('2026-10-04'), position: [50,50], crops: enemies, tick, nextBoss: Infinity, nextWave: Infinity, lastPulse: tick, hurtUntil: 0 })
+import {
+  createFarm,
+  stepFarm,
+  FPS,
+  HEAL_COOLDOWN,
+  HEAL_TTL,
+  MAX_GEAR_LEVEL,
+  SHIELD_COOLDOWN,
+  SHIELD_LIMIT,
+} from './rules.mjs'
+const enemy = (id, kind, x, y, boss = false) => ({
+  id,
+  kind,
+  x,
+  y,
+  hp: 100,
+  maxHp: 100,
+  boss,
+  regrow: -1,
+})
+const arena = (enemies, tick = 100) => ({
+  ...createFarm('2026-10-04'),
+  position: [50, 50],
+  crops: enemies,
+  tick,
+  nextBoss: Infinity,
+  nextWave: Infinity,
+  lastPulse: tick,
+  hurtUntil: 0,
+})
 const step = (s, surge = false) => stepFarm(s, s.position, surge)
 
 describe('survivor combat', () => {
   it('chases the player at different speeds while ranged enemies keep distance', () => {
-    const s = arena([enemy(0, 0, 10,50), enemy(1, 1,10,50), enemy(2,2,40,50), enemy(3,3,10,50)])
+    const s = arena([
+      enemy(0, 0, 10, 50),
+      enemy(1, 1, 10, 50),
+      enemy(2, 2, 40, 50),
+      enemy(3, 3, 10, 50),
+    ])
     const r = step(s).state
     expect(r.crops[0].x).toBeGreaterThan(10)
     expect(r.crops[1].x).toBeGreaterThan(r.crops[0].x)
@@ -15,43 +47,55 @@ describe('survivor combat', () => {
     expect(s.crops[0].x).toBe(10)
   })
   it('applies contact damage once, knocks back enemies and protects against piled-up attacks', () => {
-    const s = arena([enemy(0,0,50,50),enemy(1,1,51,50)])
+    const s = arena([enemy(0, 0, 50, 50), enemy(1, 1, 51, 50)])
     const r = step(s)
     expect(r.state.hp).toBe(88)
-    expect(r.events.filter(e=>e.kind==='hurt')).toHaveLength(1)
-    expect(r.state.hurtUntil).toBe(100+FPS)
-    expect(Math.hypot(r.state.crops[0].x-50,r.state.crops[0].y-50)).toBeGreaterThan(5)
-    const protectedState = {...r.state,crops:[enemy(2,0,50,50)]}
+    expect(r.events.filter((e) => e.kind === 'hurt')).toHaveLength(1)
+    expect(r.state.hurtUntil).toBe(100 + FPS)
+    expect(Math.hypot(r.state.crops[0].x - 50, r.state.crops[0].y - 50)).toBeGreaterThan(5)
+    const protectedState = { ...r.state, crops: [enemy(2, 0, 50, 50)] }
     expect(step(protectedState).state.hp).toBe(88)
-    expect(step({...protectedState,tick:protectedState.hurtUntil}).state.hp).toBe(76)
+    expect(step({ ...protectedState, tick: protectedState.hurtUntil }).state.hp).toBe(76)
   })
   it('fires aimed projectiles and allows the player to avoid their path', () => {
-    const s = arena([enemy(0,2,20,50)],128)
+    const s = arena([enemy(0, 2, 20, 50)], 128)
     const fired = step(s).state
     expect(fired.shots).toHaveLength(1)
     expect(fired.shots[0].dx).toBeGreaterThan(0)
     expect(fired.shots[0].dy).toBe(0)
-    const incoming = {...s,crops:[],shots:[{id:200,x:46,y:50,dx:1,dy:0,expires:200}]}
+    const incoming = {
+      ...s,
+      crops: [],
+      shots: [{ id: 200, x: 46, y: 50, dx: 1, dy: 0, expires: 200 }],
+    }
     expect(step(incoming).state.hp).toBe(86)
-    expect(stepFarm(incoming,[50,53]).state.hp).toBe(100)
+    expect(stepFarm(incoming, [50, 53]).state.hp).toBe(100)
   })
   it('telegraphs a boss slam for one second, then damages only players inside the marked area', () => {
-    const s = arena([enemy(0,3,20,20,true)],128)
+    const s = arena([enemy(0, 3, 20, 20, true)], 128)
     const warning = step(s).state
     expect(warning.dangers).toHaveLength(1)
-    expect(warning.dangers[0]).toMatchObject({x:50,y:50,due:144,radius:15})
+    expect(warning.dangers[0]).toMatchObject({ x: 50, y: 50, due: 144, radius: 15 })
     expect(warning.hp).toBe(100)
-    const due = {...warning,crops:[],tick:144}
+    const due = { ...warning, crops: [], tick: 144 }
     expect(step(due).state.hp).toBe(74)
-    expect(step({...due,position:[80,80]}).state.hp).toBe(100)
+    expect(step({ ...due, position: [80, 80] }).state.hp).toBe(100)
   })
   it('collects healing up to max health and grants defensive protection on burst', () => {
-    const s = arena([]); s.hp=90;s.loot=[{id:1,x:50,y:50,xp:0,coins:0,heal:18}]
+    const s = arena([])
+    s.hp = 90
+    s.loot = [{ id: 1, x: 50, y: 50, xp: 0, coins: 0, heal: 18 }]
     const r = step(s)
     expect(r.state.hp).toBe(100)
-    expect(r.events.find(e=>e.kind==='heal').points).toBe(10)
-    const charged = {...s,charge:100,loot:[],shots:[{id:1,x:49,y:50,dx:1,dy:0,expires:200}],dangers:[{id:2,x:50,y:50,due:100,radius:15}]}
-    const burst = step(charged,true).state
+    expect(r.events.find((e) => e.kind === 'heal').points).toBe(10)
+    const charged = {
+      ...s,
+      charge: 100,
+      loot: [],
+      shots: [{ id: 1, x: 49, y: 50, dx: 1, dy: 0, expires: 200 }],
+      dangers: [{ id: 2, x: 50, y: 50, due: 100, radius: 15 }],
+    }
+    const burst = step(charged, true).state
     expect(burst.hp).toBe(90)
     expect(burst.shots).toHaveLength(0)
     expect(burst.dangers).toHaveLength(0)
@@ -60,7 +104,10 @@ describe('survivor combat', () => {
   it('limits healing drops to one expiring pack, only while wounded, on a long cooldown', () => {
     const run = ({ tick = 200, hp = 70, harvested = 15, boss = false, loot = [] } = {}) => {
       const s = arena([], tick)
-      s.hp = hp; s.harvested = harvested; s.lastPulse = tick - 20; s.loot = loot
+      s.hp = hp
+      s.harvested = harvested
+      s.lastPulse = tick - 20
+      s.loot = loot
       s.crops = [enemy(1, 0, 62, 50, boss)]
       return step({ ...s, crops: [{ ...s.crops[0], hp: 1, maxHp: 1 }] }).state
     }
@@ -70,12 +117,29 @@ describe('survivor combat', () => {
     expect(packs(wounded)[0]).toMatchObject({ heal: 18, expires: 200 + HEAL_TTL })
     expect(wounded.nextHeal).toBe(200 + HEAL_COOLDOWN)
     expect(packs(run({ hp: 100 }))).toHaveLength(0)
-    const killAgain = (state, tick) => step({ ...state, tick, lastPulse: tick - 20, harvested: 31, loot: [], crops: [{ ...enemy(2, 0, 62, 50), hp: 1, maxHp: 1 }] }).state
+    const killAgain = (state, tick) =>
+      step({
+        ...state,
+        tick,
+        lastPulse: tick - 20,
+        harvested: 31,
+        loot: [],
+        crops: [{ ...enemy(2, 0, 62, 50), hp: 1, maxHp: 1 }],
+      }).state
     expect(packs(killAgain(wounded, 200 + HEAL_COOLDOWN - 1))).toHaveLength(0)
     expect(packs(killAgain(wounded, 200 + HEAL_COOLDOWN))).toHaveLength(1)
-    const occupied = step({ ...wounded, tick: 200 + HEAL_COOLDOWN, lastPulse: 200 + HEAL_COOLDOWN - 20, harvested: 31, loot: [{ id: 900, x: 120, y: 50, xp: 0, coins: 0, heal: 18, expires: 9999 }], crops: [{ ...enemy(2, 0, 62, 50), hp: 1, maxHp: 1 }] }).state
+    const occupied = step({
+      ...wounded,
+      tick: 200 + HEAL_COOLDOWN,
+      lastPulse: 200 + HEAL_COOLDOWN - 20,
+      harvested: 31,
+      loot: [{ id: 900, x: 120, y: 50, xp: 0, coins: 0, heal: 18, expires: 9999 }],
+      crops: [{ ...enemy(2, 0, 62, 50), hp: 1, maxHp: 1 }],
+    }).state
     expect(packs(occupied)).toHaveLength(1)
-    expect(packs(run({ loot: [{ id: 901, x: 60, y: 60, xp: 0, coins: 0, heal: 18, expires: 200 }] }))).toHaveLength(0)
+    expect(
+      packs(run({ loot: [{ id: 901, x: 60, y: 60, xp: 0, coins: 0, heal: 18, expires: 200 }] })),
+    ).toHaveLength(0)
     const bossKill = run({ boss: true, hp: 90, harvested: 1 })
     expect(bossKill.hp).toBe(100)
     expect(run({ boss: true, hp: 100, harvested: 1 }).hp).toBe(100)
@@ -83,29 +147,46 @@ describe('survivor combat', () => {
   it('sends a slower bass boss with ring barrages, wide slams and richer rewards', () => {
     const bass = { ...enemy(0, 3, 20, 50, true), bass: true }
     const brute = { ...enemy(1, 3, 20, 50, true) }
-    const chase = step({ ...arena([bass, brute], 128), crops: [{ ...bass, hp: 50, maxHp: 50 }, { ...brute, hp: 50, maxHp: 50 }] }).state
+    const chase = step({
+      ...arena([bass, brute], 128),
+      crops: [
+        { ...bass, hp: 50, maxHp: 50 },
+        { ...brute, hp: 50, maxHp: 50 },
+      ],
+    }).state
     expect(chase.crops[0].x - 20).toBeLessThan(chase.crops[1].x - 20)
     const barrage = step({ ...arena([bass], 144), crops: [{ ...bass, hp: 50, maxHp: 50 }] }).state
     expect(barrage.shots).toHaveLength(8)
-    expect(new Set(barrage.shots.map((shot) => Math.round(Math.atan2(shot.dy, shot.dx) * 100))).size).toBe(8)
+    expect(
+      new Set(barrage.shots.map((shot) => Math.round(Math.atan2(shot.dy, shot.dx) * 100))).size,
+    ).toBe(8)
     const slam = step({ ...arena([bass], 96), crops: [{ ...bass, hp: 50, maxHp: 50 }] }).state
     expect(slam.dangers[0]).toMatchObject({ x: 50, y: 50, radius: 21, due: 112 })
     // Close enough for the sound wave, far enough to avoid contact damage.
     const killed = (boss) => {
-      const s = arena([], 128); s.hp = 40; s.lastPulse = 108
+      const s = arena([], 128)
+      s.hp = 40
+      s.lastPulse = 108
       s.crops = [{ ...boss, x: 38, y: 50, hp: 1, maxHp: 1 }]
       return step(s)
     }
-    const bassKill = killed(bass), bruteKill = killed(brute)
+    const bassKill = killed(bass),
+      bruteKill = killed(brute)
     expect(bassKill.state.score).toBeGreaterThan(bruteKill.state.score)
     expect(bassKill.state.hp).toBe(75)
     expect(bruteKill.state.hp).toBe(70)
   })
   it('rings the star tambourine outwards, damaging and pushing monsters back', () => {
     const ring = (gear, tick) => {
-      const s = arena([{ id: 1, kind: 0, x: 56, y: 50, hp: 40, maxHp: 40, regrow: -1, boss: false }], tick)
+      const s = arena(
+        [{ id: 1, kind: 0, x: 56, y: 50, hp: 40, maxHp: 40, regrow: -1, boss: false }],
+        tick,
+      )
       Object.assign(s.gear, gear)
-      s.nextWave = Infinity; s.nextBoss = Infinity; s.nextBass = Infinity; s.lastPulse = tick
+      s.nextWave = Infinity
+      s.nextBoss = Infinity
+      s.nextBass = Infinity
+      s.lastPulse = tick
       return step(s)
     }
     const idle = ring({ bell: 0 }, 120)
@@ -124,7 +205,11 @@ describe('survivor combat', () => {
     expect(third.events.filter((event) => event.kind === 'shock')).toHaveLength(1)
     expect(third.state.bellRings).toBe(0)
     // The ring cadence shortens with the top-level chip, so the quiet tick moves too.
-    expect(step({ ...third.state, tick: 132, lastPulse: 132 }).events.filter((event) => event.kind === 'shock')).toHaveLength(0)
+    expect(
+      step({ ...third.state, tick: 132, lastPulse: 132 }).events.filter(
+        (event) => event.kind === 'shock',
+      ),
+    ).toHaveLength(0)
   })
   it('sends gold-record elites after 45 seconds: tougher, dashing and worth more', () => {
     const wave = (tick) => {
@@ -138,24 +223,55 @@ describe('survivor combat', () => {
     expect(spawned.length).toBe(1)
     const plain = horde.find((crop) => !crop.elite)
     expect(spawned[0].maxHp).toBeGreaterThan(plain ? plain.maxHp : 0)
-    const elite = { id: 7, kind: 3, x: 20, y: 50, hp: 40, maxHp: 40, regrow: -1, boss: false, elite: true, dashUntil: -1 }
+    const elite = {
+      id: 7,
+      kind: 3,
+      x: 20,
+      y: 50,
+      hp: 40,
+      maxHp: 40,
+      regrow: -1,
+      boss: false,
+      elite: true,
+      dashUntil: -1,
+    }
     const calm = step({ ...arena([{ ...elite }], 100), crops: [{ ...elite }] }).state
-    const dashing = step({ ...arena([{ ...elite }], 100), crops: [{ ...elite, dashUntil: 200 }] }).state
+    const dashing = step({
+      ...arena([{ ...elite }], 100),
+      crops: [{ ...elite, dashUntil: 200 }],
+    }).state
     expect(dashing.crops[0].x).toBeGreaterThan(calm.crops[0].x)
     const earned = (crop) => {
-      const s = arena([], 128); s.hp = 40; s.lastPulse = 108
+      const s = arena([], 128)
+      s.hp = 40
+      s.lastPulse = 108
       s.crops = [{ ...crop, x: 38, y: 50, hp: 1, maxHp: 1 }]
       return step(s).state
     }
-    expect(earned(elite).score).toBeGreaterThan(earned({ id: 8, kind: 3, x: 38, y: 50, hp: 1, maxHp: 1, regrow: -1, boss: false }).score)
+    expect(earned(elite).score).toBeGreaterThan(
+      earned({ id: 8, kind: 3, x: 38, y: 50, hp: 1, maxHp: 1, regrow: -1, boss: false }).score,
+    )
   })
   it('drops rare shields that swallow a whole hit and stack up to three', () => {
     const pick = (loot) => {
-      const s = arena([], 128); s.hp = 60; s.lastPulse = 108; s.loot = loot
+      const s = arena([], 128)
+      s.hp = 60
+      s.lastPulse = 108
+      s.loot = loot
       return step(s).state
     }
-    expect(pick([{ id: 1, x: 50, y: 52, xp: 0, coins: 0, shield: 1 }])).toMatchObject({ shields: 1, maxShields: 1 })
-    expect(pick([{ id: 1, x: 50, y: 52, xp: 0, coins: 0, shield: 1 }, { id: 2, x: 50, y: 53, xp: 0, coins: 0, shield: 1 }, { id: 3, x: 50, y: 54, xp: 0, coins: 0, shield: 1 }, { id: 4, x: 50, y: 55, xp: 0, coins: 0, shield: 1 }])).toMatchObject({ shields: SHIELD_LIMIT, maxShields: SHIELD_LIMIT })
+    expect(pick([{ id: 1, x: 50, y: 52, xp: 0, coins: 0, shield: 1 }])).toMatchObject({
+      shields: 1,
+      maxShields: 1,
+    })
+    expect(
+      pick([
+        { id: 1, x: 50, y: 52, xp: 0, coins: 0, shield: 1 },
+        { id: 2, x: 50, y: 53, xp: 0, coins: 0, shield: 1 },
+        { id: 3, x: 50, y: 54, xp: 0, coins: 0, shield: 1 },
+        { id: 4, x: 50, y: 55, xp: 0, coins: 0, shield: 1 },
+      ]),
+    ).toMatchObject({ shields: SHIELD_LIMIT, maxShields: SHIELD_LIMIT })
     const guarded = arena([enemy(0, 0, 50, 50)], 128)
     guarded.shields = 1
     const absorbed = step(guarded)
@@ -163,12 +279,20 @@ describe('survivor combat', () => {
     expect(absorbed.state.shields).toBe(0)
     expect(absorbed.events.some((event) => event.kind === 'shield')).toBe(true)
     // A blocked hit still clears the crowd around the player.
-    expect(Math.hypot(absorbed.state.crops[0].x - 50, absorbed.state.crops[0].y - 50)).toBeGreaterThan(5)
-    const exposed = { ...absorbed.state, tick: absorbed.state.hurtUntil, crops: [{ ...enemy(1, 0, 50, 50) }] }
+    expect(
+      Math.hypot(absorbed.state.crops[0].x - 50, absorbed.state.crops[0].y - 50),
+    ).toBeGreaterThan(5)
+    const exposed = {
+      ...absorbed.state,
+      tick: absorbed.state.hurtUntil,
+      crops: [{ ...enemy(1, 0, 50, 50) }],
+    }
     expect(step(exposed).state.hp).toBe(88)
     // Shields come from the same harvest cadence, on their own slower timer.
     const spawned = arena([], 128)
-    spawned.harvested = 39; spawned.nextShield = 0; spawned.lastPulse = 108
+    spawned.harvested = 39
+    spawned.nextShield = 0
+    spawned.lastPulse = 108
     spawned.crops = [{ id: 1, kind: 0, x: 62, y: 50, hp: 1, maxHp: 1, regrow: -1, boss: false }]
     const wave = step(spawned).state
     expect(wave.loot.some((drop) => drop.shield)).toBe(true)
@@ -176,12 +300,22 @@ describe('survivor combat', () => {
   })
   it('turns a long combo into stronger and wider sound waves', () => {
     const wave = (combo) => {
-      const s = arena([{ id: 1, kind: 0, x: 50, y: 62, hp: 60, maxHp: 60, regrow: -1, boss: false }], 128)
-      s.combo = combo; s.lastPulse = 108; s.lastHarvest = 128
+      const s = arena(
+        [{ id: 1, kind: 0, x: 50, y: 62, hp: 60, maxHp: 60, regrow: -1, boss: false }],
+        128,
+      )
+      s.combo = combo
+      s.lastPulse = 108
+      s.lastHarvest = 128
       const result = step(s)
-      return { hp: result.state.crops[0].hp, radius: result.events.find((event) => event.kind === 'pulse').radius }
+      return {
+        hp: result.state.crops[0].hp,
+        radius: result.events.find((event) => event.kind === 'pulse').radius,
+      }
     }
-    const calm = wave(0), warm = wave(30), hot = wave(60)
+    const calm = wave(0),
+      warm = wave(30),
+      hot = wave(60)
     expect(warm.hp).toBeLessThan(calm.hp)
     expect(hot.hp).toBeLessThan(warm.hp)
     expect(hot.radius).toBeGreaterThan(warm.radius)
@@ -190,9 +324,16 @@ describe('survivor combat', () => {
   it('leaves echo-whistle notes behind that keep hurting, then expire and stay capped', () => {
     const note = (id, x, y, expires = 9999) => ({ id, x, y, damage: 2, expires })
     const walk = (gear, trails = [], tick = 120) => {
-      const s = arena([{ id: 1, kind: 0, x: 58, y: 50, hp: 60, maxHp: 60, regrow: -1, boss: false }], tick)
+      const s = arena(
+        [{ id: 1, kind: 0, x: 58, y: 50, hp: 60, maxHp: 60, regrow: -1, boss: false }],
+        tick,
+      )
       Object.assign(s.gear, gear)
-      s.trails = trails; s.nextWave = Infinity; s.nextBoss = Infinity; s.nextBass = Infinity; s.lastPulse = tick
+      s.trails = trails
+      s.nextWave = Infinity
+      s.nextBoss = Infinity
+      s.nextBass = Infinity
+      s.lastPulse = tick
       return step(s).state
     }
     const clean = walk({ whistle: 0 })
@@ -206,34 +347,73 @@ describe('survivor combat', () => {
     const faded = walk({ whistle: 2 }, [note(9, 50, 50, 100)], 130)
     expect(faded.trails).toHaveLength(1)
     expect(faded.trails[0].id).not.toBe(9)
-    const many = walk({ whistle: 1 }, Array.from({ length: 40 }, (_, index) => note(index, 50, 50, 9999)), 120)
+    const many = walk(
+      { whistle: 1 },
+      Array.from({ length: 40 }, (_, index) => note(index, 50, 50, 9999)),
+      120,
+    )
     expect(many.trails.length).toBeLessThanOrEqual(30)
     // A saturated arena still gets elites: they take over a slot that is
     // waiting to respawn instead of waiting for room in the monster pool.
-    const crowded = { ...arena(Array.from({ length: 100 }, (_, index) => ({ id: index, kind: 0, x: 40, y: 50, hp: index < 20 ? 30 : 0, maxHp: 30, regrow: 1e9, boss: false })), 720), nextWave: Infinity }
+    const crowded = {
+      ...arena(
+        Array.from({ length: 100 }, (_, index) => ({
+          id: index,
+          kind: 0,
+          x: 40,
+          y: 50,
+          hp: index < 20 ? 30 : 0,
+          maxHp: 30,
+          regrow: 1e9,
+          boss: false,
+        })),
+        720,
+      ),
+      nextWave: Infinity,
+    }
     const promoted = step(crowded).state
     expect(promoted.crops.filter((crop) => crop.elite && crop.hp > 0).length).toBe(1)
     expect(promoted.crops.length).toBe(100)
     // A recycled monster slot must not keep the elite crown.
-    const dead = { id: 3, kind: 3, x: 20, y: 50, hp: 0, maxHp: 40, regrow: 100, boss: false, elite: true, dashUntil: 500 }
-    const recycled = step({ ...arena([], 100), crops: [dead], nextWave: Infinity, nextBoss: Infinity, nextBass: Infinity }).state.crops[0]
+    const dead = {
+      id: 3,
+      kind: 3,
+      x: 20,
+      y: 50,
+      hp: 0,
+      maxHp: 40,
+      regrow: 100,
+      boss: false,
+      elite: true,
+      dashUntil: 500,
+    }
+    const recycled = step({
+      ...arena([], 100),
+      crops: [dead],
+      nextWave: Infinity,
+      nextBoss: Infinity,
+      nextBass: Infinity,
+    }).state.crops[0]
     expect(recycled.elite).toBe(false)
     expect(recycled.dashUntil).toBe(-1)
     expect(recycled.hp).toBeGreaterThan(0)
   })
   it('ends immediately at zero health without upgrades or further moves', () => {
-    const s=arena([enemy(0,0,50,50)]);s.hp=10;s.xp=100
-    const r=step(s).state
+    const s = arena([enemy(0, 0, 50, 50)])
+    s.hp = 10
+    s.xp = 100
+    const r = step(s).state
     expect(r.hp).toBe(0)
     expect(r.offered).toHaveLength(0)
     expect(step(r)).toBeNull()
   })
   it('keeps spawning outside the player area and caps the enemy pool', () => {
-    const s=arena([],100);s.nextWave=100
-    const r=step(s).state
+    const s = arena([], 100)
+    s.nextWave = 100
+    const r = step(s).state
     expect(r.crops).toHaveLength(3)
-    expect(r.crops.every(e=>Math.hypot(e.x-50,e.y-50)>40)).toBe(true)
-    const capped={...s,crops:Array.from({length:100},(_,id)=>enemy(id,0,-10,0))}
+    expect(r.crops.every((e) => Math.hypot(e.x - 50, e.y - 50) > 40)).toBe(true)
+    const capped = { ...s, crops: Array.from({ length: 100 }, (_, id) => enemy(id, 0, -10, 0)) }
     expect(step(capped).state.crops).toHaveLength(100)
   })
 })

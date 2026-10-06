@@ -12,9 +12,7 @@ const CHARACTER_IDS = new Set([
 ])
 
 export function normalizeCharacterId(value) {
-  return typeof value === 'string' && CHARACTER_IDS.has(value)
-    ? value
-    : DEFAULT_CHARACTER_ID
+  return typeof value === 'string' && CHARACTER_IDS.has(value) ? value : DEFAULT_CHARACTER_ID
 }
 
 export function normalizePlayerId(value) {
@@ -28,9 +26,8 @@ export function createLegacyPlayerId(name) {
 }
 
 export function normalizeScoreInput(value) {
-  const name = typeof value?.name === 'string'
-    ? value.name.trim().replace(/\s+/g, ' ').slice(0, 12)
-    : ''
+  const name =
+    typeof value?.name === 'string' ? value.name.trim().replace(/\s+/g, ' ').slice(0, 12) : ''
   const score = value?.score
 
   if (!name || !Number.isFinite(score) || score < 0) return null
@@ -39,10 +36,12 @@ export function normalizeScoreInput(value) {
 
 export function rankLeaderboardEntries(entries) {
   return [...entries]
-    .sort((left, right) =>
-      right.score - left.score ||
-      (left.updatedAt ?? 0) - (right.updatedAt ?? 0) ||
-      left.name.localeCompare(right.name, 'zh-CN'))
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        (left.updatedAt ?? 0) - (right.updatedAt ?? 0) ||
+        left.name.localeCompare(right.name, 'zh-CN'),
+    )
     .slice(0, 100)
     .map((entry, index) => ({
       rank: index + 1,

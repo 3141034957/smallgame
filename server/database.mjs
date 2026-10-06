@@ -24,9 +24,7 @@ function normalizeLegacyLeaderboard(records) {
     const input = normalizeScoreInput(entry)
     if (!input || input.score > MAX_SCORE) continue
 
-    const updatedAt = Number.isSafeInteger(entry.time) && entry.time >= 0
-      ? entry.time
-      : 0
+    const updatedAt = Number.isSafeInteger(entry.time) && entry.time >= 0 ? entry.time : 0
     const current = bestByName.get(input.name)
     if (
       !current ||
@@ -49,25 +47,17 @@ function normalizeLegacyStats(value) {
 
   for (const reporter of Array.isArray(value?.reporters) ? value.reporters : []) {
     const input = normalizeScoreInput({ name: reporter?.nickname, score: 0 })
-    if (
-      !input ||
-      !Number.isSafeInteger(reporter?.reportCount) ||
-      reporter.reportCount < 0
-    ) {
+    if (!input || !Number.isSafeInteger(reporter?.reportCount) || reporter.reportCount < 0) {
       continue
     }
-    reportersByName.set(
-      input.name,
-      (reportersByName.get(input.name) ?? 0) + reporter.reportCount,
-    )
+    reportersByName.set(input.name, (reportersByName.get(input.name) ?? 0) + reporter.reportCount)
   }
 
-  const reporterTotal = [...reportersByName.values()]
-    .reduce((total, count) => total + count, 0)
-  const storedTotal = Number.isSafeInteger(value?.scoreReportCount) &&
-    value.scoreReportCount >= 0
-    ? value.scoreReportCount
-    : 0
+  const reporterTotal = [...reportersByName.values()].reduce((total, count) => total + count, 0)
+  const storedTotal =
+    Number.isSafeInteger(value?.scoreReportCount) && value.scoreReportCount >= 0
+      ? value.scoreReportCount
+      : 0
 
   return {
     scoreReportCount: Math.max(storedTotal, reporterTotal),
@@ -79,37 +69,21 @@ function normalizeLegacyStats(value) {
 }
 
 function hasCurrentScoreLimit(db, tableName, scoreColumn) {
-  const schema = db.prepare(
-    'SELECT sql FROM sqlite_master WHERE type = ? AND name = ?',
-  ).get('table', tableName)?.sql ?? ''
+  const schema =
+    db.prepare('SELECT sql FROM sqlite_master WHERE type = ? AND name = ?').get('table', tableName)
+      ?.sql ?? ''
 
   return schema.includes(`${scoreColumn} <= ${MAX_SCORE}`)
 }
 
 function migratePlayerSchema(db) {
   const leaderboardColumns = db.prepare('PRAGMA table_info(leaderboard)').all()
-  const submissionColumns = db.prepare(
-    'PRAGMA table_info(score_submissions)',
-  ).all()
-  const leaderboardHasPlayerId = leaderboardColumns.some(
-    (column) => column.name === 'player_id',
-  )
-  const submissionsHavePlayerId = submissionColumns.some(
-    (column) => column.name === 'player_id',
-  )
-  const submissionsHaveClientIp = submissionColumns.some(
-    (column) => column.name === 'client_ip',
-  )
-  const leaderboardIsCurrent = hasCurrentScoreLimit(
-    db,
-    'leaderboard',
-    'score',
-  )
-  const submissionsAreCurrent = hasCurrentScoreLimit(
-    db,
-    'score_submissions',
-    'submitted_score',
-  )
+  const submissionColumns = db.prepare('PRAGMA table_info(score_submissions)').all()
+  const leaderboardHasPlayerId = leaderboardColumns.some((column) => column.name === 'player_id')
+  const submissionsHavePlayerId = submissionColumns.some((column) => column.name === 'player_id')
+  const submissionsHaveClientIp = submissionColumns.some((column) => column.name === 'client_ip')
+  const leaderboardIsCurrent = hasCurrentScoreLimit(db, 'leaderboard', 'score')
+  const submissionsAreCurrent = hasCurrentScoreLimit(db, 'score_submissions', 'submitted_score')
   if (
     leaderboardHasPlayerId &&
     submissionsHavePlayerId &&
@@ -119,12 +93,8 @@ function migratePlayerSchema(db) {
     return
   }
 
-  const leaderboardPlayerId = leaderboardHasPlayerId
-    ? 'player_id'
-    : "'legacy:' || name"
-  const submissionPlayerId = submissionsHavePlayerId
-    ? 'player_id'
-    : "'legacy:' || nickname"
+  const leaderboardPlayerId = leaderboardHasPlayerId ? 'player_id' : "'legacy:' || name"
+  const submissionPlayerId = submissionsHavePlayerId ? 'player_id' : "'legacy:' || nickname"
   const submissionClientIp = submissionsHaveClientIp ? 'client_ip' : 'NULL'
 
   db.exec('BEGIN IMMEDIATE')
@@ -271,9 +241,7 @@ function initializeSchema(db) {
     `)
   }
 
-  const submissionColumns = db.prepare(
-    'PRAGMA table_info(score_submissions)',
-  ).all()
+  const submissionColumns = db.prepare('PRAGMA table_info(score_submissions)').all()
   if (!submissionColumns.some((column) => column.name === 'character_id')) {
     db.exec(`
       ALTER TABLE score_submissions
@@ -295,9 +263,7 @@ function initializeSchema(db) {
 }
 
 function importLegacyJson(db, leaderboardPath, statsPath) {
-  const existingImport = db.prepare(
-    'SELECT value FROM app_meta WHERE key = ?',
-  ).get(JSON_IMPORT_KEY)
+  const existingImport = db.prepare('SELECT value FROM app_meta WHERE key = ?').get(JSON_IMPORT_KEY)
   if (existingImport) {
     return { imported: false, ...JSON.parse(existingImport.value) }
   }
@@ -334,9 +300,7 @@ function importLegacyJson(db, leaderboardPath, statsPath) {
     VALUES ('score_report_count', ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value
   `)
-  const setMeta = db.prepare(
-    'INSERT INTO app_meta (key, value) VALUES (?, ?)',
-  )
+  const setMeta = db.prepare('INSERT INTO app_meta (key, value) VALUES (?, ?)')
   const migration = {
     importedAt: Date.now(),
     leaderboardCount: leaderboard.length,
@@ -369,19 +333,13 @@ function importLegacyJson(db, leaderboardPath, statsPath) {
   return { imported: true, ...migration }
 }
 
-export function createLeaderboardStore({
-  databasePath,
-  leaderboardPath,
-  statsPath,
-}) {
+export function createLeaderboardStore({ databasePath, leaderboardPath, statsPath }) {
   mkdirSync(dirname(databasePath), { recursive: true })
   const db = new DatabaseSync(databasePath)
   initializeSchema(db)
   const migration = importLegacyJson(db, leaderboardPath, statsPath)
 
-  const findBest = db.prepare(
-    'SELECT score FROM leaderboard WHERE player_id = ?',
-  )
+  const findBest = db.prepare('SELECT score FROM leaderboard WHERE player_id = ?')
   const insertSubmission = db.prepare(`
     INSERT INTO score_submissions (
       player_id,
@@ -458,9 +416,7 @@ export function createLeaderboardStore({
     FROM score_reporters
     ORDER BY report_count DESC, nickname ASC
   `)
-  const selectSubmissionCount = db.prepare(
-    'SELECT COUNT(*) AS count FROM score_submissions',
-  )
+  const selectSubmissionCount = db.prepare('SELECT COUNT(*) AS count FROM score_submissions')
   const selectSubmissionsInRange = db.prepare(`
     SELECT
       id,
@@ -517,13 +473,7 @@ export function createLeaderboardStore({
         )
         incrementReporter.run(name)
         incrementTotal.run()
-        upsertLeaderboard.run(
-          playerId,
-          name,
-          score,
-          normalizedCharacterId,
-          submittedAt,
-        )
+        upsertLeaderboard.run(playerId, name, score, normalizedCharacterId, submittedAt)
         db.exec('COMMIT')
         return {
           submissionId: Number(result.lastInsertRowid),
@@ -549,7 +499,9 @@ export function createLeaderboardStore({
 
     getRecentSubmissions(limit = 20) {
       const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)))
-      return db.prepare(`
+      return db
+        .prepare(
+          `
         SELECT
           id,
           player_id AS playerId,
@@ -562,13 +514,14 @@ export function createLeaderboardStore({
         FROM score_submissions
         ORDER BY submitted_at DESC, id DESC
         LIMIT ?
-      `).all(safeLimit).map(normalizeSubmission)
+      `,
+        )
+        .all(safeLimit)
+        .map(normalizeSubmission)
     },
 
     getSubmissionsInRange(startTime, endTime) {
-      return selectSubmissionsInRange
-        .all(startTime, endTime)
-        .map(normalizeSubmission)
+      return selectSubmissionsInRange.all(startTime, endTime).map(normalizeSubmission)
     },
 
     getReporterCountsInRange(startTime, endTime) {

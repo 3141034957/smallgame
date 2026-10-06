@@ -58,8 +58,12 @@ export function getDailyOffers(dateKey: string, roundIndex: number): readonly Se
 /** Date-only challenge targets. All three parts move between neighboring days. */
 export function getDailyPattern(dateKey: string): DailyPattern {
   const dayNumber = dayNumberFromKey(dateKey)
-  const featuredSlot = positiveModulo(dayNumber * 3 + Math.floor(dayNumber / SLOT_COUNT), SLOT_COUNT)
-  const featuredKind = KINDS[positiveModulo(dayNumber + Math.floor(dayNumber / KINDS.length), KINDS.length)]
+  const featuredSlot = positiveModulo(
+    dayNumber * 3 + Math.floor(dayNumber / SLOT_COUNT),
+    SLOT_COUNT,
+  )
+  const featuredKind =
+    KINDS[positiveModulo(dayNumber + Math.floor(dayNumber / KINDS.length), KINDS.length)]
   const quietOffset = 1 + positiveModulo(dayNumber, SLOT_COUNT - 1)
   const quietSlot = positiveModulo(featuredSlot + quietOffset, SLOT_COUNT)
   return { featuredSlot, featuredKind, quietSlot }
@@ -166,7 +170,10 @@ export function bestDailyScore(dateKey: string, beamWidth = 24): number {
         }
       }
     }
-    candidates.sort((left, right) => scoreDailyGarden(right, dateKey).score - scoreDailyGarden(left, dateKey).score)
+    candidates.sort(
+      (left, right) =>
+        scoreDailyGarden(right, dateKey).score - scoreDailyGarden(left, dateKey).score,
+    )
     beam = candidates.slice(0, beamWidth)
   }
 
@@ -195,9 +202,8 @@ export function suggestNextMove(
 
   for (let index = 0; index < SLOT_COUNT; index += 1) {
     const planted = board[index]
-    const attempts: (SeedKind | null)[] = planted === null
-      ? [...kinds]
-      : [...kinds.filter((kind) => kind !== planted), null]
+    const attempts: (SeedKind | null)[] =
+      planted === null ? [...kinds] : [...kinds.filter((kind) => kind !== planted), null]
     for (const kind of attempts) {
       const candidate = [...board]
       candidate[index] = kind
@@ -224,5 +230,10 @@ export function scoreDailyGarden(board: Board, dateKey: string): GardenScore {
     bonuses.push({ label: `今日留白 · 第 ${quietSlot + 1} 拍`, points: 15 })
   }
 
-  return { score: base.score + bonuses.slice(base.bonuses.length).reduce((total, bonus) => total + bonus.points, 0), bonuses }
+  return {
+    score:
+      base.score +
+      bonuses.slice(base.bonuses.length).reduce((total, bonus) => total + bonus.points, 0),
+    bonuses,
+  }
 }

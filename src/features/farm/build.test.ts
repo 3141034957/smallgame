@@ -8,7 +8,9 @@ describe('run build summary', () => {
   it('lists every recipe with empty levels and flags the evolved pairs', () => {
     const empty = farmBuildSummary(gear())
     expect(empty).toHaveLength(RECIPES.length)
-    expect(empty.every((item) => !item.evolved && item.weaponLevel === 0 && item.chipLevel === 0)).toBe(true)
+    expect(
+      empty.every((item) => !item.evolved && item.weaponLevel === 0 && item.chipLevel === 0),
+    ).toBe(true)
     expect(farmBuiltLevels(gear())).toBe(0)
     const built: Gear = { ...gear(), drum: MAX_GEAR_LEVEL, range: MAX_GEAR_LEVEL, echo: 2 }
     const summary = farmBuildSummary(built)

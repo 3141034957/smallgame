@@ -92,7 +92,13 @@ function assertBoard(board: Board): void {
     throw new Error('Board must contain exactly eight valid seed slots.')
   }
   for (const seed of board) {
-    if (seed !== null && seed !== 'heart' && seed !== 'rain' && seed !== 'bell' && seed !== 'echo') {
+    if (
+      seed !== null &&
+      seed !== 'heart' &&
+      seed !== 'rain' &&
+      seed !== 'bell' &&
+      seed !== 'echo'
+    ) {
       throw new Error('Board must contain exactly eight valid seed slots.')
     }
   }
@@ -236,10 +242,10 @@ export function evaluateStoryChapter(board: Board, chapterIndex: number): Chapte
 
 export function encodeBoard(board: Board): string {
   assertBoard(board)
-  return board.map((seed) => seed === null ? '.' : SEED_CODES[seed]).join('')
+  return board.map((seed) => (seed === null ? '.' : SEED_CODES[seed])).join('')
 }
 
 export function decodeBoard(code: string): Board | null {
   if (typeof code !== 'string' || !/^[HRBE.]{8}$/.test(code)) return null
-  return [...code].map((character) => character === '.' ? null : CODE_SEEDS[character])
+  return [...code].map((character) => (character === '.' ? null : CODE_SEEDS[character]))
 }

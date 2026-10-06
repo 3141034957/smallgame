@@ -5,13 +5,21 @@ export const FARM_SETTINGS_KEY = 'farm-settings-v1'
 // never depend on this flag.
 export function loadFarmSettings(): FarmSettings {
   let stored: unknown = null
-  try { stored = JSON.parse(localStorage.getItem(FARM_SETTINGS_KEY) ?? 'null') } catch { stored = null }
+  try {
+    stored = JSON.parse(localStorage.getItem(FARM_SETTINGS_KEY) ?? 'null')
+  } catch {
+    stored = null
+  }
   const effects = (stored as { effects?: unknown } | null)?.effects
   return { effects: effects !== false }
 }
 
 export function saveFarmSettings(next: FarmSettings): FarmSettings {
   const settings = { effects: next.effects !== false }
-  try { localStorage.setItem(FARM_SETTINGS_KEY, JSON.stringify(settings)) } catch { /* Storage optional. */ }
+  try {
+    localStorage.setItem(FARM_SETTINGS_KEY, JSON.stringify(settings))
+  } catch {
+    /* Storage optional. */
+  }
   return settings
 }

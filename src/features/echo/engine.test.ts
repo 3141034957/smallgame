@@ -64,18 +64,26 @@ describe('letter patterns', () => {
   })
 
   it('requires rain in each of the two half circles between the heart pair', () => {
-    expect(evaluateChapter(boardWith([0, 'heart'], [4, 'heart'], [2, 'rain'], [6, 'rain']), 1)).toMatchObject({
+    expect(
+      evaluateChapter(boardWith([0, 'heart'], [4, 'heart'], [2, 'rain'], [6, 'rain']), 1),
+    ).toMatchObject({
       complete: true,
       marked: [0, 2, 4, 6],
     })
-    expect(evaluateChapter(boardWith([0, 'heart'], [4, 'heart'], [1, 'rain'], [3, 'rain']), 1).complete).toBe(false)
+    expect(
+      evaluateChapter(boardWith([0, 'heart'], [4, 'heart'], [1, 'rain'], [3, 'rain']), 1).complete,
+    ).toBe(false)
     expect(evaluateChapter(boardWith([1, 'rain'], [5, 'rain']), 1).complete).toBe(false)
   })
 
   it('finds a valid heart pair when another pair is not surrounded by rain', () => {
     const board = boardWith(
-      [0, 'heart'], [4, 'heart'], [2, 'heart'], [6, 'heart'],
-      [1, 'rain'], [3, 'rain'],
+      [0, 'heart'],
+      [4, 'heart'],
+      [2, 'heart'],
+      [6, 'heart'],
+      [1, 'rain'],
+      [3, 'rain'],
     )
     expect(evaluateChapter(board, 1)).toMatchObject({ complete: true, marked: [1, 2, 3, 6] })
   })
@@ -91,14 +99,26 @@ describe('letter patterns', () => {
 
   it('asks for the four sounds to appear clockwise as heart, rain, bell, echo', () => {
     const ordered = boardWith(
-      [0, 'heart'], [1, 'rain'], [2, 'bell'], [3, 'echo'], [4, 'heart'], [6, 'rain'],
+      [0, 'heart'],
+      [1, 'rain'],
+      [2, 'bell'],
+      [3, 'echo'],
+      [4, 'heart'],
+      [6, 'rain'],
     )
     expect(evaluateChapter(ordered, 3)).toMatchObject({ complete: true, marked: [0, 1, 2, 3] })
 
     const wrapped = boardWith([6, 'heart'], [7, 'rain'], [0, 'bell'], [1, 'echo'])
     expect(evaluateChapter(wrapped, 3)).toMatchObject({ complete: true, marked: [6, 7, 0, 1] })
 
-    const scattered = boardWith([0, 'heart'], [4, 'heart'], [2, 'rain'], [6, 'rain'], [1, 'bell'], [7, 'echo'])
+    const scattered = boardWith(
+      [0, 'heart'],
+      [4, 'heart'],
+      [2, 'rain'],
+      [6, 'rain'],
+      [1, 'bell'],
+      [7, 'echo'],
+    )
     expect(evaluateChapter(scattered, 3).complete).toBe(false)
 
     const swapped = boardWith([0, 'heart'], [2, 'bell'], [3, 'rain'], [4, 'echo'])
@@ -134,7 +154,11 @@ describe('cumulative story letters', () => {
   it('lets an alternating second-letter layout be rearranged into a valid finale', () => {
     const alternating = boardWith([0, 'heart'], [2, 'rain'], [4, 'heart'], [6, 'rain'])
     expect(evaluateStoryChapter(alternating, 1).complete).toBe(true)
-    expect(alternating.every((kind, index) => kind !== null || alternating[(index + 1) % SLOT_COUNT] !== null)).toBe(true)
+    expect(
+      alternating.every(
+        (kind, index) => kind !== null || alternating[(index + 1) % SLOT_COUNT] !== null,
+      ),
+    ).toBe(true)
 
     const movedRain = plantSeed(plantSeed(alternating, 2, 'rain'), 1, 'rain')
     const finale = plantSeed(plantSeed(movedRain, 2, 'bell'), 3, 'echo')
@@ -145,14 +169,26 @@ describe('cumulative story letters', () => {
 
   it('delivers the last letter only once the whole ring is in order', () => {
     const ring = boardWith(
-      [0, 'heart'], [1, 'rain'], [2, 'bell'], [3, 'echo'], [4, 'heart'], [5, 'rain'],
+      [0, 'heart'],
+      [1, 'rain'],
+      [2, 'bell'],
+      [3, 'echo'],
+      [4, 'heart'],
+      [5, 'rain'],
     )
     for (let chapter = 0; chapter < 4; chapter += 1) {
       expect(evaluateStoryChapter(ring, chapter).complete).toBe(true)
     }
 
     const crossed = boardWith(
-      [0, 'heart'], [1, 'bell'], [2, 'echo'], [3, 'rain'], [4, 'heart'], [5, 'bell'], [6, 'echo'], [7, 'rain'],
+      [0, 'heart'],
+      [1, 'bell'],
+      [2, 'echo'],
+      [3, 'rain'],
+      [4, 'heart'],
+      [5, 'bell'],
+      [6, 'echo'],
+      [7, 'rain'],
     )
     expect(evaluateStoryChapter(crossed, 2).complete).toBe(true)
     expect(evaluateStoryChapter(crossed, 3)).toMatchObject({ complete: false, marked: [] })

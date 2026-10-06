@@ -3,33 +3,64 @@ import { Readable } from 'node:stream'
 import { DatabaseSync } from 'node:sqlite'
 import { rmSync } from 'node:fs'
 import { createMelodyStore, handleMelodyRequest, verifyPerformance } from './melody.mjs'
-import { SONGS, DIFFICULTIES, makeChart, emptyRun, hitNote, advanceRun, runAccuracy } from '../src/features/melody/rules.mjs'
+import {
+  SONGS,
+  DIFFICULTIES,
+  makeChart,
+  emptyRun,
+  hitNote,
+  advanceRun,
+  runAccuracy,
+} from '../src/features/melody/rules.mjs'
 
 const stores = []
-afterEach(() => { for (const store of stores.splice(0)) store.close() })
-function store() { const value = createMelodyStore(':memory:'); stores.push(value); return value }
-function performance(song = SONGS[0], difficulty = 'cozy', taps = makeChart(song, difficulty).map(({ lane, time }) => ({ lane, time }))) {
+afterEach(() => {
+  for (const store of stores.splice(0)) store.close()
+})
+function store() {
+  const value = createMelodyStore(':memory:')
+  stores.push(value)
+  return value
+}
+function performance(
+  song = SONGS[0],
+  difficulty = 'cozy',
+  taps = makeChart(song, difficulty).map(({ lane, time }) => ({ lane, time })),
+) {
   const notes = makeChart(song, difficulty)
   let run = emptyRun()
   for (const tap of taps) run = hitNote(run, notes, tap.lane, tap.time).run
-  run = advanceRun(run, notes, song.beats * 60 / song.bpm + 1)
-  return { input: { playerId: 'player_one_123', name: '奶糖', songId: song.id, difficulty, score: run.score, taps }, run }
+  run = advanceRun(run, notes, (song.beats * 60) / song.bpm + 1)
+  return {
+    input: {
+      playerId: 'player_one_123',
+      name: '奶糖',
+      songId: song.id,
+      difficulty,
+      score: run.score,
+      taps,
+    },
+    run,
+  }
 }
 
 describe('melody performance verification', () => {
   it('replays exactly the same judgement as the browser for all nine boards', () => {
-    for (const song of SONGS) for (const { id } of DIFFICULTIES) {
-      const { input, run } = performance(song, id)
-      const record = verifyPerformance(input)
-      expect(record?.score).toBe(run.score)
-      expect(record?.maxCombo).toBe(makeChart(song, id).length)
-      expect(record?.accuracy).toBe(10000)
-      expect(record?.stars).toBe(3)
-    }
+    for (const song of SONGS)
+      for (const { id } of DIFFICULTIES) {
+        const { input, run } = performance(song, id)
+        const record = verifyPerformance(input)
+        expect(record?.score).toBe(run.score)
+        expect(record?.maxCombo).toBe(makeChart(song, id).length)
+        expect(record?.accuracy).toBe(10000)
+        expect(record?.stars).toBe(3)
+      }
   })
   it('preserves good hits, misses and spam penalties, including calibrated timing', () => {
     const notes = makeChart(SONGS[0], 'cozy')
-    const taps = notes.slice(1).map((note, index) => ({ lane: note.lane, time: note.time + (index % 2 ? 0.12 : -0.04) }))
+    const taps = notes
+      .slice(1)
+      .map((note, index) => ({ lane: note.lane, time: note.time + (index % 2 ? 0.12 : -0.04) }))
     taps.splice(5, 0, { lane: (taps[4].lane + 1) % 4, time: taps[4].time + 0.001 })
     const { input, run } = performance(SONGS[0], 'cozy', taps)
     const record = verifyPerformance(input)
@@ -56,9 +87,17 @@ async function request(db, method, path, body) {
   req.method = method
   const response = { status: 0, headers: {}, body: null, headersSent: false }
   const res = {
-    get headersSent() { return response.headersSent },
-    writeHead(status, headers) { response.status = status; response.headers = headers; response.headersSent = true },
-    end(value) { response.body = JSON.parse(value) },
+    get headersSent() {
+      return response.headersSent
+    },
+    writeHead(status, headers) {
+      response.status = status
+      response.headers = headers
+      response.headersSent = true
+    },
+    end(value) {
+      response.body = JSON.parse(value)
+    },
   }
   await handleMelodyRequest(req, res, new URL(path, 'http://localhost'), db)
   return response
@@ -72,7 +111,11 @@ describe('melody API', () => {
     expect(submission.status).toBe(200)
     expect(submission.body.acceptedScore).toBe(input.score)
     expect(submission.body.own.rank).toBe(1)
-    const board = await request(db, 'GET', `/api/melody/leaderboard?song=strawberry&difficulty=cozy&playerId=${input.playerId}`)
+    const board = await request(
+      db,
+      'GET',
+      `/api/melody/leaderboard?song=strawberry&difficulty=cozy&playerId=${input.playerId}`,
+    )
     expect(board.status).toBe(200)
     expect(board.headers['Cache-Control']).toBe('no-store')
     expect(board.body.data).toEqual(submission.body.data)
@@ -81,9 +124,20 @@ describe('melody API', () => {
     const db = store()
     expect((await request(db, 'POST', '/api/melody/score', 'invalid json')).status).toBe(400)
     expect((await request(db, 'POST', '/api/melody/score', 'a'.repeat(65537))).status).toBe(413)
-    expect((await request(db, 'GET', '/api/melody/leaderboard?song=no&difficulty=cozy')).status).toBe(400)
+    expect(
+      (await request(db, 'GET', '/api/melody/leaderboard?song=no&difficulty=cozy')).status,
+    ).toBe(400)
     const { input } = performance()
-    expect((await request(db, 'POST', '/api/melody/score', JSON.stringify({ ...input, score: input.score + 1 }))).status).toBe(400)
+    expect(
+      (
+        await request(
+          db,
+          'POST',
+          '/api/melody/score',
+          JSON.stringify({ ...input, score: input.score + 1 }),
+        )
+      ).status,
+    ).toBe(400)
     expect(db.board('strawberry', 'cozy').total).toBe(0)
   })
 })
@@ -113,7 +167,9 @@ describe('separate online melody leaderboards', () => {
     db.submit({ ...record, playerId: 'player_low_combo', maxCombo: 1 }, 2)
     db.submit({ ...record, playerId: 'player_perfect' }, 3)
     db.submit({ ...record, playerId: 'player_later' }, 4)
-    expect(db.board('strawberry', 'cozy').data.map(({ rank, name }) => ({ rank, name })).length).toBe(4)
+    expect(
+      db.board('strawberry', 'cozy').data.map(({ rank, name }) => ({ rank, name })).length,
+    ).toBe(4)
     expect(db.board('strawberry', 'cozy', 'player_perfect').own.rank).toBe(1)
     expect(db.board('strawberry', 'cozy', 'player_later').own.rank).toBe(2)
     expect(db.board('strawberry', 'cozy', 'player_low_combo').own.rank).toBe(3)
@@ -129,19 +185,42 @@ describe('separate online melody leaderboards', () => {
       max_combo INTEGER NOT NULL CHECK(max_combo >= 0), stars INTEGER NOT NULL CHECK(stars BETWEEN 0 AND 3), updated_at INTEGER NOT NULL,
       PRIMARY KEY(player_id, song_id, difficulty)
     ) STRICT;`)
-    legacy.prepare('INSERT INTO melody_scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run('player_legacy_1', 'strawberry', 'cozy', '老玩家', 5000, 3000, 40, 2, 1700000000000)
+    legacy
+      .prepare('INSERT INTO melody_scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run('player_legacy_1', 'strawberry', 'cozy', '老玩家', 5000, 3000, 40, 2, 1700000000000)
     legacy.close()
     const migrated = createMelodyStore(file)
-    expect(migrated.board('strawberry', 'cozy', 'player_legacy_1').data[0]).toMatchObject({ name: '老玩家', score: 5000, seconds: 0 })
-    migrated.submit({ playerId: 'player_fresh_1', songId: 'strawberry', difficulty: 'cozy', name: '新玩家', score: 9000, accuracy: 2000, maxCombo: 60, stars: 3, seconds: 123 }, 1700000001000)
-    expect(migrated.board('strawberry', 'cozy', 'player_fresh_1').own).toMatchObject({ score: 9000, seconds: 123 })
+    expect(migrated.board('strawberry', 'cozy', 'player_legacy_1').data[0]).toMatchObject({
+      name: '老玩家',
+      score: 5000,
+      seconds: 0,
+    })
+    migrated.submit(
+      {
+        playerId: 'player_fresh_1',
+        songId: 'strawberry',
+        difficulty: 'cozy',
+        name: '新玩家',
+        score: 9000,
+        accuracy: 2000,
+        maxCombo: 60,
+        stars: 3,
+        seconds: 123,
+      },
+      1700000001000,
+    )
+    expect(migrated.board('strawberry', 'cozy', 'player_fresh_1').own).toMatchObject({
+      score: 9000,
+      seconds: 123,
+    })
     migrated.close()
     rmSync(file, { force: true })
   })
   it('returns the personal rank even outside the first fifty', () => {
     const db = store()
     const record = verifyPerformance(performance().input)
-    for (let index = 0; index < 60; index++) db.submit({ ...record, playerId: `player_${index.toString().padStart(4, '0')}` }, index)
+    for (let index = 0; index < 60; index++)
+      db.submit({ ...record, playerId: `player_${index.toString().padStart(4, '0')}` }, index)
     const board = db.board('strawberry', 'cozy', 'player_0059')
     expect(board.data).toHaveLength(50)
     expect(board.total).toBe(60)

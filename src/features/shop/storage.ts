@@ -1,49 +1,25 @@
-import { DEFAULT_CHARACTER_ID } from '@/features/shop/catalog'
+import { CHARACTERS } from './catalog'
+import { loadLegacyProfile, saveLegacyProfile } from '@/utils/legacyProfile'
 
-const STORAGE_KEY = 'character-unlocks-v1'
-const SELECTED_KEY = 'character-selected-v1'
-const DEFAULT_CHARACTER_MIGRATION_KEY = 'character-default-oscar-v1'
+export const getUnlocks = () => loadLegacyProfile().unlocks
+export const getSelected = () => loadLegacyProfile().selected
 
-export function getUnlocks(): string[] {
-  try {
-    const value = localStorage.getItem(STORAGE_KEY)
-    const stored = value ? JSON.parse(value) : []
-    const unlocks = Array.isArray(stored)
-      ? stored.filter((id): id is string => typeof id === 'string')
-      : []
-    if (unlocks.includes(DEFAULT_CHARACTER_ID)) return unlocks
-    const nextUnlocks = [...unlocks, DEFAULT_CHARACTER_ID]
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUnlocks))
-    return nextUnlocks
-  } catch {
-    return [DEFAULT_CHARACTER_ID]
-  }
+export function selectCharacter(id: string) {
+  const profile = loadLegacyProfile()
+  if (!profile.unlocks.includes(id)) throw new Error('请先解锁这个角色。')
+  return saveLegacyProfile({ ...profile, selected: id })
 }
 
-export function saveUnlocks(ids: string[]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...new Set(ids)])) } catch { /* Storage optional. */ }
+export function buyCharacter(id: string) {
+  const character = CHARACTERS.find((character) => character.id === id)
+  if (!character) throw new Error('这个角色暂不可用。')
+  const profile = loadLegacyProfile()
+  if (profile.unlocks.includes(id)) return selectCharacter(id)
+  if (profile.stars < character.price)
+    throw new Error(`星星不足！还需 ${character.price - profile.stars} 颗`)
+  return saveLegacyProfile({
+    stars: profile.stars - character.price,
+    unlocks: [...profile.unlocks, id],
+    selected: id,
+  })
 }
-
-export function getSelected(): string {
-  try {
-    const selected = localStorage.getItem(SELECTED_KEY)
-    const migrated = localStorage.getItem(DEFAULT_CHARACTER_MIGRATION_KEY)
-
-    if (!migrated) {
-      localStorage.setItem(DEFAULT_CHARACTER_MIGRATION_KEY, '1')
-      if (!selected || selected === 'default' || selected === 'burger-dog') {
-        localStorage.setItem(SELECTED_KEY, DEFAULT_CHARACTER_ID)
-        return DEFAULT_CHARACTER_ID
-      }
-    }
-
-    return selected || DEFAULT_CHARACTER_ID
-  } catch {
-    return DEFAULT_CHARACTER_ID
-  }
-}
-
-export function saveSelected(id: string) {
-  try { localStorage.setItem(SELECTED_KEY, id) } catch { /* Storage optional. */ }
-}
-

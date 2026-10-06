@@ -86,7 +86,10 @@ function scheduleTone(
   oscillator.type = type
   oscillator.frequency.setValueAtTime(frequency, when)
   if (endFrequency) {
-    oscillator.frequency.exponentialRampToValueAtTime(endFrequency, when + Math.min(duration * 0.7, 0.18))
+    oscillator.frequency.exponentialRampToValueAtTime(
+      endFrequency,
+      when + Math.min(duration * 0.7, 0.18),
+    )
   }
   gain.gain.setValueAtTime(0.0001, when)
   gain.gain.linearRampToValueAtTime(volume, when + Math.min(attack, duration * 0.5))
@@ -137,13 +140,19 @@ function scheduleRain(
   })
 }
 
-function scheduleHeart(context: AudioContext, master: GainNode, voices: VoiceSet, when: number, softer = false) {
+function scheduleHeart(
+  context: AudioContext,
+  master: GainNode,
+  voices: VoiceSet,
+  when: number,
+  softer = false,
+) {
   scheduleTone(context, master, voices, {
     frequency: 112,
     endFrequency: 51,
     when,
     duration: 0.24,
-    volume: softer ? 0.10 : 0.22,
+    volume: softer ? 0.1 : 0.22,
     attack: 0.004,
   })
   scheduleTone(context, master, voices, {
@@ -201,7 +210,13 @@ function scheduleEcho(
   })
 }
 
-function schedulePad(context: AudioContext, master: GainNode, voices: VoiceSet, when: number, round: number) {
+function schedulePad(
+  context: AudioContext,
+  master: GainNode,
+  voices: VoiceSet,
+  when: number,
+  round: number,
+) {
   const chord = CHORDS[round % CHORDS.length]
   for (const frequency of chord) {
     scheduleTone(context, master, voices, {
@@ -277,7 +292,8 @@ export function useEchoAudio() {
   const ensureContext = () => {
     if (typeof window === 'undefined') return null
     if (!contextRef.current || contextRef.current.state === 'closed') {
-      const AudioContextConstructor = window.AudioContext ||
+      const AudioContextConstructor =
+        window.AudioContext ||
         (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
       if (!AudioContextConstructor) return null
       try {
@@ -315,7 +331,17 @@ export function useEchoAudio() {
     const master = masterRef.current
     const rainBuffer = rainBufferRef.current
     if (!context || !master || !rainBuffer) return
-    scheduleSeed(context, master, previewVoicesRef.current, rainBuffer, kind, context.currentTime + 0.025, 0, 0, null)
+    scheduleSeed(
+      context,
+      master,
+      previewVoicesRef.current,
+      rainBuffer,
+      kind,
+      context.currentTime + 0.025,
+      0,
+      0,
+      null,
+    )
     resumeContext(context)
   }
 
@@ -340,12 +366,19 @@ export function useEchoAudio() {
     const openingEcho = rounds < 4 && board[SLOT_COUNT - 1] === 'bell' && board[0] === 'echo'
     const contextTimeAtStart = context.currentTime
     const wallTimeAtStart = performance.now()
-    const startTimeSec = contextTimeAtStart + (openingEcho ? 0.30 : 0.065)
+    const startTimeSec = contextTimeAtStart + (openingEcho ? 0.3 : 0.065)
     const durationSec = rounds * SLOT_COUNT * STEP_SECONDS
     if (openingEcho) {
       // The last slot is the previous beat of slot zero. Let the player hear
       // that bell once before the first circle so its echo has a real call.
-      scheduleBell(context, master, voicesRef.current, BELL_NOTES[SLOT_COUNT - 1], startTimeSec - 0.24, 0.055)
+      scheduleBell(
+        context,
+        master,
+        voicesRef.current,
+        BELL_NOTES[SLOT_COUNT - 1],
+        startTimeSec - 0.24,
+        0.055,
+      )
     }
     for (let round = 0; round < rounds; round += 1) {
       const roundStart = startTimeSec + round * SLOT_COUNT * STEP_SECONDS
@@ -398,16 +431,19 @@ export function useEchoAudio() {
     }
   }
 
-  useEffect(() => () => {
-    stopVoices(voicesRef.current)
-    stopVoices(previewVoicesRef.current)
-    masterRef.current?.disconnect()
-    const context = contextRef.current
-    contextRef.current = null
-    masterRef.current = null
-    rainBufferRef.current = null
-    if (context && context.state !== 'closed') void context.close()
-  }, [])
+  useEffect(
+    () => () => {
+      stopVoices(voicesRef.current)
+      stopVoices(previewVoicesRef.current)
+      masterRef.current?.disconnect()
+      const context = contextRef.current
+      contextRef.current = null
+      masterRef.current = null
+      rainBufferRef.current = null
+      if (context && context.state !== 'closed') void context.close()
+    },
+    [],
+  )
 
   return { previewSeed, playLoop, setMuted, stop }
 }

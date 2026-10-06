@@ -21,13 +21,19 @@ export function farmBuildSummary(gear: Gear): FarmBuildItem[] {
     const weapon = TALENTS.find((talent) => talent.id === recipe.weapon)!
     const chip = TALENTS.find((talent) => talent.id === recipe.chip)!
     return {
-      weapon: recipe.weapon, chip: recipe.chip,
-      weaponName: weapon.name, chipName: chip.name,
-      weaponIcon: weapon.icon, chipIcon: chip.icon,
-      weaponLevel: gear[recipe.weapon] ?? 0, chipLevel: gear[recipe.chip] ?? 0,
-      evolved: forms.includes(recipe.weapon), form: recipe.name,
+      weapon: recipe.weapon,
+      chip: recipe.chip,
+      weaponName: weapon.name,
+      chipName: chip.name,
+      weaponIcon: weapon.icon,
+      chipIcon: chip.icon,
+      weaponLevel: gear[recipe.weapon] ?? 0,
+      chipLevel: gear[recipe.chip] ?? 0,
+      evolved: forms.includes(recipe.weapon),
+      form: recipe.name,
     }
   })
 }
 
-export const farmBuiltLevels = (gear: Gear) => TALENTS.reduce((sum, talent) => sum + (gear[talent.id] ?? 0), 0)
+export const farmBuiltLevels = (gear: Gear) =>
+  TALENTS.reduce((sum, talent) => sum + (gear[talent.id] ?? 0), 0)

@@ -5,12 +5,31 @@ import type { Gear } from '@/features/farm/rules.mjs'
 export function BuildSummary({ gear }: { gear: Gear }) {
   const summary = farmBuildSummary(gear).filter((item) => item.weaponLevel || item.chipLevel)
   if (!summary.length) return null
-  return <section className="farm-build" aria-label="本局乐队">
-    <div className="farm-build-heading"><small>THIS RUN&apos;S BAND</small><span>共 {farmBuiltLevels(gear)} 次升级</span></div>
-    <ul>{summary.map((item) => <li key={item.weapon} className={item.evolved ? 'is-evolved' : ''}>
-      <span aria-hidden="true">{item.weaponIcon}</span>
-      <div><strong>{item.evolved ? item.form : item.weaponName}</strong><small>成员 {item.weaponName} Lv.{item.weaponLevel} ＋ 装备 {item.chipName} Lv.{item.chipLevel}</small></div>
-      <b>{item.evolved ? '终极 ✦' : `${item.weaponLevel + item.chipLevel}/${MAX_GEAR_LEVEL * 2}`}</b>
-    </li>)}</ul>
-  </section>
+  return (
+    <section className="farm-build" aria-label="本局乐队">
+      <div className="farm-build-heading">
+        <small>THIS RUN&apos;S BAND</small>
+        <span>共 {farmBuiltLevels(gear)} 次升级</span>
+      </div>
+      <ul>
+        {summary.map((item) => (
+          <li key={item.weapon} className={item.evolved ? 'is-evolved' : ''}>
+            <span aria-hidden="true">{item.weaponIcon}</span>
+            <div>
+              <strong>{item.evolved ? item.form : item.weaponName}</strong>
+              <small>
+                成员 {item.weaponName} Lv.{item.weaponLevel} ＋ 装备 {item.chipName} Lv.
+                {item.chipLevel}
+              </small>
+            </div>
+            <b>
+              {item.evolved
+                ? '终极 ✦'
+                : `${item.weaponLevel + item.chipLevel}/${MAX_GEAR_LEVEL * 2}`}
+            </b>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
 }

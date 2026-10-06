@@ -1,18 +1,41 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { awardFarmCoins, FARM_CHARACTERS, FARM_DEFAULT_CHARACTER, FARM_PROFILE_KEY, loadFarmProfile, selectFarmCharacter } from './characters'
+import { buyCharacter } from '../shop/storage'
+import {
+  awardFarmCoins,
+  FARM_CHARACTERS,
+  FARM_DEFAULT_CHARACTER,
+  FARM_PROFILE_KEY,
+  loadFarmProfile,
+  selectFarmCharacter,
+} from './characters'
 
 let data: Map<string, string>
 beforeEach(() => {
   data = new Map()
-  vi.stubGlobal('localStorage', { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value) } })
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => data.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      data.set(key, value)
+    },
+  })
 })
 afterEach(() => vi.unstubAllGlobals())
 
 describe('survivor character shop', () => {
+  it('also honors ownership saved by the original shop atomic profile', () => {
+    buyCharacter('neon')
+    expect(loadFarmProfile().owned).toContain('neon')
+    expect(selectFarmCharacter('neon').profile.coins).toBe(0)
+  })
   it('provides seven characters and a free starter with no unexplained currency', () => {
     expect(FARM_CHARACTERS).toHaveLength(7)
     for (const character of FARM_CHARACTERS) expect(character.price).toBeGreaterThanOrEqual(0)
-    expect(loadFarmProfile()).toEqual({ coins: 0, owned: [FARM_DEFAULT_CHARACTER], selected: FARM_DEFAULT_CHARACTER, rewardedRuns: [] })
+    expect(loadFarmProfile()).toEqual({
+      coins: 0,
+      owned: [FARM_DEFAULT_CHARACTER],
+      selected: FARM_DEFAULT_CHARACTER,
+      rewardedRuns: [],
+    })
   })
 
   it('awards a round once, buys and equips a character, and never charges for switching owned characters', () => {
@@ -32,7 +55,8 @@ describe('survivor character shop', () => {
   it('rejects insufficient funds, unknown characters and invalid rewards without deducting coins', () => {
     expect(selectFarmCharacter('golden').error).toContain('还差')
     expect(selectFarmCharacter('missing').error).toBeTruthy()
-    for (const amount of [-1, NaN, Infinity, 1.2]) expect(awardFarmCoins('invalid', amount).error).toBeTruthy()
+    for (const amount of [-1, NaN, Infinity, 1.2])
+      expect(awardFarmCoins('invalid', amount).error).toBeTruthy()
     expect(loadFarmProfile().coins).toBe(0)
     expect(loadFarmProfile().owned).toEqual([FARM_DEFAULT_CHARACTER])
   })
@@ -40,9 +64,15 @@ describe('survivor character shop', () => {
   it('imports original character ownership and rejects locked or missing selected characters', () => {
     data.set('character-unlocks-v1', JSON.stringify(['burger-dog', 'missing', 'burger-dog']))
     data.set('character-selected-v1', 'burger-dog')
-    expect(loadFarmProfile()).toMatchObject({ owned: [FARM_DEFAULT_CHARACTER, 'burger-dog'], selected: 'burger-dog' })
+    expect(loadFarmProfile()).toMatchObject({
+      owned: [FARM_DEFAULT_CHARACTER, 'burger-dog'],
+      selected: 'burger-dog',
+    })
     expect(selectFarmCharacter('burger-dog').profile.coins).toBe(0)
-    data.set(FARM_PROFILE_KEY, JSON.stringify({ coins: 42, selected: 'golden', owned: ['missing'], rewardedRuns: null }))
+    data.set(
+      FARM_PROFILE_KEY,
+      JSON.stringify({ coins: 42, selected: 'golden', owned: ['missing'], rewardedRuns: null }),
+    )
     expect(loadFarmProfile()).toMatchObject({ coins: 42, selected: FARM_DEFAULT_CHARACTER })
   })
 
@@ -50,7 +80,12 @@ describe('survivor character shop', () => {
     awardFarmCoins('round-1', 1200)
     data.set('character-unlocks-v1', '{broken')
     expect(loadFarmProfile().coins).toBe(1200)
-    vi.stubGlobal('localStorage', { getItem: (key: string) => data.get(key) ?? null, setItem: () => { throw new Error('quota') } })
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => data.get(key) ?? null,
+      setItem: () => {
+        throw new Error('quota')
+      },
+    })
     const failed = selectFarmCharacter('burger-dog')
     expect(failed.error).toContain('无法保存')
     expect(failed.profile.coins).toBe(1200)

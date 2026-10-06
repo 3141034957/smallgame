@@ -43,7 +43,7 @@ export function GameScene({
           const opacity = distance < 0 ? Math.max(0, 1 + distance * 14) : 1
           const platformStyle = {
             '--platform-x': `${x}px`,
-            '--platform-y': `${y * gameSize.height / 100}px`,
+            '--platform-y': `${(y * gameSize.height) / 100}px`,
             '--platform-width': `${width}px`,
             '--platform-scale': scale,
             '--platform-depth': 100 - index,
@@ -58,7 +58,9 @@ export function GameScene({
                 'platform-wrap',
                 platform.id === bounceId ? 'is-bounced' : '',
                 platform.reward > 1 ? 'platform-wrap--risk' : '',
-              ].filter(Boolean).join(' ')}
+              ]
+                .filter(Boolean)
+                .join(' ')}
               style={platformStyle}
               key={platform.id}
               ref={(element) => {
@@ -92,7 +94,9 @@ export function GameScene({
             'player-sprite',
             impact.id > 0 ? 'player-sprite--landed' : '',
             impact.perfect ? 'player-sprite--perfect' : '',
-          ].filter(Boolean).join(' ')}
+          ]
+            .filter(Boolean)
+            .join(' ')}
           key={`player-impact-${impact.id}`}
         >
           <img className="player-character-image" src={character.image} alt="" draggable={false} />

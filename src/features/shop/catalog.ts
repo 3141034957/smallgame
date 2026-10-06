@@ -137,4 +137,3 @@ export const CHARACTERS = CHARACTER_DISPLAY_ORDER.map(
 )
 
 export const DEFAULT_CHARACTER_ID = 'steampunk'
-

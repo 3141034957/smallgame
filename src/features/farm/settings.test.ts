@@ -4,7 +4,12 @@ import { loadFarmSettings, saveFarmSettings, FARM_SETTINGS_KEY } from './setting
 let data: Map<string, string>
 beforeEach(() => {
   data = new Map()
-  vi.stubGlobal('localStorage', { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value) } })
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => data.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      data.set(key, value)
+    },
+  })
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -21,7 +26,12 @@ describe('farm display settings', () => {
     expect(loadFarmSettings().effects).toBe(true)
     data.set(FARM_SETTINGS_KEY, JSON.stringify({ effects: 'no' }))
     expect(loadFarmSettings().effects).toBe(true)
-    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => { throw new Error('quota') } })
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error('quota')
+      },
+    })
     expect(saveFarmSettings({ effects: false })).toEqual({ effects: false })
   })
 })

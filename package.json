@@ -15,22 +15,24 @@
     "start": "PORT=${PORT:-80} node server/index.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
-    "format": "prettier --write"
+    "format": "prettier --write",
+    "format:check": "prettier --check --ignore-unknown src server scripts vite.config.ts postcss.config.js package.json .prettierrc.json"
   },
   "dependencies": {
-    "antd-mobile": "^5.42.3",
-    "antd-mobile-icons": "^0.3.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.2"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "jsdom": "^29.1.1",
     "less": "^4.8.1",
     "oxlint": "^1.71.0",
+    "postcss": "^8.5.29",
     "postcss-mobile-forever": "^5.0.0",
     "prettier": "^3.9.9",
     "typescript": "~6.0.2",

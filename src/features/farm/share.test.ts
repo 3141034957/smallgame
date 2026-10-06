@@ -3,11 +3,28 @@ import { farmShareText } from './share'
 import { MAX_GEAR_LEVEL, TALENTS } from './rules.mjs'
 import type { FarmRound } from './rules.mjs'
 
-const emptyGear = () => Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])) as FarmRound['gear']
+const emptyGear = () =>
+  Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])) as FarmRound['gear']
 const round = (patch: Partial<FarmRound> = {}): FarmRound => ({
-  day: '2026-10-04', frames: [[50, 76]], choices: [], surges: [], outcome: 'defeated', hp: 0, seconds: 185, score: 12345,
-  maxCombo: 40, harvested: 820, bosses: 5, elites: 2, blocks: 3, maxShields: 2, coins: 900, xp: 40, stars: 2,
-  gear: { ...emptyGear(), drum: MAX_GEAR_LEVEL, range: MAX_GEAR_LEVEL }, ...patch,
+  day: '2026-10-04',
+  frames: [[50, 76]],
+  choices: [],
+  surges: [],
+  outcome: 'defeated',
+  hp: 0,
+  seconds: 185,
+  score: 12345,
+  maxCombo: 40,
+  harvested: 820,
+  bosses: 5,
+  elites: 2,
+  blocks: 3,
+  maxShields: 2,
+  coins: 900,
+  xp: 40,
+  stars: 2,
+  gear: { ...emptyGear(), drum: MAX_GEAR_LEVEL, range: MAX_GEAR_LEVEL },
+  ...patch,
 })
 
 describe('result share text', () => {

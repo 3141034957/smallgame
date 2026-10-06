@@ -7,8 +7,16 @@ export function firstSongStep(journey: Journey) {
   return Math.min(3, journey.actions.filter((action) => action.type === 'move').length)
 }
 export function hasPlayedFirstSong() {
-  try { return localStorage.getItem(KEY) === 'done' } catch { return false }
+  try {
+    return localStorage.getItem(KEY) === 'done'
+  } catch {
+    return false
+  }
 }
 export function rememberFirstSong() {
-  try { localStorage.setItem(KEY, 'done') } catch { /* The tour is still completed in memory. */ }
+  try {
+    localStorage.setItem(KEY, 'done')
+  } catch {
+    /* The tour is still completed in memory. */
+  }
 }

@@ -9,6 +9,7 @@ import {
   getOrCreatePlayerId,
   getStoredNickname,
   MAX_NAME_LENGTH,
+  normalizeNickname,
   saveNickname,
 } from '@/utils/playerIdentity'
 
@@ -36,6 +37,18 @@ export function FarmBoard({
   const [submittedRound, setSubmittedRound] = useState<FarmRound | null>(null)
   const boardRef = useRef<AbortController | null>(null)
   const submitRef = useRef<AbortController | null>(null)
+  const attempted = useRef<FarmRound | null>(null)
+
+  // StrictMode replays setup after cleanup; a cancelled attempt must be allowed
+  // to restart, and its old promise must not clear a newer request's busy state.
+  useEffect(() => {
+    setBusy(false)
+    return () => {
+      submitRef.current?.abort()
+      submitRef.current = null
+      attempted.current = null
+    }
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -60,12 +73,14 @@ export function FarmBoard({
   const submitted = !!round && submittedRound === round
   const submit = useCallback(
     (nickname: string, target: FarmRound | null | undefined) => {
-      if (!target || busy) return
-      const next = saveNickname(nickname)
+      if (!target || submitRef.current) return
+      const next = normalizeNickname(nickname)
       if (!next) {
         setError('给你的乐手取个昵称吧。')
         return
       }
+      saveNickname(next)
+      attempted.current = target
       setName(next)
       boardRef.current?.abort()
       const controller = new AbortController()
@@ -94,26 +109,26 @@ export function FarmBoard({
             setError(reason instanceof Error ? reason.message : '暂时连不上，再试一次。')
         })
         .finally(() => {
-          if (!controller.signal.aborted) setBusy(false)
+          if (submitRef.current === controller) {
+            submitRef.current = null
+            setBusy(false)
+          }
         })
     },
-    [busy, playerId, characterId],
+    [playerId, characterId],
   )
 
   // A player who already picked a nickname is on the board the moment the run
   // ends; a failure is retried from the button, never in a loop.
-  const attempted = useRef<FarmRound | null>(null)
   const submitNow = useRef(submit)
   submitNow.current = submit
   useEffect(() => {
     if (compact || !round || round.score <= 0 || !name) return
     if (attempted.current === round) return
-    attempted.current = round
     // Through a ref: the submission itself must not be cancelled by the state
     // updates it triggers.
     submitNow.current(name, round)
   }, [round, name, compact])
-  useEffect(() => () => submitRef.current?.abort(), [])
 
   return (
     <section className={`farm-board${compact ? ' is-compact' : ''}`} aria-label="无限总榜">

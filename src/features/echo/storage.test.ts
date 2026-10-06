@@ -25,13 +25,23 @@ function installStorage(): Map<string, string> {
   const map = new Map<string, string>()
   const stub = {
     getItem: (key: string) => map.get(key) ?? null,
-    setItem: (key: string, value: string) => { map.set(key, String(value)) },
-    removeItem: (key: string) => { map.delete(key) },
+    setItem: (key: string, value: string) => {
+      map.set(key, String(value))
+    },
+    removeItem: (key: string) => {
+      map.delete(key)
+    },
     clear: () => map.clear(),
     key: (index: number) => [...map.keys()][index] ?? null,
-    get length() { return map.size },
+    get length() {
+      return map.size
+    },
   }
-  Object.defineProperty(globalThis, 'localStorage', { value: stub, configurable: true, writable: true })
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: stub,
+    configurable: true,
+    writable: true,
+  })
   return map
 }
 
@@ -49,7 +59,9 @@ describe('date helpers', () => {
 
 describe('saved song collection', () => {
   let map: Map<string, string>
-  beforeEach(() => { map = installStorage() })
+  beforeEach(() => {
+    map = installStorage()
+  })
 
   it('starts empty, then keeps the newest song first without duplicates', () => {
     expect(readCollection()).toEqual([])
@@ -97,7 +109,9 @@ describe('saved song collection', () => {
 })
 
 describe('preferences', () => {
-  beforeEach(() => { installStorage() })
+  beforeEach(() => {
+    installStorage()
+  })
 
   it('remembers the skin and mute state, defaulting to night and unmuted', () => {
     expect(readSkin()).toBe('night')
@@ -112,12 +126,17 @@ describe('preferences', () => {
 })
 
 describe('story progress', () => {
-  beforeEach(() => { installStorage() })
+  beforeEach(() => {
+    installStorage()
+  })
 
   it('round trips a board and chapter, and rejects impossible chapters', () => {
     expect(readStoryProgress()).toBeNull()
     writeStoryProgress(boardWith([0, 'heart'], [4, 'heart']), 1)
-    expect(readStoryProgress()).toEqual({ board: boardWith([0, 'heart'], [4, 'heart']), chapter: 1 })
+    expect(readStoryProgress()).toEqual({
+      board: boardWith([0, 'heart'], [4, 'heart']),
+      chapter: 1,
+    })
 
     localStorage.setItem('echo-garden-story-v1', JSON.stringify({ code: 'H...H...', chapter: 99 }))
     expect(readStoryProgress()).toBeNull()
@@ -127,7 +146,9 @@ describe('story progress', () => {
 })
 
 describe('daily flower scores', () => {
-  beforeEach(() => { installStorage() })
+  beforeEach(() => {
+    installStorage()
+  })
 
   it('keeps the highest score for a date', () => {
     expect(readDailyBest('2026-09-24')).toBe(0)
@@ -149,8 +170,10 @@ describe('daily flower scores', () => {
     const records = recentDailyBest('2026-09-24')
     expect(records).toHaveLength(7)
     expect(records.at(-1)).toEqual({ date: '2026-09-24', score: 100 })
-    expect(records.filter((record) => record.score > 0).map((record) => record.date))
-      .toEqual(['2026-09-22', '2026-09-24'])
+    expect(records.filter((record) => record.score > 0).map((record) => record.date)).toEqual([
+      '2026-09-22',
+      '2026-09-24',
+    ])
   })
 
   it('counts a streak of finished days and tolerates an unplayed today', () => {
