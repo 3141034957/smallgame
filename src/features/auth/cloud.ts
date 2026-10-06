@@ -1,16 +1,15 @@
 import {
   acknowledgeAccountSave,
   installAccountSave,
+  progressForCloud,
   readAccountSave,
   type ProgressData,
 } from '@/utils/accountStorage'
-import { isProgressKey, validProgress } from './progress.mjs'
+import { validProgress } from './progress.mjs'
 import { AccountError, notifyAccountExpired } from './client'
 
 export type CloudProgress = { data: ProgressData; revision: number }
 export type SyncStatus = 'saved' | 'pending' | 'offline' | 'conflict'
-const dataForCloud = (data: ProgressData) =>
-  Object.fromEntries(Object.entries(data).filter(([key]) => isProgressKey(key)))
 export async function progressRequest(
   id: string,
   save?: CloudProgress,
@@ -57,35 +56,48 @@ export async function loadAccountProgress(id: string, signal: AbortSignal, force
     local.dirty &&
     (local.revision === remote.revision ||
       (remote.revision === 0 && Object.keys(local.data).length > 0))
+  let backup: string | null = null
   if (local.dirty && !keepLocal && Object.keys(local.data).length) {
-    localStorage.setItem(`farm-account-backup-v1:${id}`, JSON.stringify(local))
+    const key = `farm-account-backup-v1:${id}`
+    try {
+      localStorage.setItem(key, JSON.stringify(local))
+      backup = key
+    } catch {
+      // A full quota must not turn the cloud restore into a failure.
+    }
   }
   const persisted = installAccountSave(id, {
-    data: keepLocal ? dataForCloud(local.data) : remote.data,
+    // Keep every local key: only the upload is limited to progress keys.
+    data: keepLocal ? local.data : remote.data,
     revision: remote.revision,
     dirty: keepLocal,
   })
-  return { persisted, retained: keepLocal }
+  return { persisted, retained: keepLocal, backup }
 }
 
 export function createProgressSync(id: string, onStatus: (status: SyncStatus) => void) {
   const controller = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
   let pending: Promise<boolean> | null = null
+  let generation = 0
   let conflict = false
   let stopped = false
   const flush = (keepalive = false): Promise<boolean> => {
     if (stopped || conflict) return Promise.resolve(false)
     if (timer) clearTimeout(timer)
-    if (pending) return pending
+    const previous = pending
+    // A keepalive save must own its request, otherwise the page unload cancels it.
+    if (previous && !keepalive) return previous
+    const token = ++generation
     pending = (async () => {
+      if (previous) await previous
       await Promise.resolve()
       try {
         let current = readAccountSave(id)
         while (current.dirty && !stopped) {
           if (current.revision === null) throw new Error('尚未恢复云端存档。')
           onStatus('pending')
-          const data = dataForCloud(current.data)
+          const data = progressForCloud(current.data)
           const result = await progressRequest(
             id,
             { data, revision: current.revision },
@@ -105,7 +117,7 @@ export function createProgressSync(id: string, onStatus: (status: SyncStatus) =>
         }
         return false
       } finally {
-        pending = null
+        if (token === generation) pending = null
       }
     })()
     return pending

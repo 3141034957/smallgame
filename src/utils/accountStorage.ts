@@ -1,8 +1,11 @@
 import { isProgressKey, PROGRESS_KEYS } from '@/features/auth/progress.mjs'
 
 const PREFIX = 'farm-account-save-v1:'
+const CORRUPT = ':corrupt'
 const CLAIM = 'farm-legacy-claim-v1'
 const GUEST = 'farm-guest-save-v1'
+const DAILY_BEST = /^farm-best-v[\w-]+:(\d{4}-\d{2}-\d{2})$/
+const DAILY_BEST_DAYS = 400
 export const ACCOUNT_SAVE_EVENT = 'echo-progress-changed'
 export type ProgressData = Record<string, string>
 export type AccountSave = { data: ProgressData; revision: number | null; dirty: boolean }
@@ -12,12 +15,29 @@ export const activeAccountId = () => accountId
 export function activateAccount(id: string | null) {
   accountId = id
 }
+const empty = (): AccountSave => ({ data: {}, revision: null, dirty: false })
 function object(value: string | null): ProgressData {
-  const parsed = JSON.parse(value ?? '{}')
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(value ?? '{}')
+  } catch {
+    return {}
+  }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
   return Object.fromEntries(
     Object.entries(parsed).filter(([, value]) => typeof value === 'string'),
   ) as ProgressData
+}
+const safeRevision = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isSafeInteger(value) ? value : null
+// Keep the unreadable blob around so a later write cannot make it unrecoverable.
+function quarantine(id: string, raw: string): AccountSave {
+  try {
+    localStorage.setItem(PREFIX + id + CORRUPT, raw)
+  } catch {
+    /* Nothing else to do: the copy in memory is already empty. */
+  }
+  return empty()
 }
 function legacySnapshot() {
   const keys = new Set([...PROGRESS_KEYS, 'clockwork-player-id-v1'])
@@ -44,17 +64,27 @@ export function readAccountSave(id: string): AccountSave {
   if (memory) return memory
   const raw = localStorage.getItem(PREFIX + id)
   if (raw !== null) {
-    const parsed = JSON.parse(raw)
+    let parsed: { data?: unknown; revision?: unknown; dirty?: unknown } | null = null
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      return quarantine(id, raw)
+    }
     if (parsed?.data && typeof parsed.data === 'object' && !Array.isArray(parsed.data))
       return {
         data: object(JSON.stringify(parsed.data)),
-        revision: Number.isSafeInteger(parsed.revision) ? parsed.revision : null,
+        revision: safeRevision(parsed.revision),
         dirty: parsed.dirty === true,
       }
     // Migrate the flat account save from before cloud storage.
     return { data: object(raw), revision: null, dirty: true }
   }
-  const claim = JSON.parse(localStorage.getItem(CLAIM) ?? 'null')
+  let claim: { owner?: unknown; data?: unknown } | null = null
+  try {
+    claim = JSON.parse(localStorage.getItem(CLAIM) ?? 'null')
+  } catch {
+    claim = null
+  }
   return {
     data: claim?.owner === id ? object(JSON.stringify(claim.data)) : {},
     revision: null,
@@ -76,18 +106,28 @@ export function installAccountSave(id: string, save: AccountSave) {
 }
 export function acknowledgeAccountSave(id: string, sent: ProgressData, revision: number) {
   const current = readAccountSave(id)
-  const data = Object.fromEntries(
-    Object.entries(current.data).filter(([key]) => isProgressKey(key)),
-  )
-  const dirty = JSON.stringify(data) !== JSON.stringify(sent)
+  const dirty = JSON.stringify(progressForCloud(current.data)) !== JSON.stringify(sent)
   installAccountSave(id, { data: current.data, revision, dirty })
   return dirty
 }
-export function resetGuestProgress() {
+export function resetGuestProgress(transferred: ProgressData = {}) {
   // Preserve the transferred snapshot as a backup, then start a separate fresh guest.
   const data = guestProgress()
   localStorage.setItem('farm-guest-backup-v1', JSON.stringify(data))
-  localStorage.setItem(GUEST, '{}')
+  // Only drop what actually reached the account; unknown keys stay playable.
+  const rest = Object.fromEntries(Object.entries(data).filter(([key]) => !(key in transferred)))
+  localStorage.setItem(GUEST, JSON.stringify(rest))
+}
+// Daily best scores are dropped after a while so the upload stays within the server limit.
+export function progressForCloud(data: ProgressData): ProgressData {
+  const cutoff = new Date(Date.now() - DAILY_BEST_DAYS * 86_400_000).toISOString().slice(0, 10)
+  return Object.fromEntries(
+    Object.entries(data).filter(([key]) => {
+      if (!isProgressKey(key)) return false
+      const date = DAILY_BEST.exec(key)?.[1]
+      return date === undefined || date >= cutoff
+    }),
+  )
 }
 export function canClaimLegacyProgress() {
   try {
@@ -102,12 +142,17 @@ export function claimLegacyProgress(id: string) {
 }
 export const accountStorage = {
   getItem(key: string): string | null {
-    return (accountId ? readAccountSave(accountId).data : guestProgress())[key] ?? null
+    try {
+      return (accountId ? readAccountSave(accountId).data : guestProgress())[key] ?? null
+    } catch {
+      return null
+    }
   },
   setItem(key: string, value: string) {
     if (accountId) {
       const current = readAccountSave(accountId)
-      writeAccountSave(accountId, {
+      // A rejected write must not strand the player: keep the save in memory instead.
+      installAccountSave(accountId, {
         ...current,
         data: { ...current.data, [key]: value },
         dirty: true,

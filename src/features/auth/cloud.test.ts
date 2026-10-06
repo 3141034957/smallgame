@@ -107,6 +107,64 @@ it('migrates a local-only account when the server has no cloud snapshot', async 
   expect((await loadAccountProgress(owner, new AbortController().signal)).retained).toBe(true)
   expect(readAccountSave(owner)).toEqual({ data: { [key]: 'legacy' }, revision: 0, dirty: true })
 })
+it('keeps unrelated local keys when the local copy wins over the cloud', async () => {
+  installAccountSave(owner, {
+    data: { [key]: 'local', 'unrelated-secret': 'private' },
+    revision: 2,
+    dirty: true,
+  })
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({ [key]: 'remote' }, 2)))
+  const result = await loadAccountProgress(owner, new AbortController().signal)
+  expect(result.retained).toBe(true)
+  expect(result.backup).toBeNull()
+  expect(readAccountSave(owner).data).toEqual({
+    [key]: 'local',
+    'unrelated-secret': 'private',
+  })
+})
+it('reports the backup key when the cloud replaces local progress', async () => {
+  accountStorage.setItem(key, 'local')
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({ [key]: 'cloud' }, 5)))
+  const result = await loadAccountProgress(owner, new AbortController().signal)
+  expect(result.backup).toBe(`farm-account-backup-v1:${owner}`)
+  expect(JSON.parse(localStorage.getItem(result.backup!)!).data[key]).toBe('local')
+})
+it('restores the cloud copy even when the local backup cannot be written', async () => {
+  accountStorage.setItem(key, 'local')
+  vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+    throw new Error('full')
+  })
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({ [key]: 'cloud' }, 5)))
+  const result = await loadAccountProgress(owner, new AbortController().signal)
+  expect(result.backup).toBeNull()
+  expect(readAccountSave(owner).data[key]).toBe('cloud')
+})
+it('sends its own keepalive request instead of reusing an in-flight save', async () => {
+  let finish!: (value: Response) => void
+  const fetcher = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = resolve
+        }),
+    )
+    .mockResolvedValueOnce(reply({ [key]: 'local' }, 2))
+  vi.stubGlobal('fetch', fetcher)
+  accountStorage.setItem(key, 'local')
+  const sync = createProgressSync(owner, vi.fn())
+  const first = sync.flush()
+  await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1))
+  const leaving = sync.flush(true)
+  expect(leaving).not.toBe(first)
+  finish(new Response('{"error":"boom"}', { status: 500 }))
+  expect(await first).toBe(false)
+  expect(await leaving).toBe(true)
+  expect(fetcher).toHaveBeenCalledTimes(2)
+  expect(fetcher.mock.calls[0][1].keepalive).toBe(false)
+  expect(fetcher.mock.calls[1][1].keepalive).toBe(true)
+  sync.stop()
+})
 it('does not acknowledge a response arriving after the account synchronizer is stopped', async () => {
   let finish!: (value: Response) => void
   vi.stubGlobal(

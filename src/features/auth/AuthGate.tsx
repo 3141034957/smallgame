@@ -39,7 +39,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>('saved')
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('pending')
   const userId = user?.id
   const sync = useRef<ReturnType<typeof createProgressSync> | null>(null)
   const mounted = useRef(false)
@@ -62,6 +62,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
       if (!preserveGuest) flushSync(() => setGameVisible(false))
       activateAccount(next?.id ?? null)
       if (!preserveGuest) setGameKey(next?.id ?? `guest:${Date.now()}`)
+      // Never carry a conflict or "saved" badge from the previous account over.
+      setSyncStatus('pending')
     } else activateAccount(next?.id ?? null)
     principal.current = next
     setUser(next)
@@ -212,7 +214,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       if (progress) {
         installAccountSave(next.id, { data: progress, revision: 1, dirty: false })
         try {
-          resetGuestProgress()
+          resetGuestProgress(progress)
         } catch {
           setNotice('账号已保存，本机游客备份暂时无法更新。')
         }
@@ -274,13 +276,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
     try {
       // End the old run before replacing its storage, then remount from the cloud.
       flushSync(() => setGameVisible(false))
-      await loadAccountProgress(owner.id, controller.signal, true)
+      const { backup } = await loadAccountProgress(owner.id, controller.signal, true)
       if (!mounted.current || controller.signal.aborted) return
       setGameKey(`${owner.id}:${Date.now()}`)
       setGameVisible(true)
       setUser({ ...owner })
       setSyncStatus('saved')
-      setNotice('已恢复云端进度，未上传的本机副本已保留。')
+      setNotice(
+        backup
+          ? '已恢复云端进度，未上传的本机副本已保留。'
+          : '已恢复云端进度，本机没有需要保留的进度。',
+      )
     } catch (cause) {
       if (mounted.current && !controller.signal.aborted) {
         setGameKey(`${owner.id}:${Date.now()}`)

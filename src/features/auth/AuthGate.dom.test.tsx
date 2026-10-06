@@ -211,6 +211,29 @@ it('keeps an account on failed logout and only starts guest mode after successfu
   await screen.findByText(/游戏账号 guest/)
   expect(activeAccountId()).toBeNull()
 })
+it('clears the conflict banner when the session switches to another account', async () => {
+  const other = { id: 'account_00000000-0000-4000-8000-000000000002', username: 'player_two' }
+  let conflicting = true
+  current = user
+  vi.mocked(fetch).mockImplementation(async (url, options) => {
+    if (String(url) === '/api/progress') {
+      if (options?.method === 'POST' && conflicting) return json({ error: 'conflict' }, 409)
+      return json({ data: cloud, revision: 1 })
+    }
+    return json({ user: current })
+  })
+  mount()
+  await screen.findByText('♫ player_one')
+  fireEvent.click(screen.getByRole('button', { name: '完成游客局' }))
+  await waitFor(() => expect(screen.getByText(/云端有更新/)).toBeTruthy())
+  conflicting = false
+  current = other
+  await act(async () =>
+    window.dispatchEvent(new StorageEvent('storage', { key: AUTH_CHANGED_KEY })),
+  )
+  await screen.findByText('♫ player_two')
+  expect(screen.queryByText(/云端有更新/)).toBeNull()
+})
 it('unmounts the previous owner before activating another account storage scope', async () => {
   const next = { id: 'account_00000000-0000-4000-8000-000000000002', username: 'player_two' }
   const WriteOnLeave = () => {

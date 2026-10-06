@@ -5,6 +5,9 @@ import {
   activateAccount,
   canClaimLegacyProgress,
   claimLegacyProgress,
+  exportGuestProgress,
+  progressForCloud,
+  resetGuestProgress,
 } from './accountStorage'
 import {
   loadFarmProfile,
@@ -23,6 +26,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   activateAccount(null)
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 it('claims old coins, characters, upgrades, statistics and best scores exactly once without deleting originals', () => {
@@ -80,7 +84,7 @@ it('isolates accounts and allows separate guest progress after logout', () => {
   expect(accountStorage.getItem('farm-quests-v1')).toBe('a')
   expect(localStorage.getItem(FARM_PROFILE_KEY)).toBeNull()
 })
-it('never overwrites an established account save with legacy progress and fails atomically when storage is full', () => {
+it('never overwrites an established account save with legacy progress and keeps saving in memory when storage is full', () => {
   activateAccount(a)
   awardFarmCoins('account_run', 7000)
   localStorage.setItem(FARM_PROFILE_KEY, '{"coins":99999}')
@@ -89,8 +93,55 @@ it('never overwrites an established account save with legacy progress and fails 
   vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
     throw new Error('full')
   })
-  expect(selectFarmCharacter('crocodile-beat').paid).toBe(false)
-  expect(loadFarmProfile().coins).toBe(7000)
+  // A rejected write falls back to memory, so the run keeps the purchase.
+  const purchase = selectFarmCharacter('crocodile-beat')
+  expect(purchase.paid).toBe(true)
+  expect(loadFarmProfile().owned).toContain('crocodile-beat')
+  expect(loadFarmProfile().coins).toBe(purchase.profile.coins)
   expect(() => claimLegacyProgress(b)).toThrow('full')
   expect(localStorage.getItem('farm-legacy-claim-v1')).toBeNull()
+})
+it('keeps saving in memory when localStorage refuses account writes', () => {
+  const c = 'account_00000000-0000-4000-8000-000000000003'
+  activateAccount(c)
+  accountStorage.setItem('farm-career-v1', '{"runs":1}')
+  vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+    throw new Error('full')
+  })
+  expect(() => accountStorage.setItem('farm-career-v1', '{"runs":2}')).not.toThrow()
+  expect(accountStorage.getItem('farm-career-v1')).toBe('{"runs":2}')
+})
+it('quarantines an unreadable account save and accepts new writes', () => {
+  activateAccount(b)
+  localStorage.setItem(`farm-account-save-v1:${b}`, '{"coins":')
+  expect(accountStorage.getItem('farm-career-v1')).toBeNull()
+  expect(localStorage.getItem(`farm-account-save-v1:${b}:corrupt`)).toBe('{"coins":')
+  expect(() => accountStorage.setItem('farm-career-v1', '{"runs":1}')).not.toThrow()
+  expect(accountStorage.getItem('farm-career-v1')).toBe('{"runs":1}')
+})
+it('keeps guest keys that registration never uploaded', () => {
+  localStorage.setItem(
+    'farm-guest-save-v1',
+    JSON.stringify({ 'farm-career-v1': '{"runs":3}', 'clockwork-player-id-v1': 'guest-id-1' }),
+  )
+  const transferred = exportGuestProgress()
+  expect(Object.keys(transferred)).toEqual(['farm-career-v1'])
+  resetGuestProgress(transferred)
+  expect(JSON.parse(localStorage.getItem('farm-guest-save-v1')!)).toEqual({
+    'clockwork-player-id-v1': 'guest-id-1',
+  })
+  expect(JSON.parse(localStorage.getItem('farm-guest-backup-v1')!)['farm-career-v1']).toBe(
+    '{"runs":3}',
+  )
+})
+it('drops daily best scores older than the retention window before uploading', () => {
+  const today = new Date().toISOString().slice(0, 10)
+  expect(
+    progressForCloud({
+      'farm-best-v8-recovery:2020-01-01': '1',
+      [`farm-best-v8-recovery:${today}`]: '2',
+      'farm-career-v1': '{"runs":1}',
+      'unrelated-secret': 'private',
+    }),
+  ).toEqual({ [`farm-best-v8-recovery:${today}`]: '2', 'farm-career-v1': '{"runs":1}' })
 })
