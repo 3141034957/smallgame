@@ -12,7 +12,7 @@ export function RunTimeline({ samples, marks, seconds }: { samples: FarmSample[]
     <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" role="img" aria-label={`本局复盘：分数最高 ${peak.toLocaleString()} 分，生命最低 ${lowest} 点，存活 ${seconds.toFixed(1)} 秒`}>
       <polyline className="farm-recap-score" points={farmTimelinePath(samples, WIDTH, HEIGHT, (sample) => sample.score)} />
       <polyline className="farm-recap-hp" points={farmTimelinePath(samples, WIDTH, HEIGHT, (sample) => sample.hp)} />
-      {marks.filter((tick) => tick >= first).map((tick) => <circle key={tick} className="farm-recap-mark" cx={(tick - first) / span * WIDTH} cy={HEIGHT - 3} r={2.5} />)}
+      {marks.filter((tick) => tick >= first).map((tick, index) => <circle key={`${tick}-${index}`} className="farm-recap-mark" cx={(tick - first) / span * WIDTH} cy={HEIGHT - 3} r={2.5} />)}
     </svg>
     <div className="farm-recap-legend"><span className="is-score">分数 最高 {peak.toLocaleString()}</span><span className="is-hp">生命 最低 {lowest}</span><span>✦ 进化 {marks.length} 次</span></div>
   </figure>
