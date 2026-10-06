@@ -1,3 +1,11 @@
+// Shared by simulation, upgrade descriptions and the recovery countdown.
+export const RECOVERY = {
+  safeSeconds: 8,
+  regenSeconds: 12,
+  regenAmounts: [1, 1.5, 2, 2.5, 3],
+  shieldSeconds: [180, 150, 120],
+}
+
 export const PERMANENT_BRANCHES = [
   { id: 'survival', name: '生存保障', icon: '♡' },
   { id: 'power', name: '攻击成长', icon: '♫' },
@@ -30,7 +38,7 @@ export const PERMANENT_UPGRADES = [
     icon: '✚',
     max: 5,
     prices: [3500, 14000, 35000, 80000, 160000],
-    description: '受击后安全等待 4 秒，再每 6 秒恢复生命；第一口在第 10 秒。',
+    description: `受击后安全等待 ${RECOVERY.safeSeconds} 秒，再每 ${RECOVERY.regenSeconds} 秒恢复少量生命；第一口在第 ${RECOVERY.safeSeconds + RECOVERY.regenSeconds} 秒。`,
   },
   {
     id: 'shield',
@@ -39,7 +47,7 @@ export const PERMANENT_UPGRADES = [
     icon: '⬡',
     max: 3,
     prices: [18000, 70000, 200000],
-    description: '空盾时计时，最近 8 秒未受击可补 1 层。不会自动叠盾。',
+    description: '空盾时计时；任何有效受击或拾取护盾都会从零重计，自动只补 1 层。',
   },
   {
     id: 'power',
@@ -119,8 +127,8 @@ export function permanentStats(value) {
     attraction: 1 + levels.magnet * 0.04,
     xp: 1 + levels.wisdom * 0.02,
     damageTaken: 1 - levels.armor * 0.02,
-    regen: levels.regen ? levels.regen + 1 : 0,
-    shieldSeconds: levels.shield ? [90, 75, 60][levels.shield - 1] : 0,
+    regen: RECOVERY.regenAmounts[levels.regen - 1] ?? 0,
+    shieldSeconds: RECOVERY.shieldSeconds[levels.shield - 1] ?? 0,
   }
 }
 export function permanentEffect(id, level) {
@@ -130,7 +138,11 @@ export function permanentEffect(id, level) {
   if (id === 'magnet') return `拾取半径 +${level * 4}%`
   if (id === 'wisdom') return `经验 +${level * 2}%`
   if (id === 'armor') return `减伤 ${level * 2}%`
-  if (id === 'regen') return level ? `每 6 秒恢复 ${level + 1} 生命` : '自动回血未启用'
-  if (id === 'shield') return level ? `空盾 ${[90, 75, 60][level - 1]} 秒补 1 层` : '自动补盾未启用'
+  if (id === 'regen')
+    return level
+      ? `每 ${RECOVERY.regenSeconds} 秒恢复 ${RECOVERY.regenAmounts[level - 1]} 生命`
+      : '自动回血未启用'
+  if (id === 'shield')
+    return level ? `空盾 ${RECOVERY.shieldSeconds[level - 1]} 秒补 1 层` : '自动补盾未启用'
   return ''
 }

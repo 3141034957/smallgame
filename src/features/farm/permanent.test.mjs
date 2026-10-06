@@ -14,6 +14,7 @@ import {
   permanentStats,
   validPermanentLevels,
   PERMANENT_UPGRADES,
+  RECOVERY,
 } from './permanent.mjs'
 
 const day = '2026-10-06'
@@ -133,24 +134,24 @@ describe('permanent growth rules', () => {
     expect(step(quiet({ armor: 6 }), true).hp).toBe(89.44)
   })
 
-  it('heals at ten seconds after a hit, then every six seconds, and resets on another hit', () => {
+  it('heals at twenty seconds after a hit, then every twelve seconds, and resets on another hit', () => {
     let state = step(quiet({ regen: 1 }), true)
     expect(state.hp).toBe(88)
-    while (state.tick < 160) state = step(state)
+    while (state.tick < 320) state = step(state)
     expect(state.hp).toBe(88)
     state = step(state)
-    expect(state.hp).toBe(90)
-    for (let tick = 0; tick < 95; tick++) state = step(state)
-    expect(state.hp).toBe(90)
+    expect(state.hp).toBe(89)
+    for (let tick = 0; tick < 191; tick++) state = step(state)
+    expect(state.hp).toBe(89)
     state = step(state)
-    expect(state.hp).toBe(92)
+    expect(state.hp).toBe(90)
     state = step(state, true)
-    expect(state.hp).toBe(80)
+    expect(state.hp).toBe(78)
     expect(state.regenTicks).toBe(0)
   })
 
   it('resets recovery on shield hits, ignores invulnerable collisions, and clears a full-heal timer', () => {
-    let state = { ...quiet({ regen: 5 }), hp: 50, shields: 1, regenTicks: 95 }
+    let state = { ...quiet({ regen: 5 }), hp: 50, shields: 1, regenTicks: 191 }
     state = step(state, true)
     expect(state.hp).toBe(50)
     expect(state.shields).toBe(0)
@@ -158,15 +159,15 @@ describe('permanent growth rules', () => {
     const lastHit = state.lastHit
     state = step(state, true)
     expect(state.lastHit).toBe(lastHit)
-    state = chooseTalent({ ...state, offered: ['heal'], regenTicks: 95 }, 'heal')
+    state = chooseTalent({ ...state, offered: ['heal'], regenTicks: 191 }, 'heal')
     expect(state.hp).toBe(state.maxHp)
     expect(state.regenTicks).toBe(0)
   })
 
   it.each([
-    [1, 90],
-    [2, 75],
-    [3, 60],
+    [1, 180],
+    [2, 150],
+    [3, 120],
   ])('regenerates only one empty shield at rank %s', (shield, seconds) => {
     let state = quiet({ shield })
     for (let tick = 0; tick < seconds * FPS - 1; tick++) state = step(state)
@@ -181,16 +182,23 @@ describe('permanent growth rules', () => {
     expect(state.shieldTicks).toBe(0)
   })
 
-  it('waits for eight safe seconds and lets pickups cancel a ready automatic shield', () => {
-    let state = { ...quiet({ shield: 3 }), tick: 960, shieldTicks: 960, lastHit: 900 }
-    state = step(state)
+  it('restarts the whole empty-shield timer on damage and never banks progress through combat', () => {
+    let state = { ...quiet({ shield: 3 }), tick: 2000, shieldTicks: 1919 }
+    state = step(state, true)
+    expect(state.shieldTicks).toBe(0)
     expect(state.shields).toBe(0)
-    while (state.tick < 1028) state = step(state)
+    state = step(state, true) // Ignored during invulnerability: recharge still advances.
+    expect(state.shieldTicks).toBe(1)
+    for (let tick = 0; tick < 1918; tick++) state = step(state)
+    expect(state.shields).toBe(0)
     state = step(state)
     expect(state.shields).toBe(1)
+  })
+
+  it('lets pickups cancel a ready automatic shield without generating a second layer', () => {
     const pickup = {
       ...quiet({ shield: 3 }),
-      shieldTicks: 959,
+      shieldTicks: 1919,
       loot: [{ id: 1, x: 50, y: 76, xp: 0, coins: 0, shield: 1 }],
     }
     const result = stepFarm(pickup, pickup.position).state
@@ -200,12 +208,36 @@ describe('permanent growth rules', () => {
 
   it('never heals a lethal hit or accumulates recovery while full', () => {
     const dead = step(
-      { ...quiet({ regen: 5, shield: 3 }), hp: 5, regenTicks: 95, shieldTicks: 959 },
+      { ...quiet({ regen: 5, shield: 3 }), hp: 5, regenTicks: 191, shieldTicks: 1919 },
       true,
     )
     expect(dead.hp).toBe(0)
     expect(dead.shields).toBe(0)
     expect(stepFarm(dead, dead.position)).toBeNull()
-    expect(step({ ...quiet({ regen: 5 }), regenTicks: 95 }).regenTicks).toBe(0)
+    expect(step({ ...quiet({ regen: 5 }), regenTicks: 191 }).regenTicks).toBe(0)
+  })
+
+  it.each([1, 2, 3, 4, 5])(
+    'keeps rank %s healing small, fractional and capped at maximum health',
+    (regen) => {
+      const amount = [1, 1.5, 2, 2.5, 3][regen - 1]
+      const ready = { ...quiet({ regen }), hp: 50, regenTicks: 191 }
+      expect(step(ready).hp).toBe(50 + amount)
+      expect(step({ ...ready, hp: 99.75 }).hp).toBe(100)
+      expect(permanentStats({ regen }).regen).toBe(amount)
+      expect(RECOVERY.regenSeconds).toBe(12)
+    },
+  )
+
+  it('cannot sustain continuous contact damage even with all defensive ranks and three stored shields', () => {
+    let state = { ...quiet({ vitality: 12, armor: 6, regen: 5, shield: 3 }), shields: 3 }
+    for (let tick = 0; tick < 20 * FPS && state.hp > 0; tick++) {
+      state = step(state, tick % FPS === 0)
+      expect(state.regenTicks).toBe(0)
+      expect(state.shields).toBeLessThanOrEqual(3)
+      expect(state.shieldTicks).toBeLessThan(FPS)
+    }
+    expect(state.hp).toBe(0)
+    expect(state.shields).toBe(0)
   })
 })

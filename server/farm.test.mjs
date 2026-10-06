@@ -188,7 +188,7 @@ describe('replay-verified all-time farm leaderboard', () => {
       verifyFarm({ ...defeat, frames: [...lowerRound.frames, lowerRound.frames.at(-1)] }),
     ).toBeNull()
     expect(verifyFarm({ ...defeat, surges: [lowerRound.frames.length] })).toBeNull()
-    expect(farmKey(day)).toBe(`farm:v7-growth:${day}`)
+    expect(farmKey(day)).toBe(`farm:v8-recovery:${day}`)
   })
 
   it('rejects the former one-minute finish while the player is alive', () => {

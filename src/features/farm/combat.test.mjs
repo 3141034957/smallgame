@@ -298,6 +298,26 @@ describe('survivor combat', () => {
     expect(wave.loot.some((drop) => drop.shield)).toBe(true)
     expect(wave.nextShield).toBe(128 + SHIELD_COOLDOWN)
   })
+  it('limits dropped shields to one every forty-five seconds even with rapid kills', () => {
+    expect(SHIELD_COOLDOWN).toBe(45 * FPS)
+    const kill = (tick, nextShield) => {
+      const state = arena([], tick)
+      state.harvested = 39
+      state.nextShield = nextShield
+      state.lastPulse = tick - 20
+      state.crops = [{ id: 1, kind: 0, x: 62, y: 50, hp: 1, maxHp: 1, regrow: -1, boss: false }]
+      return step(state).state
+    }
+    const first = kill(128, 0)
+    expect(first.loot.filter((drop) => drop.shield)).toHaveLength(1)
+    expect(kill(first.nextShield - 1, first.nextShield).loot.some((drop) => drop.shield)).toBe(
+      false,
+    )
+    expect(
+      kill(first.nextShield, first.nextShield).loot.filter((drop) => drop.shield),
+    ).toHaveLength(1)
+  })
+
   it('turns a long combo into stronger and wider sound waves', () => {
     const wave = (combo) => {
       const s = arena(

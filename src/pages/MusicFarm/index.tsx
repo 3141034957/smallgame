@@ -33,7 +33,7 @@ import { drawFarm } from './render'
 import { FarmBoard } from './FarmBoard'
 import { CharacterShop } from './CharacterShop'
 import { PermanentTree } from './PermanentTree'
-import { permanentStats } from '@/features/farm/permanent.mjs'
+import { RECOVERY, permanentStats } from '@/features/farm/permanent.mjs'
 import { loadFarmCharacterSprite } from './characterSprite'
 import {
   awardFarmCoins,
@@ -101,8 +101,10 @@ export default function MusicFarm() {
   const modifier = farmModifier(day)
   const bossesAlive = view.crops.filter((crop) => crop.boss).length
   const growthStats = permanentStats(view.permanent)
-  const safeSeconds = Math.max(0, Math.ceil((FPS * 4 - (view.tick - view.lastHit)) / FPS))
-  const shieldSafeSeconds = Math.max(0, Math.ceil((FPS * 8 - (view.tick - view.lastHit)) / FPS))
+  const safeSeconds = Math.max(
+    0,
+    Math.ceil((FPS * RECOVERY.safeSeconds - (view.tick - view.lastHit)) / FPS),
+  )
   const heroSprite = useRef<HTMLCanvasElement | null>(null)
   const [heroError, setHeroError] = useState(false)
   const [rewardError, setRewardError] = useState('')
@@ -922,7 +924,7 @@ export default function MusicFarm() {
                         ? '满血'
                         : safeSeconds
                           ? `安全等待 ${safeSeconds}s`
-                          : `回血 ${Math.ceil((FPS * 6 - view.regenTicks) / FPS)}s`}
+                          : `回血 ${Math.ceil((FPS * RECOVERY.regenSeconds - view.regenTicks) / FPS)}s`}
                     </span>
                   )}
                   {!!growthStats.shieldSeconds && (
@@ -930,9 +932,7 @@ export default function MusicFarm() {
                       ⬡{' '}
                       {view.shields
                         ? `${view.shields} 层`
-                        : view.shieldTicks < growthStats.shieldSeconds * FPS
-                          ? `补盾 ${Math.ceil(growthStats.shieldSeconds - view.shieldTicks / FPS)}s`
-                          : `安全等待 ${shieldSafeSeconds}s`}
+                        : `补盾 ${Math.ceil(growthStats.shieldSeconds - view.shieldTicks / FPS)}s`}
                     </span>
                   )}
                 </div>

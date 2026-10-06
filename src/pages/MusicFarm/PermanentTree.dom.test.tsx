@@ -30,7 +30,7 @@ it('buys from any branch, updates levels and price, persists across remounts, an
   const mounted = render(<Tree />)
   fireEvent.click(screen.getByRole('button', { name: '升级守护音盾，花费18000金币' }))
   const shield = within(screen.getByRole('article', { name: '守护音盾' }))
-  expect(shield.getByText('空盾 90 秒补 1 层')).toBeTruthy()
+  expect(shield.getByText('空盾 180 秒补 1 层')).toBeTruthy()
   expect(loadFarmProfile().coins).toBe(2000)
   mounted.unmount()
   render(<Tree />)

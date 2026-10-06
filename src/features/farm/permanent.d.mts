@@ -2,6 +2,12 @@ export type PermanentId =
   'vitality' | 'armor' | 'regen' | 'shield' | 'power' | 'wisdom' | 'stride' | 'magnet'
 export type PermanentLevels = Record<PermanentId, number>
 export type FarmGrowth = { levels: PermanentLevels; spent: number }
+export const RECOVERY: {
+  safeSeconds: number
+  regenSeconds: number
+  regenAmounts: number[]
+  shieldSeconds: number[]
+}
 export const PERMANENT_BRANCHES: { id: string; name: string; icon: string }[]
 export const PERMANENT_UPGRADES: {
   id: PermanentId

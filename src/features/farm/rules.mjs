@@ -1,5 +1,10 @@
 import { BAND_CHARACTERS } from './characterRoster.mjs'
-import { normalizePermanentLevels, permanentStats, validPermanentLevels } from './permanent.mjs'
+import {
+  RECOVERY,
+  normalizePermanentLevels,
+  permanentStats,
+  validPermanentLevels,
+} from './permanent.mjs'
 import { FARM_RULESET, MONSTERS, regularMonsterKind } from './monsters.mjs'
 import { routeSeed, todayRoute, validDay } from './calendar.mjs'
 export { todayRoute, validDay }
@@ -59,7 +64,7 @@ export const HEAL_TTL = 10 * FPS
 export const HEAL_WOUNDED = 0.8
 // Shield pickups are rarer than healing: they absorb one hit each.
 export const SHIELD_EVERY = 40
-export const SHIELD_COOLDOWN = 20 * FPS
+export const SHIELD_COOLDOWN = 45 * FPS
 export const SHIELD_LIMIT = 3
 const TALENT_DEFINITIONS = [
   {
@@ -1189,13 +1194,12 @@ export function stepFarm(previous, point, useSurge = false) {
     state.hurtUntil = state.tick + FPS
     state.lastHit = state.tick
     state.regenTicks = 0
+    // Recharge rewards a sustained escape, never time spent taking damage.
+    state.shieldTicks = 0
+    shieldReset = true
     // A held shield eats the whole hit instead of reducing it.
     if (state.shields > 0) {
       state.shields--
-      if (!state.shields) {
-        state.shieldTicks = 0
-        shieldReset = true
-      }
       state.blocks++
       events.push({
         id: state.nextId++,
@@ -1419,9 +1423,9 @@ export function stepFarm(previous, point, useSurge = false) {
   // Recover only after all attacks resolve; a lethal hit cannot be undone.
   if (state.hp > 0) {
     if (state.hp >= state.maxHp) state.regenTicks = 0
-    else if (stats.regen && state.tick - state.lastHit > FPS * 4) {
+    else if (stats.regen && state.tick - state.lastHit > FPS * RECOVERY.safeSeconds) {
       state.regenTicks++
-      if (state.regenTicks >= FPS * 6) {
+      if (state.regenTicks >= FPS * RECOVERY.regenSeconds) {
         const healed = Math.min(stats.regen, state.maxHp - state.hp)
         state.hp = Math.round((state.hp + healed) * 100) / 100
         state.regenTicks = 0
@@ -1439,7 +1443,7 @@ export function stepFarm(previous, point, useSurge = false) {
     else if (stats.shieldSeconds) {
       // A shield broken on this frame starts its empty timer on the next frame.
       if (previous.shields === 0 && !shieldReset) state.shieldTicks++
-      if (state.shieldTicks >= stats.shieldSeconds * FPS && state.tick - state.lastHit >= FPS * 8) {
+      if (state.shieldTicks >= stats.shieldSeconds * FPS) {
         state.shields = 1
         state.maxShields = Math.max(state.maxShields, 1)
         state.shieldTicks = 0
