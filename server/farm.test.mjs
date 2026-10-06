@@ -38,6 +38,16 @@ function playFixture(active = true) {
     frames.push(point)
     state = stepFarm(state, point, surge).state
   }
+  // The fleeing route can outlive ten minutes, and the replay needs a death.
+  // Walk into the horde until it ends: contact damage outpaces capped healing,
+  // so this finishes on every platform instead of depending on float details.
+  while (state.hp > 0 && frames.length < FPS * 60 * 12) {
+    while (state.offered.length) state = chooseTalent(state, state.offered[0])
+    const target = state.crops.find((crop) => crop.hp > 0)
+    const point = clampPoint(state.position, target ? [target.x, target.y] : [...state.position])
+    frames.push(point)
+    state = stepFarm(state, point, false).state
+  }
   return replayFarm(day, frames, choices, surges)
 }
 const round = playFixture()
