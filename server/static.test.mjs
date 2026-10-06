@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { brotliDecompressSync, gunzipSync } from 'node:zlib'
@@ -41,6 +41,15 @@ function response(path = '/', accept, method = 'GET') {
 }
 
 describe('static response correctness', () => {
+  it('serves compressed artwork as WebP without applying another HTTP compression layer', () => {
+    const artwork = readFileSync(new URL('../public/assets/band-lineup/bear.webp', import.meta.url))
+    writeFileSync(join(root, 'client/assets/bear.webp'), artwork)
+    const result = response('/assets/bear.webp', 'br, gzip')
+    expect(result.status).toBe(200)
+    expect(result.headers['Content-Type']).toBe('image/webp')
+    expect(result.headers['Content-Encoding']).toBeUndefined()
+    expect(result.body).toEqual(artwork)
+  })
   it('serves page fallbacks as HTML without caching them as assets', () => {
     for (const path of ['/', '/farm', '/rhythm', '/old-page.html']) {
       const result = response(path)

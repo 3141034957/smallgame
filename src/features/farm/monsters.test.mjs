@@ -30,7 +30,7 @@ const arena = (tick, crops = []) => ({
 const step = (state) => stepFarm(state, state.position)
 
 describe('new monster roster and encounters', () => {
-  it('ships seven separate transparent PNGs and maps every enemy to its correct artwork', () => {
+  it('ships seven separate transparent WebPs and maps every enemy to its correct artwork', () => {
     expect(MONSTERS).toHaveLength(7)
     const examples = [
       enemy(0),
@@ -44,9 +44,10 @@ describe('new monster roster and encounters', () => {
     for (const [index, example] of examples.entries()) {
       const info = monsterFor(example)
       expect(info.id).toBe(MONSTERS[index].id)
-      const png = readFileSync(resolve('public', info.image))
-      expect(png.subarray(1, 4).toString()).toBe('PNG')
-      expect(png[25]).toBe(6) // RGBA, not a flattened preview with a magenta background.
+      const webp = readFileSync(resolve('public', info.image))
+      expect(webp.subarray(0, 4).toString()).toBe('RIFF')
+      expect(webp.subarray(8, 16).toString()).toBe('WEBPVP8X')
+      expect(webp[20] & 0x10).toBe(0x10) // Alpha, not a flattened preview.
     }
   })
   it('unlocks ordinary monsters at the advertised boundaries, including recycled slots', () => {

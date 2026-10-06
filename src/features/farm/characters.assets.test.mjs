@@ -24,18 +24,21 @@ describe('survivor character assets', () => {
       expect(character).toMatchObject({
         name,
         talentId,
-        image: `./assets/band-lineup/${animal}.png`,
+        image: `./assets/band-lineup/${animal}.webp`,
       })
       expect(TALENTS.find((item) => item.id === talentId)).toMatchObject({ name, characterId: id })
     }
     expect(TALENTS.find((item) => item.id === 'synth').characterId).toBeUndefined()
   })
-  it('ships nine real PNG images', () => {
+  it('ships nine real WebP images with transparency', () => {
     expect(FARM_CHARACTERS).toHaveLength(9)
     for (const character of FARM_CHARACTERS) {
       const path = resolve('public', character.image.replace(/^\.\//, ''))
       expect(existsSync(path)).toBe(true)
-      expect(readFileSync(path).subarray(1, 4).toString()).toBe('PNG')
+      const webp = readFileSync(path)
+      expect(webp.subarray(0, 4).toString()).toBe('RIFF')
+      expect(webp.subarray(8, 16).toString()).toBe('WEBPVP8X')
+      expect(webp[20] & 0x10).toBe(0x10)
     }
   })
 })

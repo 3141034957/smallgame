@@ -51,7 +51,9 @@ it('keeps all nine previews, equipped identities and saved selections together',
   }
   first.unmount()
   render(<Shop />)
-  expect(screen.getByRole('img', { name: '打碟机哔哔' }).getAttribute('src')).toContain('robot.png')
+  expect(screen.getByRole('img', { name: '打碟机哔哔' }).getAttribute('src')).toContain(
+    'robot.webp',
+  )
   expect(screen.getByRole('button', { name: '预览打碟机哔哔' }).getAttribute('aria-pressed')).toBe(
     'true',
   )

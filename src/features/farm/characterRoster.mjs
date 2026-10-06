@@ -7,7 +7,7 @@ export const BAND_CHARACTERS = [
     name: '鼓手咚咚',
     desc: '戴上贝雷帽，用热闹的鼓点为乐队开场。',
     coinPrice: 0,
-    image: './assets/band-lineup/bear.png',
+    image: './assets/band-lineup/bear.webp',
     color: '#c79265',
   },
   {
@@ -17,7 +17,7 @@ export const BAND_CHARACTERS = [
     name: '吉他手弦弦',
     desc: '橘色小猫抱着电吉他，把勇气弹进每一拍。',
     coinPrice: 600,
-    image: './assets/band-lineup/cat.png',
+    image: './assets/band-lineup/cat.webp',
     color: '#e7ad62',
   },
   {
@@ -27,7 +27,7 @@ export const BAND_CHARACTERS = [
     name: '贝斯手阿低',
     desc: '紫色狮子奏起低音提琴，用低音守住整支乐队。',
     coinPrice: 4200,
-    image: './assets/band-lineup/lion.png',
+    image: './assets/band-lineup/lion.webp',
     color: '#ad91c0',
   },
   {
@@ -37,7 +37,7 @@ export const BAND_CHARACTERS = [
     name: '主唱啾啾',
     desc: '粉色小鸟站上麦克风，把舞台唱得暖暖的。',
     coinPrice: 1800,
-    image: './assets/band-lineup/bird.png',
+    image: './assets/band-lineup/bird.webp',
     color: '#e9a0aa',
   },
   {
@@ -47,7 +47,7 @@ export const BAND_CHARACTERS = [
     name: '节拍鳄小绿',
     desc: '戴着大耳机的小鳄鱼，摇着尾巴跟上你的节奏。',
     coinPrice: 1200,
-    image: './assets/band-lineup/crocodile.png',
+    image: './assets/band-lineup/crocodile.webp',
     color: '#9dbf75',
   },
   {
@@ -57,7 +57,7 @@ export const BAND_CHARACTERS = [
     name: '键盘手叮当',
     desc: '小仓鼠按下彩色琴键，奏出闪闪发光的和弦。',
     coinPrice: 4800,
-    image: './assets/band-lineup/hamster.png',
+    image: './assets/band-lineup/hamster.webp',
     color: '#c4a073',
   },
   {
@@ -67,7 +67,7 @@ export const BAND_CHARACTERS = [
     name: '长笛手呼呼',
     desc: '奶白小兔吹起金色长笛，让轻柔旋律穿过怪潮。',
     coinPrice: 3000,
-    image: './assets/band-lineup/rabbit.png',
+    image: './assets/band-lineup/rabbit.webp',
     color: '#d7b9b7',
   },
   {
@@ -77,7 +77,7 @@ export const BAND_CHARACTERS = [
     name: '萨克斯阿鸣',
     desc: '狐狸抱着金色萨克斯，用一段独奏点亮舞台。',
     coinPrice: 3600,
-    image: './assets/band-lineup/fox.png',
+    image: './assets/band-lineup/fox.webp',
     color: '#d99565',
   },
   {
@@ -87,7 +87,7 @@ export const BAND_CHARACTERS = [
     name: '打碟机哔哔',
     desc: '青蓝眼睛的机器人转动唱片，让整场演出沸腾。',
     coinPrice: 2400,
-    image: './assets/band-lineup/robot.png',
+    image: './assets/band-lineup/robot.webp',
     color: '#99b9cf',
   },
 ]

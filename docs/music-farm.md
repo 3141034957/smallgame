@@ -15,7 +15,7 @@
 ## 战斗规则
 
 - 100 点生命，普通接触伤害 12、重装怪 18、Boss 24；远程弹幕 14、预警砸地 26。受伤后一秒无敌并击退近身怪物。
-- 七种怪物采用 `public/assets/monsters/` 的独立透明 PNG，素材、出场表和攻击说明统一定义在 `src/features/farm/monsters.mjs`。图鉴入口为右上角玩法帮助。
+- 七种怪物采用 `public/assets/monsters/` 的独立透明 WebP，素材、出场表和攻击说明统一定义在 `src/features/farm/monsters.mjs`。图鉴入口为右上角玩法帮助。
 
 | 开始出现 | 怪物 | 攻击与应对 |
 | --- | --- | --- |

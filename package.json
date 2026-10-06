@@ -16,7 +16,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "format": "prettier --write",
-    "format:check": "prettier --check --ignore-unknown src server scripts vite.config.ts package.json .prettierrc.json"
+    "format:check": "prettier --check --ignore-unknown src server scripts vite.config.ts package.json .prettierrc.json",
+    "assets:optimize": "node scripts/optimize-game-assets.mjs"
   },
   "dependencies": {
     "react": "^19.2.7",

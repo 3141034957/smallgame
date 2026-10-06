@@ -9,7 +9,7 @@ export const MONSTERS = [
     kind: 0,
     starts: 0,
     size: 52,
-    image: './assets/monsters/monster-chaser.png',
+    image: './assets/monsters/monster-chaser.webp',
     attack: '持续追击，贴身碰撞。保持走位，避免被包围。',
   },
   {
@@ -18,7 +18,7 @@ export const MONSTERS = [
     kind: 1,
     starts: 10,
     size: 60,
-    image: './assets/monsters/monster-bat.png',
+    image: './assets/monsters/monster-bat.webp',
     attack: '快速接近；亮起冲刺线后蓄力半秒，沿锁定方向突进。横向闪避。',
   },
   {
@@ -27,7 +27,7 @@ export const MONSTERS = [
     kind: 2,
     starts: 20,
     size: 64,
-    image: './assets/monsters/monster-noise.png',
+    image: './assets/monsters/monster-noise.webp',
     attack: '保持距离，蓄能后发射瞄准音弹；两分钟后升级为三连扇射。绕开弹道。',
   },
   {
@@ -36,7 +36,7 @@ export const MONSTERS = [
     kind: 3,
     starts: 35,
     size: 72,
-    image: './assets/monsters/monster-heavy-speaker.png',
+    image: './assets/monsters/monster-heavy-speaker.webp',
     attack: '血厚移动慢，近身后原地蓄力砸地。离开橙圈，击破可打断。',
   },
   {
@@ -45,7 +45,7 @@ export const MONSTERS = [
     kind: 3,
     starts: 45,
     size: 80,
-    image: './assets/monsters/monster-elite-record.png',
+    image: './assets/monsters/monster-elite-record.webp',
     attack: '预警后直线冲刺；90 秒后冲刺结束会散射金色音弹。击破奖励更多。',
   },
   {
@@ -56,7 +56,7 @@ export const MONSTERS = [
     starts: 60,
     interval: 18,
     size: 112,
-    image: './assets/monsters/boss-drum-beast.png',
+    image: './assets/monsters/boss-drum-beast.webp',
     attack: '追击并锁定你的落点，红圈预警一秒后砸地；两分钟后连续锁定两处。',
   },
   {
@@ -67,7 +67,7 @@ export const MONSTERS = [
     starts: 90,
     interval: 45,
     size: 120,
-    image: './assets/monsters/boss-bass-king.png',
+    image: './assets/monsters/boss-bass-king.webp',
     attack: '每三秒释放八向环形弹幕，每六秒锁定大范围砸地。走弹幕间隙。',
   },
 ]
