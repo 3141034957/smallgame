@@ -1,5 +1,7 @@
 export type BandCharacter = {
   id: string
+  talentId: string
+  icon: string
   name: string
   desc: string
   coinPrice: number

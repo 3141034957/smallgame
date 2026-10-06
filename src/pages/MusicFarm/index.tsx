@@ -292,7 +292,9 @@ export default function MusicFarm() {
     setView(next)
     // Picking an instrument for the first time reads as the member joining.
     if (talent(id).kind === 'weapon' && next.gear[id] === 1) {
-      setNotice(`${talent(id).icon} ${talent(id).name} 加入乐队！`)
+      setNotice(
+        `${talent(id).icon} ${talent(id).name} ${talent(id).characterId ? '加入乐队！' : '就位！'}`,
+      )
       noticeUntil.current = performance.now() + 2600
     }
     const newForm = evolved(next.gear).find((weapon) => !evolved(before.gear).includes(weapon))

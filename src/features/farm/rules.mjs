@@ -1,3 +1,4 @@
+import { BAND_CHARACTERS } from './characterRoster.mjs'
 import { FARM_RULESET, MONSTERS, regularMonsterKind } from './monsters.mjs'
 import { routeSeed, todayRoute, validDay } from './calendar.mjs'
 export { todayRoute, validDay }
@@ -44,13 +45,11 @@ export const HEAL_WOUNDED = 0.8
 export const SHIELD_EVERY = 40
 export const SHIELD_COOLDOWN = 20 * FPS
 export const SHIELD_LIMIT = 3
-export const TALENTS = [
+const TALENT_DEFINITIONS = [
   {
     id: 'drum',
     kind: 'weapon',
     partner: 'range',
-    name: '鼓手咚咚',
-    icon: '🥁',
     color: '#edaa8e',
     description: '击败怪物，鼓点引爆周围怪群。',
     tag: '连锁爆破',
@@ -59,8 +58,6 @@ export const TALENTS = [
     id: 'orbit',
     kind: 'weapon',
     partner: 'tempo',
-    name: '吉他手弦弦',
-    icon: '🎸',
     color: '#b7a0dd',
     description: '旋转音符绕着你飞，碰到怪物就造成伤害，还能挡下飞来的弹幕。',
     tag: '旋转音刃',
@@ -69,8 +66,6 @@ export const TALENTS = [
     id: 'power',
     kind: 'weapon',
     partner: 'magnet',
-    name: '贝斯手阿低',
-    icon: '🎻',
     color: '#a5b7d1',
     description: '奏出低音光柱，击穿同列敌人。',
     tag: '贯穿攻击',
@@ -79,8 +74,6 @@ export const TALENTS = [
     id: 'echo',
     kind: 'weapon',
     partner: 'lucky',
-    name: '主唱麦麦',
-    icon: '🎤',
     color: '#df9bb1',
     description: '追着怪物唱出高音箭雨，自动命中。',
     tag: '自动追踪',
@@ -129,8 +122,6 @@ export const TALENTS = [
     id: 'bell',
     kind: 'weapon',
     partner: 'sustain',
-    name: '键盘手叮当',
-    icon: '🎹',
     color: '#8fb7d9',
     description: '每隔几秒向外扩散一圈星浪，推开并伤害身边怪群。',
     tag: '环形冲击',
@@ -149,8 +140,6 @@ export const TALENTS = [
     id: 'whistle',
     kind: 'weapon',
     partner: 'delay',
-    name: '口琴手呼呼',
-    icon: '🎷',
     color: '#9ac6b4',
     description: '走过的地方留下延迟音符，踩到的怪物持续受伤。',
     tag: '残留音阵',
@@ -162,15 +151,13 @@ export const TALENTS = [
     name: '延迟效果器',
     icon: '◑',
     color: '#84b3a2',
-    description: '残留类更久更密、范围更大，配口琴手进化',
+    description: '残留类更久更密、范围更大，配长笛手进化',
     tag: '残留强化',
   },
   {
     id: 'sax',
     kind: 'weapon',
     partner: 'mute',
-    name: '萨克斯阿鸣',
-    icon: '🎺',
     color: '#d8a05f',
     description: '朝最近的怪吹出号角冲刺波，撞飞并拖慢一排怪。',
     tag: '冲刺音波',
@@ -189,8 +176,6 @@ export const TALENTS = [
     id: 'sampler',
     kind: 'weapon',
     partner: 'trigger',
-    name: '采样机咔哒',
-    icon: '🎛️',
     color: '#c0a2d8',
     description: '走过的地方埋下音爆采样，片刻后炸开一圈。',
     tag: '音爆地雷',
@@ -202,15 +187,13 @@ export const TALENTS = [
     name: '触发器',
     icon: '◓',
     color: '#a585c4',
-    description: '布设类攻击更快更密、伤害更高，配采样机进化',
+    description: '布设类攻击更快更密、伤害更高，配节拍鳄进化',
     tag: '地雷强化',
   },
   {
     id: 'deck',
     kind: 'weapon',
     partner: 'needle',
-    name: '打碟猫 DJ',
-    icon: '💿',
     color: '#9db9c9',
     description: '刮碟甩出宽音刃，命中后弹出回响弹。',
     tag: '刮碟音刃',
@@ -222,14 +205,14 @@ export const TALENTS = [
     name: '唱针',
     icon: '◔',
     color: '#7c9cb0',
-    description: '所有攻击伤害 +，回响弹更痛，配打碟猫进化',
+    description: '所有攻击伤害 +，回响弹更痛，配打碟机进化',
     tag: '音刃强化',
   },
   {
     id: 'synth',
     kind: 'weapon',
     partner: 'arp',
-    name: '合成器哔哔',
+    name: '辅助合成器',
     icon: '🎚️',
     color: '#a8c9a0',
     description: '朝最近的怪扇形连发音浪，穿透一排怪。',
@@ -246,6 +229,13 @@ export const TALENTS = [
     tag: '音浪强化',
   },
 ]
+// Member identity comes from the same roster used by the shop and avatar.
+export const TALENTS = TALENT_DEFINITIONS.map((talent) => {
+  const character = BAND_CHARACTERS.find((item) => item.talentId === talent.id)
+  return character
+    ? { ...talent, characterId: character.id, name: character.name, icon: character.icon }
+    : talent
+})
 export const RECIPES = [
   {
     weapon: 'drum',
@@ -285,15 +275,15 @@ export const RECIPES = [
   {
     weapon: 'whistle',
     chip: 'delay',
-    name: '回音口琴阵',
-    icon: '🎷',
+    name: '回音长笛阵',
+    icon: '🪈',
     description: '残留音符更长更痛，整片舞台都是你的音阵',
   },
   {
     weapon: 'sax',
     chip: 'mute',
     name: '金焰萨克斯',
-    icon: '🎺',
+    icon: '🎷',
     description: '冲刺波贯穿全场，击退更远并长时间拖慢',
   },
   {

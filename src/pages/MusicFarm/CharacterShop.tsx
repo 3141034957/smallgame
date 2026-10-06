@@ -104,6 +104,7 @@ export function CharacterShop({
           <div>
             <small>CHARACTER COLLECTION</small>
             <strong>选择角色</strong>
+            <p>角色决定上场外观，本局乐队通过升级组建。</p>
           </div>
           <span>
             <b>{profile.owned.length}</b> / {FARM_CHARACTERS.length}

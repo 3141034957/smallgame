@@ -1,4 +1,4 @@
-import type { FarmRound, Gear } from './rules.mjs'
+import { TALENTS, type FarmRound, type Gear } from './rules.mjs'
 
 export type FarmCareer = {
   runs: number
@@ -55,8 +55,9 @@ export function loadFarmCareer(): FarmCareer {
 
 export function farmCareerFavourite(career: FarmCareer): string {
   return (
-    Object.entries(career.gear).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ??
-    ''
+    TALENTS.filter((talent) => talent.kind === 'weapon' && (career.gear[talent.id] ?? 0) > 0).sort(
+      (a, b) => career.gear[b.id] - career.gear[a.id] || a.id.localeCompare(b.id),
+    )[0]?.id ?? ''
   )
 }
 

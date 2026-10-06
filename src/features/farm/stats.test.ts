@@ -40,6 +40,14 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('survivor career totals', () => {
+  it('never presents an equipment chip or unknown save key as the main performer', () => {
+    const career = loadFarmCareer()
+    expect(farmCareerFavourite({ ...career, gear: { lucky: 90, missing: 100, echo: 3 } })).toBe(
+      'echo',
+    )
+    expect(farmCareerFavourite({ ...career, gear: { lucky: 90, drum: 0 } })).toBe('')
+    expect(farmCareerFavourite({ ...career, gear: { synth: 4, deck: 2 } })).toBe('synth')
+  })
   it('starts empty and accumulates runs, harvests and bosses', () => {
     expect(loadFarmCareer()).toEqual({
       runs: 0,

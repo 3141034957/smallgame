@@ -35,7 +35,7 @@ type Assets = {
   garden: HTMLCanvasElement[]
   crops: HTMLCanvasElement[]
   sprout: HTMLCanvasElement
-  bunny: HTMLCanvasElement[]
+  heroPlaceholder: HTMLCanvasElement[]
   loot: HTMLCanvasElement
   notes: HTMLCanvasElement[]
 }
@@ -248,7 +248,7 @@ function cropSprite(
   ctx.restore()
 }
 
-function bunny(
+function drawHero(
   ctx: CanvasRenderingContext2D,
   state: FarmState,
   now: number,
@@ -292,7 +292,8 @@ function bunny(
   if (character) {
     ellipse(ctx, 0, 17, 16, 5, '#70608030')
     ctx.drawImage(character, -40, -52, 80, 80)
-  } else ctx.drawImage(assets.bunny[state.tick < state.surgeUntil ? 1 : 0], -40, -40, 80, 80)
+  } else
+    ctx.drawImage(assets.heroPlaceholder[state.tick < state.surgeUntil ? 1 : 0], -40, -40, 80, 80)
   ctx.restore()
 }
 
@@ -349,36 +350,15 @@ function cropBody(ctx: CanvasRenderingContext2D, kind: number) {
   face(ctx, 0, -1)
 }
 
-function bunnyBody(ctx: CanvasRenderingContext2D, happy: boolean) {
-  ellipse(ctx, 0, 16, 15, 5, '#446a493d')
-  ellipse(ctx, -7, 11, 5, 4, '#fff8eb')
-  ellipse(ctx, 7, 11, 5, 4, '#fff8eb')
-  ellipse(ctx, 0, 5, 13, 13, '#fff8ef')
-  ctx.fillStyle = '#79a98c'
-  ctx.beginPath()
-  roundedRect(ctx, -9, 1, 18, 13, 5)
-  ctx.fill()
-  ellipse(ctx, 0, 6, 3, 3, '#f5df8d')
-  for (const side of [-1, 1]) {
-    ctx.save()
-    ctx.translate(side * 7, -15)
-    ctx.rotate(side * 0.12)
-    ellipse(ctx, 0, -7, 5, 13, '#fff9ee')
-    ellipse(ctx, 0, -8, 2, 8, '#edb5ba')
-    ctx.restore()
-  }
-  ellipse(ctx, 0, -7, 15, 13, '#fffaf0')
-  // Mint headphones tie the farmer to the musical combat theme.
-  ctx.strokeStyle = '#527d66'
-  ctx.lineWidth = 3
-  ctx.beginPath()
-  ctx.arc(0, -6, 15, Math.PI, 0)
-  ctx.stroke()
-  for (const side of [-1, 1]) {
-    ellipse(ctx, side * 15, -6, 3.7, 5.3, '#648d73')
-    ellipse(ctx, side * 15, -6, 1.6, 3.3, '#c5ddba')
-  }
-  face(ctx, 0, -5, 1.3, happy)
+// A neutral loading marker avoids showing another band member on image failure.
+function heroPlaceholder(ctx: CanvasRenderingContext2D, active: boolean) {
+  ellipse(ctx, 0, 10, 16, 5, '#446a493d')
+  ellipse(ctx, 0, -3, 20, 20, active ? '#edcf83' : '#a8c3ad')
+  ctx.fillStyle = '#fffaf0'
+  ctx.font = 'bold 27px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('♪', 0, -3)
 }
 
 function sprite(
@@ -417,10 +397,10 @@ function assetsFor(ctx: CanvasRenderingContext2D): Assets {
       leaf(ctx, 0, 6, -0.7, 7, '#91b383')
       leaf(ctx, 0, 6, 0.7, 7, '#a6c493')
     }),
-    bunny: [false, true].map((happy) =>
+    heroPlaceholder: [false, true].map((happy) =>
       sprite(owner, 80, 80, (ctx) => {
         ctx.translate(40, 40)
-        bunnyBody(ctx, happy)
+        heroPlaceholder(ctx, happy)
       }),
     ),
     loot: sprite(owner, 18, 18, (ctx) => {
@@ -1044,7 +1024,7 @@ export function drawFarm(
       ctx.restore()
     }
   }
-  bunny(ctx, moving, now, assets, pose?.character)
+  drawHero(ctx, moving, now, assets, pose?.character)
   for (const { event, born } of active) airEffect(ctx, event, (now - born) / 900)
   ctx.restore()
   ctx.save()

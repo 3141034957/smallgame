@@ -11,7 +11,7 @@ export function UpgradeChoices({ gear, offered, onSelect }: Props) {
   return (
     <>
       <small className="farm-eyebrow">LEVEL UP · 时间已暂停</small>
-      <h2>新成员，选你喜欢的！</h2>
+      <h2>组建乐队，选你喜欢的！</h2>
       <p>
         成员负责攻击，装备负责强化；一局最多带 {MAX_EQUIPPED} 件乐器和 {MAX_EQUIPPED}{' '}
         件芯片，槽位满了只会升级已有的。
@@ -37,7 +37,8 @@ export function UpgradeChoices({ gear, offered, onSelect }: Props) {
               </i>
               <span className="farm-choice-icon">{item.icon}</span>
               <small>
-                {item.kind === 'weapon' ? '乐队成员' : '乐队装备'} · {item.tag}
+                {item.kind === 'chip' ? '乐队装备' : item.characterId ? '乐队成员' : '辅助乐器'} ·{' '}
+                {item.tag}
               </small>
               <b>
                 {item.name}
@@ -48,7 +49,10 @@ export function UpgradeChoices({ gear, offered, onSelect }: Props) {
               <p>{item.description}</p>
               <div className="farm-recipe-progress">
                 <span>
-                  成员 {TALENTS.find((talent) => talent.id === recipe.weapon)!.name}{' '}
+                  {TALENTS.find((talent) => talent.id === recipe.weapon)!.characterId
+                    ? '成员'
+                    : '辅助乐器'}{' '}
+                  {TALENTS.find((talent) => talent.id === recipe.weapon)!.name}{' '}
                   {nextGear[recipe.weapon]}/{MAX_GEAR_LEVEL}
                 </span>
                 <span>

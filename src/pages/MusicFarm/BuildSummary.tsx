@@ -18,7 +18,8 @@ export function BuildSummary({ gear }: { gear: Gear }) {
             <div>
               <strong>{item.evolved ? item.form : item.weaponName}</strong>
               <small>
-                成员 {item.weaponName} Lv.{item.weaponLevel} ＋ 装备 {item.chipName} Lv.
+                {item.weaponIsMember ? '成员' : '辅助乐器'} {item.weaponName} Lv.{item.weaponLevel}{' '}
+                ＋ 装备 {item.chipName} Lv.
                 {item.chipLevel}
               </small>
             </div>

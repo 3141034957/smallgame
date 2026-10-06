@@ -3,6 +3,7 @@ import { evolved, RECIPES, TALENTS, type Gear, type TalentId } from './rules.mjs
 export type FarmBuildItem = {
   weapon: TalentId
   chip: TalentId
+  weaponIsMember: boolean
   weaponName: string
   chipName: string
   weaponIcon: string
@@ -23,6 +24,7 @@ export function farmBuildSummary(gear: Gear): FarmBuildItem[] {
     return {
       weapon: recipe.weapon,
       chip: recipe.chip,
+      weaponIsMember: Boolean(weapon.characterId),
       weaponName: weapon.name,
       chipName: chip.name,
       weaponIcon: weapon.icon,

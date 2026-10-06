@@ -2,6 +2,8 @@
 export const BAND_CHARACTERS = [
   {
     id: 'bear-drums',
+    talentId: 'drum',
+    icon: '🥁',
     name: '鼓手咚咚',
     desc: '戴上贝雷帽，用热闹的鼓点为乐队开场。',
     coinPrice: 0,
@@ -10,6 +12,8 @@ export const BAND_CHARACTERS = [
   },
   {
     id: 'cat-guitar',
+    talentId: 'orbit',
+    icon: '🎸',
     name: '吉他手弦弦',
     desc: '橘色小猫抱着电吉他，把勇气弹进每一拍。',
     coinPrice: 600,
@@ -18,14 +22,18 @@ export const BAND_CHARACTERS = [
   },
   {
     id: 'lion-bass',
+    talentId: 'power',
+    icon: '🎻',
     name: '贝斯手阿低',
-    desc: '紫色狮子拉起大提琴，用低音守住整支乐队。',
+    desc: '紫色狮子奏起低音提琴，用低音守住整支乐队。',
     coinPrice: 4200,
     image: './assets/band-lineup/lion.png',
     color: '#ad91c0',
   },
   {
     id: 'bird-vocals',
+    talentId: 'echo',
+    icon: '🎤',
     name: '主唱啾啾',
     desc: '粉色小鸟站上麦克风，把舞台唱得暖暖的。',
     coinPrice: 1800,
@@ -34,6 +42,8 @@ export const BAND_CHARACTERS = [
   },
   {
     id: 'crocodile-beat',
+    talentId: 'sampler',
+    icon: '🎛️',
     name: '节拍鳄小绿',
     desc: '戴着大耳机的小鳄鱼，摇着尾巴跟上你的节奏。',
     coinPrice: 1200,
@@ -42,6 +52,8 @@ export const BAND_CHARACTERS = [
   },
   {
     id: 'hamster-keys',
+    talentId: 'bell',
+    icon: '🎹',
     name: '键盘手叮当',
     desc: '小仓鼠按下彩色琴键，奏出闪闪发光的和弦。',
     coinPrice: 4800,
@@ -50,6 +62,8 @@ export const BAND_CHARACTERS = [
   },
   {
     id: 'rabbit-flute',
+    talentId: 'whistle',
+    icon: '🪈',
     name: '长笛手呼呼',
     desc: '奶白小兔吹起金色长笛，让轻柔旋律穿过怪潮。',
     coinPrice: 3000,
@@ -58,6 +72,8 @@ export const BAND_CHARACTERS = [
   },
   {
     id: 'fox-sax',
+    talentId: 'sax',
+    icon: '🎷',
     name: '萨克斯阿鸣',
     desc: '狐狸抱着金色萨克斯，用一段独奏点亮舞台。',
     coinPrice: 3600,
@@ -66,6 +82,8 @@ export const BAND_CHARACTERS = [
   },
   {
     id: 'robot-dj',
+    talentId: 'deck',
+    icon: '💿',
     name: '打碟机哔哔',
     desc: '青蓝眼睛的机器人转动唱片，让整场演出沸腾。',
     coinPrice: 2400,

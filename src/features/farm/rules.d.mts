@@ -54,6 +54,7 @@ export type TalentId =
   | 'arp'
 export const TALENTS: {
   id: TalentId
+  characterId?: string
   kind: 'weapon' | 'chip'
   partner: TalentId
   name: string
