@@ -1,3 +1,5 @@
+import { monsterFor } from '@/features/farm/monsters.mjs'
+import { loadMonsterSprites, type MonsterSprites } from './monsterSprites'
 import {
   evolved,
   FPS,
@@ -29,6 +31,7 @@ export type FarmPose = {
   alpha: number
 }
 type Assets = {
+  monsters: MonsterSprites
   garden: HTMLCanvasElement[]
   crops: HTMLCanvasElement[]
   sprout: HTMLCanvasElement
@@ -188,92 +191,60 @@ function cropSprite(
     ctx.restore()
     return
   }
-  const bob = Math.sin(now / 110 + crop.id * 1.3) * 2
-  const wobble = hit ? Math.sin(now / 18) * 2 : 0
-  ctx.save()
-  ctx.translate(x + wobble, y + bob)
-  if (hit) {
-    ctx.shadowColor = '#fff6e2'
-    ctx.shadowBlur = 18
-  }
-  if (crop.boss) {
-    const bass = crop.bass === true
-    ellipse(ctx, 0, 19, bass ? 32 : 28, 6, '#5e775b35')
-    const glow = ctx.createRadialGradient(0, 0, 5, 0, 0, 38)
-    glow.addColorStop(0, bass ? '#8f7ae04d' : '#f5c96b4d')
-    glow.addColorStop(1, bass ? '#8f7ae000' : '#f5c96b00')
-    ellipse(ctx, 0, 0, 38, 38, glow)
-    ellipse(ctx, bass ? -19 : -16, 19, bass ? 12 : 10, 6, '#8880bb')
-    ellipse(ctx, bass ? 19 : 16, 19, bass ? 12 : 10, 6, '#8880bb')
-    ellipse(ctx, 0, 0, bass ? 32 : 28, bass ? 27 : 24, bass ? '#7159ad' : '#a299d3')
-    // The bass boss is a stack of speakers: rings instead of ears and horns.
-    if (bass)
-      for (const ring of [-9, 4]) {
-        ellipse(ctx, 0, ring, 20 - Math.abs(ring), 6, '#f6e7bd')
-        ellipse(ctx, 0, ring, 10 - Math.abs(ring) / 2, 3, '#4a3a72')
-      }
-    else
-      for (const side of [-1, 1]) {
-        ctx.fillStyle = '#eee4ff'
-        ctx.beginPath()
-        ctx.moveTo(side * 15, -17)
-        ctx.lineTo(side * 25, -35)
-        ctx.lineTo(side * 5, -21)
-        ctx.fill()
-        ellipse(ctx, side * 10, -3, 5, 7, '#fff9ed')
-        ellipse(ctx, side * 10, -2, 2.4, 4, INK)
-      }
-    ctx.fillStyle = bass ? '#3f3163' : '#675687'
+  const monster = monsterFor(crop)
+  const art = assets.monsters.get(monster.id)
+  const winding = tick < (crop.windupUntil ?? -1)
+  if (winding && crop.dashDx !== undefined && crop.dashDy !== undefined) {
+    ctx.save()
+    ctx.strokeStyle = crop.elite ? '#d99424' : '#d35e92'
+    ctx.lineWidth = 7
+    ctx.globalAlpha = 0.5
+    ctx.setLineDash([8, 5])
     ctx.beginPath()
-    roundedRect(ctx, -9, 9, 18, 6, 3)
-    ctx.fill()
-    ctx.fillStyle = '#fffdf3'
-    ctx.beginPath()
-    roundedRect(ctx, -24, 28, 48, 6, 3)
-    ctx.fill()
-    ctx.fillStyle = bass ? '#8a63c9' : '#e3a44f'
-    ctx.beginPath()
-    roundedRect(ctx, -23, 29, Math.max(2, (46 * crop.hp) / crop.maxHp), 4, 2)
-    ctx.fill()
-    ctx.font = '600 9px system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillStyle = bass ? '#5b4788' : '#846b44'
-    ctx.fillText(bass ? '低音炮王' : '鼓噪巨兽', 0, -35)
-    ctx.font = '700 8px system-ui, sans-serif'
-    ctx.fillText(`${Math.max(1, Math.ceil((crop.hp / crop.maxHp) * 100))}%`, 0, 42)
+    ctx.moveTo(x, y)
+    ctx.lineTo(X(crop.x + crop.dashDx * 20), Y(crop.y + crop.dashDy * 20))
+    ctx.stroke()
     ctx.restore()
-    return
   }
-  if (crop.elite) {
-    // Gold-record elites: a shining ring, a wider body and a small crown.
-    const shine = ctx.createRadialGradient(0, 0, 6, 0, 0, 34)
-    shine.addColorStop(0, '#f0cf6b3d')
-    shine.addColorStop(1, '#f0cf6b00')
-    ellipse(ctx, 0, 0, 34, 34, shine)
-    ellipse(ctx, 0, 20, 17, 6, '#5e775b35')
-    ctx.strokeStyle = tick < (crop.dashUntil ?? -1) ? '#e2537f' : '#e6b95f'
+  const bob = Math.sin(now / (crop.kind === 1 ? 70 : 110) + crop.id * 1.3) * 2
+  ctx.save()
+  ctx.translate(x + (hit ? Math.sin(now / 18) * 2 : 0), y + bob)
+  ellipse(ctx, 0, monster.size * 0.34, monster.size * 0.3, 5, '#5e775b35')
+  const warning =
+    winding ||
+    tick < (crop.attackUntil ?? -1) ||
+    (!crop.boss && crop.kind === 2 && (tick + crop.id) % 64 >= 52)
+  if (warning || hit) {
+    ctx.shadowColor = warning ? '#e36e95' : '#fff6e2'
+    ctx.shadowBlur = warning ? 10 : 18
+  }
+  if (crop.elite || warning) {
+    ctx.strokeStyle = crop.elite ? '#dba23e' : '#dc759a'
     ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.ellipse(0, 0, 22, 22, 0, 0, Math.PI * 2)
+    ctx.ellipse(0, 0, monster.size * 0.48, monster.size * 0.48, 0, 0, Math.PI * 2)
     ctx.stroke()
-    ctx.drawImage(assets.crops[crop.kind], -38, -38, 76, 76)
-    ctx.fillStyle = '#a9803a'
-    ctx.font = 'bold 11px system-ui'
-    ctx.textAlign = 'center'
-    ctx.fillText('♛', 0, -24)
-    ctx.restore()
-    return
   }
-  for (const side of [-1, 1])
-    ellipse(ctx, side * 7, 13 + Math.sin(now / 100 + side) * 2, 4, 2.5, '#797197')
-  if (crop.kind === 2 && (tick + crop.id) % 64 > 48) {
-    ctx.strokeStyle = '#e06f91'
-    ctx.lineWidth = 1.5
+  if (art) ctx.drawImage(art, -monster.size / 2, -monster.size / 2, monster.size, monster.size)
+  else ctx.drawImage(assets.crops[crop.kind], -32, -32, 64, 64)
+  ctx.shadowBlur = 0
+  if (crop.boss) {
+    const bottom = monster.size / 2 + 3
+    ctx.fillStyle = '#fffdf3'
     ctx.beginPath()
-    ctx.arc(0, 0, 19, 0, Math.PI * 2)
-    ctx.stroke()
+    roundedRect(ctx, -28, bottom, 56, 6, 3)
+    ctx.fill()
+    ctx.fillStyle = crop.bass ? '#8a63c9' : '#e3a44f'
+    ctx.beginPath()
+    roundedRect(ctx, -27, bottom + 1, Math.max(2, (54 * crop.hp) / crop.maxHp), 4, 2)
+    ctx.fill()
+    ctx.font = '700 10px system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillStyle = crop.bass ? '#5b4788' : '#846b44'
+    ctx.fillText(monster.name, 0, -monster.size / 2 - 5)
+    ctx.font = '700 8px system-ui, sans-serif'
+    ctx.fillText(`${Math.max(1, Math.ceil((crop.hp / crop.maxHp) * 100))}%`, 0, bottom + 18)
   }
-  ctx.drawImage(assets.crops[crop.kind], -32, -32, 64, 64)
   ctx.restore()
 }
 
@@ -430,6 +401,7 @@ function assetsFor(ctx: CanvasRenderingContext2D): Assets {
   if (cached) return cached
   const owner = ctx.canvas.ownerDocument
   const assets: Assets = {
+    monsters: loadMonsterSprites(owner),
     garden: Array.from({ length: 4 }, (_, variant) =>
       sprite(owner, 360, 430, (ctx) => paintFarmGround(ctx, variant)),
     ),
@@ -892,8 +864,15 @@ export function drawFarm(
   )
   for (const danger of state.dangers) {
     const progress = Math.max(0, Math.min(1, 1 - (danger.due - moving.tick) / 16))
-    ellipse(ctx, X(danger.x), Y(danger.y), Y(danger.radius), Y(danger.radius), '#e2537830')
-    ctx.strokeStyle = '#cf456f'
+    ellipse(
+      ctx,
+      X(danger.x),
+      Y(danger.y),
+      Y(danger.radius),
+      Y(danger.radius),
+      danger.sourceId !== undefined ? '#e5a54530' : '#e2537830',
+    )
+    ctx.strokeStyle = danger.sourceId !== undefined ? '#c58b26' : '#cf456f'
     ctx.lineWidth = 2
     ctx.beginPath()
     ctx.arc(X(danger.x), Y(danger.y), Y(danger.radius), 0, Math.PI * 2)
@@ -932,7 +911,14 @@ export function drawFarm(
     const x = X(before ? before.x + (shot.x - before.x) * alpha : shot.x),
       y = Y(before ? before.y + (shot.y - before.y) * alpha : shot.y)
     ellipse(ctx, x, y, 6, 6, '#fff7e8')
-    ellipse(ctx, x, y, 4.5, 4.5, '#db6289')
+    ellipse(
+      ctx,
+      x,
+      y,
+      4.5,
+      4.5,
+      shot.kind === 'record' ? '#c89530' : shot.kind === 'bass' ? '#9d65bc' : '#db6289',
+    )
     ellipse(ctx, x - 1, y - 1, 1.5, 1.5, '#ffc5c0')
   }
   // Echo whistle leaves delayed notes behind: draw them on the stage floor.

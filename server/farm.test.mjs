@@ -155,7 +155,7 @@ describe('replay-verified all-time farm leaderboard', () => {
       verifyFarm({ ...defeat, frames: [...lowerRound.frames, lowerRound.frames.at(-1)] }),
     ).toBeNull()
     expect(verifyFarm({ ...defeat, surges: [lowerRound.frames.length] })).toBeNull()
-    expect(farmKey(day)).toBe(`farm:v4:endless:${day}`)
+    expect(farmKey(day)).toBe(`farm:v5-monsters:${day}`)
   })
 
   it('rejects the former one-minute finish while the player is alive', () => {
@@ -286,6 +286,7 @@ describe('replay-verified all-time farm leaderboard', () => {
       )
       for (const [songId, difficulty] of [
         [`farm:v3:${day}`, 'farm'],
+        [`farm:v4:endless:${day}`, 'farm'],
         [`wave:v1:${day}`, 'wave'],
         [farmKey(day), 'melody'],
       ]) {
@@ -392,6 +393,14 @@ describe('replay-verified all-time farm leaderboard', () => {
         (await request('POST', '/api/farm/score', JSON.stringify({ ...input, score: 999999 })))
           .status,
       ).toBe(400)
+      const outdated = await request(
+        'POST',
+        '/api/farm/score',
+        JSON.stringify({ ...input, ruleset: 'v4-endless' }),
+      )
+      expect(outdated.status).toBe(409)
+      expect(outdated.data.error).toContain('刷新页面')
+      expect((await request('GET', '/api/farm/leaderboard')).data.total).toBe(0)
       expect((await request('GET', '/api/farm/no-such-route')).status).toBe(404)
       expect((await request('POST', '/api/farm/leaderboard', '{}')).status).toBe(404)
     } finally {

@@ -366,7 +366,7 @@ describe('music roguelite farming', () => {
     }
     expect(coins('golden')).toBeGreaterThan(coins('calm'))
     expect(createFarm('2026-10-04').modifier).toBe(farmModifier('2026-10-04').id)
-    expect(createFarm('2026-10-01').nextBoss).toBeLessThanOrEqual(16 * FPS)
+    expect(createFarm('2026-10-01').nextBoss).toBeLessThanOrEqual(60 * FPS)
     const days = new Set()
     for (let index = 0; index < 60; index++)
       days.add(farmModifier(`2026-11-${String((index % 28) + 1).padStart(2, '0')}`).id)

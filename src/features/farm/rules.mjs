@@ -1,3 +1,4 @@
+import { FARM_RULESET, MONSTERS, regularMonsterKind } from './monsters.mjs'
 import { routeSeed, todayRoute, validDay } from './calendar.mjs'
 export { todayRoute, validDay }
 export const FPS = 16
@@ -417,8 +418,12 @@ export function createFarm(day) {
     echoDue: -1,
     bellRings: 0,
     modifier: modifier.id,
-    nextBoss: Math.round(16 * FPS * (modifier.boss ?? 1)),
-    nextBass: Math.round(90 * FPS * (modifier.boss ?? 1)),
+    nextBoss: Math.round(
+      MONSTERS.find((monster) => monster.id === 'drum-boss').starts * FPS * (modifier.boss ?? 1),
+    ),
+    nextBass: Math.round(
+      MONSTERS.find((monster) => monster.id === 'bass-boss').starts * FPS * (modifier.boss ?? 1),
+    ),
     surgeUntil: -1,
     hp: 100,
     maxHp: 100,
@@ -434,7 +439,7 @@ export function createFarm(day) {
     nextWave: 32,
   }
   for (let id = 0; id < 24; id++) {
-    const enemy = { id, x: 0, y: 0, kind: id % 4, hp: 1, maxHp: 1, regrow: -1, boss: false }
+    const enemy = { id, x: 0, y: 0, kind: 0, hp: 1, maxHp: 1, regrow: -1, boss: false }
     placeAtEdge(state, enemy)
     state.crops.push(enemy)
   }
@@ -671,11 +676,16 @@ export function stepFarm(previous, point, useSurge = false) {
   }
   for (const crop of state.crops)
     if (!crop.boss && crop.hp <= 0 && state.tick >= crop.regrow) {
-      crop.kind = (crop.id + Math.floor(state.tick / 160)) % 4
+      crop.kind = regularMonsterKind(state.tick, FPS, crop.id)
       // A recycled slot always comes back as a regular monster, even if an elite
       // died in it — otherwise the crown and the elite rewards would stick.
       crop.elite = false
       crop.dashUntil = -1
+      crop.windupUntil = -1
+      crop.recoverUntil = -1
+      crop.attackUntil = -1
+      crop.dashDx = undefined
+      crop.dashDy = undefined
       crop.hp = enemyHealth(state.tick, crop.kind) + (modifier?.health ?? 0)
       crop.maxHp = crop.hp
       placeAtEdge(state, crop, true)
@@ -688,7 +698,7 @@ export function stepFarm(previous, point, useSurge = false) {
     const regularCount = state.crops.filter((crop) => !crop.boss).length
     for (let index = 0; index < count && regularCount + index < 100; index++) {
       const id = state.nextId++,
-        kind = id % 4,
+        kind = regularMonsterKind(state.tick, FPS, id),
         hp = enemyHealth(state.tick, kind) + (modifier?.health ?? 0)
       const enemy = { id, x: 0, y: 0, kind, hp, maxHp: hp, regrow: -1, boss: false }
       placeAtEdge(state, enemy)
@@ -696,24 +706,35 @@ export function stepFarm(previous, point, useSurge = false) {
     }
     state.nextWave += 12
   }
-  // Gold-record elites join the horde after 45 seconds: beefier, they dash now
-  // and then, and they pay far better than the monsters around them. The
-  // monster pool caps at 100 and that cap also counts monsters waiting to
-  // respawn, so a saturated arena would never see an elite. Elites therefore
-  // take over a dead slot (or a free one) on their own timer.
+  // Elites take a dead/free slot, or replace a distant ordinary monster when
+  // all 100 slots are alive. An encounter must not depend on killing first.
   if (
-    state.tick >= 45 * FPS &&
+    state.tick >= MONSTERS.find((monster) => monster.id === 'elite').starts * FPS &&
     state.tick % 72 === 0 &&
     state.crops.filter((crop) => crop.elite && crop.hp > 0).length < 5
   ) {
     const hp = (enemyHealth(state.tick, 3) + (modifier?.health ?? 0)) * 6 + 8
-    const slot = state.crops.find((crop) => !crop.boss && crop.hp <= 0)
+    const slot =
+      state.crops.find((crop) => !crop.boss && crop.hp <= 0) ??
+      (state.crops.filter((crop) => !crop.boss).length >= 100
+        ? state.crops
+            .filter((crop) => !crop.boss && !crop.elite)
+            .sort(
+              (a, b) =>
+                distance(b.x, b.y, point[0], point[1]) - distance(a.x, a.y, point[0], point[1]),
+            )[0]
+        : undefined)
     if (slot) {
       slot.kind = 3
       slot.hp = hp
       slot.maxHp = hp
       slot.elite = true
       slot.dashUntil = -1
+      slot.windupUntil = -1
+      slot.recoverUntil = -1
+      slot.attackUntil = -1
+      slot.dashDx = undefined
+      slot.dashDy = undefined
       placeAtEdge(state, slot, true)
     } else if (state.crops.filter((crop) => !crop.boss).length < 100) {
       const elite = {
@@ -733,8 +754,13 @@ export function stepFarm(previous, point, useSurge = false) {
     }
   }
   if (state.tick >= state.nextBoss) {
-    state.nextBoss += 18 * FPS
-    if (state.crops.filter((crop) => crop.boss).length < MAX_BOSSES) {
+    state.nextBoss += MONSTERS.find((monster) => monster.id === 'drum-boss').interval * FPS
+    if (
+      state.crops.filter((crop) => crop.boss).length <
+      (state.tick >= state.nextBass && !state.crops.some((crop) => crop.bass)
+        ? MAX_BOSSES - 1
+        : MAX_BOSSES)
+    ) {
       const index = state.bosses + state.crops.filter((crop) => crop.boss).length
       const maxHp = 65 + index * 45
       const boss = {
@@ -755,7 +781,7 @@ export function stepFarm(previous, point, useSurge = false) {
   // A slower, tankier boss joins later: it fires ring barrages and wide slams
   // instead of chasing, so late runs need movement instead of just damage.
   if (state.tick >= state.nextBass) {
-    state.nextBass += 45 * FPS
+    state.nextBass += MONSTERS.find((monster) => monster.id === 'bass-boss').interval * FPS
     if (state.crops.filter((crop) => crop.boss).length < MAX_BOSSES) {
       const index = state.bosses + state.crops.filter((crop) => crop.boss).length
       const maxHp = 95 + index * 60
@@ -1144,70 +1170,135 @@ export function stepFarm(previous, point, useSurge = false) {
     const dx = point[0] - enemy.x,
       dy = point[1] - enemy.y,
       dist = Math.max(0.01, distance(enemy.x, enemy.y, point[0], point[1]))
-    if (enemy.elite && (state.tick + enemy.id) % 80 === 0) enemy.dashUntil = state.tick + 8
+    const phase = state.tick + enemy.id
+    const charger = enemy.elite || (!enemy.boss && enemy.kind === 1)
+    if (
+      charger &&
+      phase % 80 === 0 &&
+      dist >= 12 &&
+      dist < 60 &&
+      state.tick >= (enemy.dashUntil ?? -1)
+    ) {
+      enemy.windupUntil = state.tick + FPS / 2
+      // Lock the direction during the warning; chasing the player mid-dash is unfair.
+      enemy.dashDx = dx / dist
+      enemy.dashDy = dy / dist
+    }
+    if (state.tick >= (enemy.windupUntil ?? Infinity) && (enemy.windupUntil ?? -1) >= 0) {
+      enemy.windupUntil = -1
+      enemy.dashUntil = state.tick + FPS / 2
+      enemy.recoverUntil = enemy.dashUntil + FPS / 2
+    }
+    const winding = state.tick < (enemy.windupUntil ?? -1)
+    const dashing = state.tick < (enemy.dashUntil ?? -1)
+    const recovering = !dashing && state.tick < (enemy.recoverUntil ?? -1)
     const speed =
       (enemy.elite
-        ? state.tick < (enemy.dashUntil ?? -1)
+        ? dashing
           ? 1.7
           : 0.42
         : enemy.bass
           ? 0.2
           : enemy.boss
             ? 0.38
-            : [0.48, 0.85, 0.34, 0.3][enemy.kind]) *
+            : enemy.kind === 1 && dashing
+              ? 1.65
+              : [0.48, 0.85, 0.34, 0.3][enemy.kind]) *
       (1 + Math.min(1.5, (state.tick / (FPS * 60)) * 0.55)) *
       (modifier?.speed ?? 1) *
       (state.tick < (enemy.slowUntil ?? -1) ? 0.45 : 1)
     const approach = enemy.kind === 2 && !enemy.boss && dist < 28 ? (dist < 20 ? -0.5 : 0) : 1
-    const travel = (Math.min(speed, dist) / dist) * approach
-    enemy.x += dx * travel
-    enemy.y += dy * travel
-    if (enemy.bass) {
-      if ((state.tick + enemy.id) % 48 === 0 && state.shots.length < 60) {
-        for (let ring = 0; ring < 8; ring++) {
-          const angle = (ring / 8) * Math.PI * 2 + enemy.id
-          state.shots.push({
-            id: state.nextId++,
-            x: enemy.x,
-            y: enemy.y,
-            dx: Math.cos(angle) * 1.05,
-            dy: Math.sin(angle) * 1.05,
-            expires: state.tick + FPS * 5,
-          })
-        }
+    const stationary = winding || recovering || state.tick < (enemy.attackUntil ?? -1)
+    if (!stationary) {
+      if (charger && dashing) {
+        enemy.x += (enemy.dashDx ?? dx / dist) * speed
+        enemy.y += (enemy.dashDy ?? dy / dist) * speed
+      } else {
+        const travel = (Math.min(speed, dist) / dist) * approach
+        enemy.x += dx * travel
+        enemy.y += dy * travel
       }
-      if ((state.tick + enemy.id) % 96 === 0)
+    }
+    // All volleys share a hard cap, including a ring fired with only one slot left.
+    const volley = (angles, velocity, damage = 14, kind = 'noise') => {
+      for (const angle of angles) {
+        if (state.shots.length >= 60) break
+        state.shots.push({
+          id: state.nextId++,
+          x: enemy.x,
+          y: enemy.y,
+          dx: (Math.cos(angle) * velocity) / 0.84,
+          dy: Math.sin(angle) * velocity,
+          expires: state.tick + FPS * 5,
+          damage,
+          kind,
+        })
+      }
+    }
+    const aimed = Math.atan2(dy, dx * 0.84)
+    if (enemy.elite && enemy.dashUntil === state.tick && state.tick >= 90 * FPS)
+      volley(
+        Array.from({ length: 6 }, (_, index) => (index * Math.PI) / 3 + enemy.id),
+        0.9,
+        12,
+        'record',
+      )
+    if (enemy.bass) {
+      if (phase % 48 === 0)
+        volley(
+          Array.from({ length: 8 }, (_, index) => (index * Math.PI) / 4 + enemy.id),
+          1.05,
+          14,
+          'bass',
+        )
+      if (phase % 96 === 0)
         state.dangers.push({
           id: state.nextId++,
           x: point[0],
           y: point[1],
           radius: 21,
-          due: state.tick + 16,
+          due: state.tick + FPS,
         })
-    } else if (enemy.boss && (state.tick + enemy.id) % 64 === 0) {
+    } else if (enemy.boss && phase % 64 === 0) {
       state.dangers.push({
         id: state.nextId++,
         x: point[0],
         y: point[1],
         radius: 15,
-        due: state.tick + 16,
+        due: state.tick + FPS,
       })
-    } else if (
-      !enemy.boss &&
-      enemy.kind === 2 &&
-      state.tick > 5 * FPS &&
-      (state.tick + enemy.id) % 64 === 0 &&
-      dist < 65 &&
-      state.shots.length < 60
-    ) {
-      state.shots.push({
+      if (state.tick >= 120 * FPS)
+        state.dangers.push({
+          id: state.nextId++,
+          x: point[0] + state.aim[0] * 4,
+          y: point[1] + state.aim[1] * 4,
+          radius: 12,
+          due: state.tick + FPS * 2,
+        })
+    } else if (!enemy.boss && !enemy.elite && enemy.kind === 3 && phase % 96 === 0 && dist < 24) {
+      enemy.attackUntil = state.tick + FPS
+      state.dangers.push({
         id: state.nextId++,
         x: enemy.x,
         y: enemy.y,
-        dx: (dx / dist) * 1.1,
-        dy: (dy / dist) * 1.1,
-        expires: state.tick + FPS * 5,
+        radius: 11,
+        due: state.tick + FPS,
+        damage: 18,
+        sourceId: enemy.id,
       })
+    } else if (
+      !enemy.boss &&
+      !enemy.elite &&
+      enemy.kind === 2 &&
+      state.tick > 5 * FPS &&
+      phase % 64 === 0 &&
+      dist < 65
+    ) {
+      const offsets = state.tick >= 120 * FPS ? [-0.2, 0, 0.2] : [0]
+      volley(
+        offsets.map((offset) => aimed + offset),
+        1.1,
+      )
     }
     if (
       distance(enemy.x, enemy.y, point[0], point[1]) <
@@ -1226,12 +1317,25 @@ export function stepFarm(previous, point, useSurge = false) {
       return false
     }
     if (distance(shot.x, shot.y, point[0], point[1]) < 3.5) {
-      hurt(14)
+      hurt(shot.damage ?? 14)
       return false
     }
     return shot.expires > state.tick && distance(shot.x, shot.y, point[0], point[1]) < 180
   })
   state.dangers = state.dangers.filter((danger) => {
+    if (
+      danger.sourceId !== undefined &&
+      !state.crops.some(
+        (enemy) =>
+          enemy.id === danger.sourceId &&
+          enemy.hp > 0 &&
+          !enemy.elite &&
+          !enemy.boss &&
+          enemy.kind === 3 &&
+          state.tick >= (enemy.spawnAt ?? 0),
+      )
+    )
+      return false
     if (state.tick < danger.due) return true
     events.push({
       id: state.nextId++,
@@ -1241,7 +1345,7 @@ export function stepFarm(previous, point, useSurge = false) {
       radius: danger.radius,
       lane: 0,
     })
-    if (distance(danger.x, danger.y, point[0], point[1]) < danger.radius) hurt(26)
+    if (distance(danger.x, danger.y, point[0], point[1]) < danger.radius) hurt(danger.damage ?? 26)
     return false
   })
   state.tick++
@@ -1289,6 +1393,7 @@ export function replayFarm(day, frames, choices, surges = []) {
 export function finishFarm(state, frames, choices, surges) {
   if (state.hp > 0) return null
   return {
+    ruleset: FARM_RULESET,
     day: state.day,
     frames,
     choices,

@@ -82,6 +82,11 @@ export type Crop = {
   boss: boolean
   bass?: boolean
   elite?: boolean
+  windupUntil?: number
+  recoverUntil?: number
+  attackUntil?: number
+  dashDx?: number
+  dashDy?: number
   dashUntil?: number
   spawnAt?: number
   xpStage?: number
@@ -135,8 +140,25 @@ export type FarmEvent = {
   angle?: number
   spread?: number
 }
-export type Shot = { id: number; x: number; y: number; dx: number; dy: number; expires: number }
-export type Danger = { id: number; x: number; y: number; radius: number; due: number }
+export type Shot = {
+  id: number
+  x: number
+  y: number
+  dx: number
+  dy: number
+  expires: number
+  damage?: number
+  kind?: string
+}
+export type Danger = {
+  id: number
+  x: number
+  y: number
+  radius: number
+  due: number
+  damage?: number
+  sourceId?: number
+}
 export type Trail = { id: number; x: number; y: number; damage: number; expires: number }
 export type Mine = { id: number; x: number; y: number; due: number; damage: number; radius: number }
 export type FarmState = {

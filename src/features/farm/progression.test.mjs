@@ -93,7 +93,7 @@ describe('farm experience progression', () => {
       const first = reward({ ...spawn(0), ...flags }, 0)
       for (const { seconds, multiplier } of EXPERIENCE_STAGES) {
         const tick = seconds * FPS
-        const monster = { ...spawn(tick), ...flags }
+        const monster = { ...spawn(tick), kind: 0, ...flags }
         const result = reward(monster, tick)
         expect(result.xp).toBe(Math.round(base * multiplier))
         expect(result.xp).toBeGreaterThan(previousXp)

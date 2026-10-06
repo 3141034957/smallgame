@@ -1,3 +1,4 @@
+import { MONSTERS } from '@/features/farm/monsters.mjs'
 import { MAX_GEAR_LEVEL, RECIPES, TALENTS } from '@/features/farm/rules.mjs'
 
 const talent = (id: string) => TALENTS.find((item) => item.id === id)!
@@ -23,6 +24,24 @@ export function FarmHelp({ onClose }: { onClose: () => void }) {
               <p>{recipe.description}</p>
             </div>
           </div>
+        ))}
+      </div>
+      <h3 className="farm-monsters-title">怪潮图鉴 · 什么时候来？</h3>
+      <p>
+        时间按本局生存秒数计算，暂停与升级不计时。「短弓」词缀让两种巨兽提前两成登场；满场时按空位补充，传送预警期间不会攻击。
+      </p>
+      <div className="farm-monsters">
+        {MONSTERS.map((monster) => (
+          <article key={monster.id}>
+            <img src={monster.image} alt={monster.name} loading="lazy" decoding="async" />
+            <div>
+              <b>
+                {monster.name}{' '}
+                <span>{monster.starts === 0 ? '开场' : `${monster.starts} 秒起`}</span>
+              </b>
+              <p>{monster.attack}</p>
+            </div>
+          </article>
         ))}
       </div>
       <p className="farm-help-keyboard">

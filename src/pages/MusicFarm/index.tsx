@@ -1,3 +1,4 @@
+import { farmBestKey } from '@/features/farm/monsters.mjs'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
@@ -120,7 +121,7 @@ export default function MusicFarm() {
   const [audioError, setAudioError] = useState(false)
   const [celebration, setCelebration] = useState('')
   const [notice, setNotice] = useState('')
-  const [best, setBest] = useState(() => loadBestScore(`farm-best-v4-endless:${day}`))
+  const [best, setBest] = useState(() => loadBestScore(farmBestKey(day)))
   const canvas = useRef<HTMLCanvasElement>(null)
   const page = useRef<HTMLDivElement>(null)
   const modal = useRef<HTMLElement>(null)
@@ -265,7 +266,7 @@ export default function MusicFarm() {
     if (model.current.day === day) return
     setQuests(loadFarmQuests(day))
     setFreshQuests([])
-    setBest(loadBestScore(`farm-best-v4-endless:${day}`))
+    setBest(loadBestScore(farmBestKey(day)))
     restartRef.current()
   }, [day])
   useEffect(
@@ -527,7 +528,7 @@ export default function MusicFarm() {
             if (finished)
               setBest((previous) => {
                 const value = Math.max(previous, finished.score)
-                saveBestScore(`farm-best-v4-endless:${day}`, value)
+                saveBestScore(farmBestKey(day), value)
                 return value
               })
             break

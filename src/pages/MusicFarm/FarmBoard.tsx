@@ -1,3 +1,4 @@
+import { FARM_RULESET } from '@/features/farm/monsters.mjs'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { farmRequest } from '@/features/farm/leaderboard'
 import type { Board } from '@/features/farm/leaderboard'
@@ -85,6 +86,7 @@ export function FarmBoard({
       setBusy(true)
       setError('')
       const submission = {
+        ruleset: FARM_RULESET,
         day: target.day,
         frames: target.frames,
         choices: target.choices,

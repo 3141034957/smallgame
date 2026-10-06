@@ -1,10 +1,11 @@
+import { FARM_RULESET, FARM_SCORE_PREFIX } from '../src/features/farm/monsters.mjs'
 import { FPS, replayFarm } from '../src/features/farm/rules.mjs'
 import { normalizeCharacterId, normalizePlayerId } from './identity.mjs'
 export const MAX_FARM_BODY_BYTES = 1024 * 1024
 // Ten minutes of simulation: enough for any real run, and it keeps a forged
 // body from blocking the event loop during replay verification.
 export const MAX_FARM_FRAMES = 10 * 60 * FPS
-export const FARM_PREFIX = 'farm:v4:endless:'
+export const FARM_PREFIX = FARM_SCORE_PREFIX
 export const farmKey = (day) => `${FARM_PREFIX}${day}`
 export function verifyFarm(input) {
   const playerId = normalizePlayerId(input?.playerId)
@@ -71,6 +72,10 @@ export async function handleFarmRequest(req, res, url, store) {
         input = JSON.parse(Buffer.concat(chunks).toString())
       } catch {
         send(400, { error: '战斗记录格式错误。' })
+        return
+      }
+      if (input?.ruleset !== FARM_RULESET) {
+        send(409, { error: '怪潮规则已更新，请刷新页面后重新挑战；本机存档仍然保留。' })
         return
       }
       const record = verifyFarm(input)
