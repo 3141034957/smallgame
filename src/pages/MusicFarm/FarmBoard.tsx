@@ -91,6 +91,7 @@ export function FarmBoard({
         frames: target.frames,
         choices: target.choices,
         surges: target.surges,
+        permanent: target.permanent,
         score: target.score,
         playerId,
         name: next,

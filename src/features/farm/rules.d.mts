@@ -1,4 +1,5 @@
 export type Lane = 0 | 1 | 2 | 3
+import type { PermanentLevels } from './permanent.mjs'
 export { todayRoute, validDay } from './calendar.mjs'
 export const FPS: number
 export type FarmModifier = {
@@ -178,6 +179,10 @@ export type Trail = { id: number; x: number; y: number; damage: number; expires:
 export type Mine = { id: number; x: number; y: number; due: number; damage: number; radius: number }
 export type FarmState = {
   day: string
+  permanent: PermanentLevels
+  lastHit: number
+  regenTicks: number
+  shieldTicks: number
   seed: number
   tick: number
   position: Point
@@ -221,6 +226,7 @@ export type FarmState = {
 }
 export type Choice = { tick: number; id: UpgradeId }
 export type FarmRound = {
+  permanent?: PermanentLevels
   outcome: 'defeated'
   hp: number
   seconds: number
@@ -240,9 +246,10 @@ export type FarmRound = {
   gear: Gear
   stars: number
 }
-export function clampPoint(previous: Point, desired: Point): Point
+export function farmMoveStep(state: FarmState): number
+export function clampPoint(previous: Point, desired: Point, step?: number): Point
 export function synergies(gear: Gear): string[]
-export function createFarm(day: string): FarmState
+export function createFarm(day: string, permanent?: Partial<PermanentLevels>): FarmState
 export function orbitPositions(state: FarmState): Point[]
 export function chooseTalent(state: FarmState, id: UpgradeId): FarmState | null
 export function stepFarm(
@@ -255,6 +262,7 @@ export function replayFarm(
   frames: Point[],
   choices: Choice[],
   surges?: number[],
+  permanent?: Partial<PermanentLevels>,
 ): FarmRound | null
 export function finishFarm(
   state: FarmState,

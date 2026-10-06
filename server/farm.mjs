@@ -20,7 +20,13 @@ export function verifyFarm(input) {
   if (!playerId || !name) return null
   if (!Array.isArray(input.frames) || !input.frames.length || input.frames.length > MAX_FARM_FRAMES)
     return null
-  const round = replayFarm(input.day, input.frames, input.choices, input.surges)
+  const round = replayFarm(
+    input.day,
+    input.frames,
+    input.choices,
+    input.surges,
+    input.permanent === undefined ? {} : input.permanent,
+  )
   if (!round || !Number.isInteger(input.score) || input.score !== round.score || !round.score)
     return null
   const characterId = normalizeCharacterId(input.characterId)

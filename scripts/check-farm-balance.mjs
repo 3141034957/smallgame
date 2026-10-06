@@ -10,6 +10,7 @@ import {
   createFarm,
   evolved,
   farmModifier,
+  farmMoveStep,
   stepFarm,
 } from '../src/features/farm/rules.mjs'
 
@@ -20,8 +21,9 @@ export function simulateFarm(
   dodge = true,
   seconds = 300,
   startHolding = false,
+  permanent = {},
 ) {
-  let state = createFarm(day)
+  let state = createFarm(day, permanent)
   // The opening deal is random, so a check that wants one exact build can start
   // the run already holding that instrument.
   if (startHolding) {
@@ -80,7 +82,11 @@ export function simulateFarm(
           state.position[1] + (state.position[1] - closest.y) * 2,
         ]
     }
-    state = stepFarm(state, clampPoint(state.position, target), state.charge === 100).state
+    state = stepFarm(
+      state,
+      clampPoint(state.position, target, farmMoveStep(state)),
+      state.charge === 100,
+    ).state
     if ([30, 60, 120, 180, 300].includes(state.tick / FPS))
       snapshots[state.tick / FPS] = state.level
   }

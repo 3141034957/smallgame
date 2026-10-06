@@ -18,6 +18,7 @@ import {
   farmModifier,
   finishFarm,
   FPS,
+  farmMoveStep,
   MOVE_STEP,
   RECIPES,
   stepFarm,
@@ -31,6 +32,8 @@ import type { Choice, FarmEvent, FarmRound, Point, UpgradeId } from '@/features/
 import { drawFarm } from './render'
 import { FarmBoard } from './FarmBoard'
 import { CharacterShop } from './CharacterShop'
+import { PermanentTree } from './PermanentTree'
+import { permanentStats } from '@/features/farm/permanent.mjs'
 import { loadFarmCharacterSprite } from './characterSprite'
 import {
   awardFarmCoins,
@@ -70,14 +73,14 @@ import {
 import './style.css'
 
 type Phase = 'ready' | 'play' | 'result'
-type Panel = 'help' | 'board' | 'pause' | 'shop' | 'badges' | null
+type Panel = 'help' | 'board' | 'pause' | 'shop' | 'growth' | 'badges' | null
 const talent = (id: UpgradeId) => UPGRADE_CARDS.find((item) => item.id === id)!
 const number = (value: number) => value.toLocaleString()
 
 export default function MusicFarm() {
   const [params] = useSearchParams()
   const day = validDay(params.get('day')) ? params.get('day')! : todayRoute()
-  const [initial] = useState(() => createFarm(day))
+  const [initial] = useState(() => createFarm(day, loadFarmProfile().growth?.levels))
   const dayRef = useRef(day)
   dayRef.current = day
   const model = useRef(initial)
@@ -97,6 +100,9 @@ export default function MusicFarm() {
   const character = FARM_CHARACTERS.find((item) => item.id === profile.selected)!
   const modifier = farmModifier(day)
   const bossesAlive = view.crops.filter((crop) => crop.boss).length
+  const growthStats = permanentStats(view.permanent)
+  const safeSeconds = Math.max(0, Math.ceil((FPS * 4 - (view.tick - view.lastHit)) / FPS))
+  const shieldSafeSeconds = Math.max(0, Math.ceil((FPS * 8 - (view.tick - view.lastHit)) / FPS))
   const heroSprite = useRef<HTMLCanvasElement | null>(null)
   const [heroError, setHeroError] = useState(false)
   const [rewardError, setRewardError] = useState('')
@@ -168,7 +174,21 @@ export default function MusicFarm() {
     if (phaseRef.current === 'play') void prepare()
     previousFocus.current?.focus({ preventScroll: true })
   }
+  const initializeBattle = () => {
+    const latest = loadFarmProfile()
+    setProfile(latest)
+    model.current = createFarm(dayRef.current, latest.growth?.levels)
+    desired.current = [...model.current.position]
+    displayPosition.current = [...model.current.position]
+    controls.current?.reset()
+    logs.current = { frames: [], choices: [], surges: [] }
+    effects.current = []
+    surge.current = false
+    keys.current.clear()
+    setView(model.current)
+  }
   const start = () => {
+    initializeBattle()
     samples.current = []
     setTimeline([])
     evolutionMarks.current = []
@@ -186,15 +206,7 @@ export default function MusicFarm() {
   const restart = () => {
     audio.current?.stop()
     audioSerial.current++
-    model.current = createFarm(dayRef.current)
-    desired.current = [...model.current.position]
-    displayPosition.current = [...model.current.position]
-    controls.current?.reset()
-    logs.current = { frames: [], choices: [], surges: [] }
-    effects.current = []
-    surge.current = false
-    keys.current.clear()
-    setView(model.current)
+    initializeBattle()
     setRound(null)
     setRewardError('')
     setFreshBadges([])
@@ -214,7 +226,7 @@ export default function MusicFarm() {
     setPanel(null)
     phaseRef.current = 'ready'
     setPhase('ready')
-    page.current?.scrollIntoView({ block: 'start' })
+    page.current?.scrollIntoView?.({ block: 'start' })
   }
   const restartRef = useRef(restart)
   restartRef.current = restart
@@ -372,8 +384,8 @@ export default function MusicFarm() {
         keys.current.clear()
         if (next.vector)
           desired.current = [
-            model.current.position[0] + next.vector[0],
-            model.current.position[1] + next.vector[1],
+            model.current.position[0] + (next.vector[0] * farmMoveStep(model.current)) / MOVE_STEP,
+            model.current.position[1] + (next.vector[1] * farmMoveStep(model.current)) / MOVE_STEP,
           ]
         if (inputModeRef.current !== 'touch') {
           inputModeRef.current = 'touch'
@@ -422,15 +434,15 @@ export default function MusicFarm() {
             desired.current = farmPointerTarget(state.position, pointerTarget.current)
           else if (stick.current?.vector)
             desired.current = [
-              state.position[0] + stick.current.vector[0],
-              state.position[1] + stick.current.vector[1],
+              state.position[0] + (stick.current.vector[0] * farmMoveStep(state)) / MOVE_STEP,
+              state.position[1] + (stick.current.vector[1] * farmMoveStep(state)) / MOVE_STEP,
             ]
           if (dx || dy)
             desired.current = [
-              state.position[0] + dx * MOVE_STEP,
-              state.position[1] + dy * MOVE_STEP,
+              state.position[0] + dx * farmMoveStep(state),
+              state.position[1] + dy * farmMoveStep(state),
             ]
-          const point = clampPoint(state.position, desired.current)
+          const point = clampPoint(state.position, desired.current, farmMoveStep(state))
           const useSurge = surge.current && state.charge >= 100
           surge.current = false
           const result = stepFarm(state, point, useSurge)
@@ -562,8 +574,8 @@ export default function MusicFarm() {
           desired.current = farmPointerTarget(state.position, pointerTarget.current)
         else if (stick.current?.vector)
           desired.current = [
-            state.position[0] + stick.current.vector[0],
-            state.position[1] + stick.current.vector[1],
+            state.position[0] + (stick.current.vector[0] * farmMoveStep(state)) / MOVE_STEP,
+            state.position[1] + (stick.current.vector[1] * farmMoveStep(state)) / MOVE_STEP,
           ]
         const previous = displayPosition.current
         displayPosition.current = advanceFarmPosition(
@@ -571,6 +583,7 @@ export default function MusicFarm() {
           desired.current,
           state.position,
           delta,
+          farmMoveStep(state),
         )
         if (
           previous[0] !== displayPosition.current[0] ||
@@ -720,6 +733,16 @@ export default function MusicFarm() {
             >
               🛍
             </button>
+            <button
+              className="farm-growth-open"
+              aria-label="打开永久强化"
+              onClick={() => {
+                setProfile(loadFarmProfile())
+                openPanel('growth')
+              }}
+            >
+              ↗ <span>升级</span>
+            </button>
             <button aria-label="查看成就墙" onClick={() => openPanel('badges')}>
               🏅
             </button>
@@ -778,7 +801,7 @@ export default function MusicFarm() {
                 <i style={{ width: `${(view.hp / view.maxHp) * 100}%` }} />
               </div>
               <b>
-                {view.hp}/{view.maxHp}
+                {Math.ceil(view.hp)}/{view.maxHp}
               </b>
               {view.shields > 0 && (
                 <em className="farm-shield-count" aria-label={`护盾 ${view.shields} 层`}>
@@ -867,15 +890,16 @@ export default function MusicFarm() {
                   } else {
                     pointerTarget.current = null
                     keys.current.add(event.key)
+                    const moveStep = farmMoveStep(model.current)
                     const movement: Record<string, Point> = {
-                      ArrowLeft: [-MOVE_STEP, 0],
-                      a: [-MOVE_STEP, 0],
-                      ArrowRight: [MOVE_STEP, 0],
-                      d: [MOVE_STEP, 0],
-                      ArrowUp: [0, -MOVE_STEP],
-                      w: [0, -MOVE_STEP],
-                      ArrowDown: [0, MOVE_STEP],
-                      s: [0, MOVE_STEP],
+                      ArrowLeft: [-moveStep, 0],
+                      a: [-moveStep, 0],
+                      ArrowRight: [moveStep, 0],
+                      d: [moveStep, 0],
+                      ArrowUp: [0, -moveStep],
+                      w: [0, -moveStep],
+                      ArrowDown: [0, moveStep],
+                      s: [0, moveStep],
                     }
                     const delta = movement[event.key]
                     desired.current = [
@@ -889,6 +913,30 @@ export default function MusicFarm() {
               onBlur={() => keys.current.clear()}
             >
               <canvas ref={canvas} aria-label={`音乐怪物与${character.name}的生存战场`} />
+              {phase === 'play' && (growthStats.regen || growthStats.shieldSeconds) ? (
+                <div className="farm-recovery-hud" aria-label="永久恢复状态">
+                  {!!growthStats.regen && (
+                    <span>
+                      ♡{' '}
+                      {view.hp >= view.maxHp
+                        ? '满血'
+                        : safeSeconds
+                          ? `安全等待 ${safeSeconds}s`
+                          : `回血 ${Math.ceil((FPS * 6 - view.regenTicks) / FPS)}s`}
+                    </span>
+                  )}
+                  {!!growthStats.shieldSeconds && (
+                    <span>
+                      ⬡{' '}
+                      {view.shields
+                        ? `${view.shields} 层`
+                        : view.shieldTicks < growthStats.shieldSeconds * FPS
+                          ? `补盾 ${Math.ceil(growthStats.shieldSeconds - view.shieldTicks / FPS)}s`
+                          : `安全等待 ${shieldSafeSeconds}s`}
+                    </span>
+                  )}
+                </div>
+              ) : null}
               {phase === 'ready' && (
                 <div className="farm-ready">
                   <div className="farm-start-card">
@@ -906,6 +954,15 @@ export default function MusicFarm() {
                       }}
                     >
                       ♬ 角色工坊
+                    </button>
+                    <button
+                      className="farm-shop-pill"
+                      onClick={() => {
+                        setProfile(loadFarmProfile())
+                        openPanel('growth')
+                      }}
+                    >
+                      ↗ 永久强化
                     </button>
                     <small>{inputMode === 'touch' ? '拖动屏幕控制走位' : '移动鼠标控制走位'}</small>
                   </div>
@@ -1025,7 +1082,7 @@ export default function MusicFarm() {
                 ) : (
                   <>
                     本局获得 ✦ {number(round?.coins ?? 0)} 金币
-                    <small>钱包共 {number(profile.coins)} 金币 · 用来解锁新角色</small>
+                    <small>钱包共 {number(profile.coins)} 金币 · 解锁角色与永久强化</small>
                   </>
                 )}
                 <button
@@ -1036,6 +1093,15 @@ export default function MusicFarm() {
                   }}
                 >
                   去角色商店 ↗
+                </button>
+                <button
+                  className="farm-result-shop"
+                  onClick={() => {
+                    setProfile(loadFarmProfile())
+                    openPanel('growth')
+                  }}
+                >
+                  去永久强化 ↗
                 </button>
               </div>
               <FarmBoard round={round} characterId={profile.selected} />
@@ -1053,9 +1119,11 @@ export default function MusicFarm() {
         </footer>
       </div>
       {(panel || upgrade) && (
-        <div className={`farm-backdrop${panel === 'shop' ? ' is-fullscreen' : ''}`}>
+        <div
+          className={`farm-backdrop${panel === 'shop' || panel === 'growth' ? ' is-fullscreen' : ''}`}
+        >
           <section
-            className={`farm-dialog ${upgrade ? 'farm-upgrade-dialog' : panel === 'shop' ? 'is-fullscreen' : ''}`}
+            className={`farm-dialog ${upgrade ? 'farm-upgrade-dialog' : panel === 'shop' || panel === 'growth' ? 'is-fullscreen' : ''}`}
             ref={modal}
             role="dialog"
             aria-modal="true"
@@ -1068,9 +1136,11 @@ export default function MusicFarm() {
                     ? '玩法与进化配方'
                     : panel === 'shop'
                       ? '角色商店'
-                      : panel === 'badges'
-                        ? '成就墙'
-                        : '游戏暂停'
+                      : panel === 'growth'
+                        ? '永久强化'
+                        : panel === 'badges'
+                          ? '成就墙'
+                          : '游戏暂停'
             }
             onKeyDown={trap}
           >
@@ -1084,13 +1154,15 @@ export default function MusicFarm() {
               />
             ) : (
               <>
-                {panel !== 'shop' && (
+                {panel !== 'shop' && panel !== 'growth' && (
                   <button className="farm-close" aria-label="关闭弹窗" onClick={closePanel}>
                     ×
                   </button>
                 )}
                 {panel === 'shop' ? (
                   <CharacterShop profile={profile} onChange={setProfile} onClose={closePanel} />
+                ) : panel === 'growth' ? (
+                  <PermanentTree profile={profile} onChange={setProfile} onClose={closePanel} />
                 ) : panel === 'badges' ? (
                   <BadgeWall log={badges} career={career} />
                 ) : panel === 'board' ? (

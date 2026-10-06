@@ -1,4 +1,11 @@
 import { BAND_CHARACTERS, DEFAULT_CHARACTER_ID, migrateCharacterId } from './characterRoster.mjs'
+import {
+  normalizePermanentLevels,
+  permanentLevelCount,
+  permanentPrice,
+  type FarmGrowth,
+  type PermanentId,
+} from './permanent.mjs'
 
 export const FARM_CHARACTERS = BAND_CHARACTERS.map(({ coinPrice, ...character }) => ({
   ...character,
@@ -12,6 +19,7 @@ export type FarmProfile = {
   owned: string[]
   selected: string
   rewardedRuns: string[]
+  growth?: FarmGrowth
 }
 export type ProfileResult = { profile: FarmProfile; error?: string; paid: boolean }
 const validId = (id: unknown): id is string =>
@@ -50,6 +58,19 @@ export function loadFarmProfile(): FarmProfile {
       rewardedRuns: Array.isArray(stored?.rewardedRuns)
         ? stored.rewardedRuns.filter((id: unknown) => typeof id === 'string').slice(-64)
         : [],
+      ...(stored?.growth
+        ? {
+            growth: {
+              levels: normalizePermanentLevels(stored.growth.levels),
+              spent:
+                permanentLevelCount(stored.growth.levels) &&
+                Number.isSafeInteger(stored.growth.spent) &&
+                stored.growth.spent >= 0
+                  ? stored.growth.spent
+                  : 0,
+            },
+          }
+        : {}),
     }
   } catch {
     return defaults()
@@ -100,6 +121,39 @@ export function awardFarmCoins(runId: string, amount: number): ProfileResult {
       coins: Math.min(Number.MAX_SAFE_INTEGER, profile.coins + amount),
       rewardedRuns: [...profile.rewardedRuns, runId].slice(-64),
     },
+    profile,
+  )
+}
+
+export function buyFarmUpgrade(id: PermanentId, expectedLevel: number): ProfileResult {
+  const profile = loadFarmProfile()
+  const levels = normalizePermanentLevels(profile.growth?.levels)
+  const price = permanentPrice(id, levels[id])
+  if (levels[id] !== expectedLevel)
+    return { profile, error: '强化等级已更新，请查看最新价格后重试。', paid: false }
+  if (price === null) return { profile, error: '这项强化已满级或暂时无法使用。', paid: false }
+  if (profile.coins < price)
+    return { profile, error: `还差 ${price - profile.coins} 金币。`, paid: false }
+  const spent = (profile.growth?.spent ?? 0) + price
+  if (!Number.isSafeInteger(spent)) return { profile, error: '强化记录异常，请重试。', paid: false }
+  return saveProfile(
+    {
+      ...profile,
+      coins: profile.coins - price,
+      growth: { levels: { ...levels, [id]: levels[id] + 1 }, spent },
+    },
+    profile,
+  )
+}
+
+export function resetFarmUpgrades(): ProfileResult {
+  const profile = loadFarmProfile()
+  if (!permanentLevelCount(profile.growth?.levels)) return { profile, paid: false }
+  const coins = profile.coins + (profile.growth?.spent ?? 0)
+  if (!Number.isSafeInteger(coins))
+    return { profile, error: '金币记录异常，无法重置。', paid: false }
+  return saveProfile(
+    { ...profile, coins, growth: { levels: normalizePermanentLevels(), spent: 0 } },
     profile,
   )
 }

@@ -1,0 +1,295 @@
+.farm-growth {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: #244940;
+  background: #f4faf6;
+  padding: 24px clamp(16px, 4vw, 64px) 40px;
+}
+.farm-growth button {
+  font: inherit;
+  cursor: pointer;
+}
+.farm-growth button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.farm-growth button:focus-visible {
+  outline: 3px solid #e27f35;
+  outline-offset: 4px;
+}
+.farm-growth-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f4faf6;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 0 22px;
+  border-bottom: 1px solid #d4e5db;
+}
+.farm-growth-bar > button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid #c6d9ce;
+  border-radius: 50%;
+  background: white;
+  color: #244940;
+  font-size: 30px;
+}
+.farm-growth-bar small {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+.farm-growth-bar h2 {
+  margin: 3px 0 0;
+  font-size: 24px;
+}
+.farm-growth-wallet {
+  margin-left: auto;
+  text-align: right;
+}
+.farm-growth-wallet strong {
+  display: block;
+  margin-top: 4px;
+  color: #926022;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+.farm-growth-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 32px 0;
+}
+.farm-growth-intro span {
+  font-size: 12px;
+  color: #557b69;
+}
+.farm-growth-intro h3 {
+  margin: 10px 0;
+  font-size: clamp(20px, 3vw, 30px);
+}
+.farm-growth-intro p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.farm-growth-total {
+  flex-shrink: 0;
+  text-align: center;
+}
+.farm-growth-total strong {
+  display: block;
+  font-size: 34px;
+}
+.farm-growth-total strong small {
+  font-size: 16px;
+  color: #789081;
+}
+.farm-growth-tree {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 24px;
+}
+.farm-growth-branch {
+  --branch-color: #38775b;
+}
+.farm-growth-branch.is-power {
+  --branch-color: #ae7138;
+}
+.farm-growth-branch.is-movement {
+  --branch-color: #5079a0;
+}
+.farm-growth-branch > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  color: var(--branch-color);
+}
+.farm-growth-branch > header > span {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 22px;
+}
+.farm-growth-branch h3 {
+  font-size: 17px;
+  margin: 0;
+}
+.farm-growth-nodes {
+  position: relative;
+  display: grid;
+  gap: 18px;
+}
+.farm-growth-nodes::before {
+  content: '';
+  position: absolute;
+  left: 22px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #cddfd3;
+}
+.farm-growth-node {
+  position: relative;
+  border: 1px solid #d0ded5;
+  border-radius: 16px;
+  background: #fff;
+  padding: 18px;
+  box-shadow: 0 3px 12px #29473708;
+}
+.farm-growth-node.is-trained {
+  border-color: var(--branch-color);
+}
+.farm-growth-node.is-maxed {
+  background: #edf5ef;
+}
+.farm-growth-node-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.farm-growth-node-title > span {
+  color: var(--branch-color);
+  font-size: 24px;
+}
+.farm-growth-node h4 {
+  margin: 0;
+  font-size: 16px;
+}
+.farm-growth-node b {
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.farm-growth-node b small {
+  color: #7e9285;
+  font-weight: normal;
+}
+.farm-growth-meter {
+  height: 4px;
+  background: #e9efeb;
+  border-radius: 4px;
+  margin: 12px 0;
+  overflow: hidden;
+}
+.farm-growth-meter i {
+  display: block;
+  height: 100%;
+  background: var(--branch-color);
+}
+.farm-growth-node p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #6b7e73;
+  margin: 0 0 14px;
+}
+.farm-growth-node dl {
+  margin: 0 0 16px;
+  font-size: 12px;
+  display: grid;
+  gap: 8px;
+}
+.farm-growth-node dl > div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.farm-growth-node dt {
+  flex-shrink: 0;
+  color: #849389;
+}
+.farm-growth-node dd {
+  margin: 0;
+}
+.farm-growth-node dl > div:last-child dd {
+  font-weight: 600;
+}
+.farm-growth-node > button {
+  width: 100%;
+  padding: 11px 6px;
+  background: var(--branch-color);
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13px;
+}
+.farm-growth-shortfall {
+  display: block;
+  text-align: center;
+  margin-top: 8px;
+  color: #77887d;
+  font-size: 11px;
+}
+.farm-growth-message {
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #e0eee3;
+  font-size: 13px;
+}
+.farm-growth-message.is-error {
+  background: #fbe9dc;
+  color: #974b26;
+}
+.farm-growth-reset {
+  margin-top: 30px;
+  padding: 22px;
+  border: 1px dashed #bbcebf;
+  border-radius: 14px;
+  text-align: center;
+}
+.farm-growth-reset p {
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 0 0 12px;
+}
+.farm-growth-reset button {
+  border: 1px solid #b5cbbb;
+  border-radius: 9px;
+  background: #fff;
+  color: #305f48;
+  padding: 9px 16px;
+  margin: 0 6px;
+}
+@media (max-width: 850px) {
+  .farm-growth-tree {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+}
+@media (max-width: 560px) {
+  .farm-growth {
+    padding: 16px 14px 30px;
+  }
+  .farm-growth-tree {
+    grid-template-columns: 1fr;
+  }
+  .farm-growth-intro {
+    align-items: start;
+    gap: 12px;
+    padding: 24px 0;
+  }
+  .farm-growth-total strong {
+    font-size: 28px;
+  }
+  .farm-growth-bar {
+    gap: 10px;
+  }
+  .farm-growth-wallet strong {
+    font-size: 16px;
+  }
+  .farm-growth-bar h2 {
+    font-size: 20px;
+  }
+}

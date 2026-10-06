@@ -1,4 +1,5 @@
 import { BAND_CHARACTERS } from './characterRoster.mjs'
+import { normalizePermanentLevels, permanentStats, validPermanentLevels } from './permanent.mjs'
 import { FARM_RULESET, MONSTERS, regularMonsterKind } from './monsters.mjs'
 import { routeSeed, todayRoute, validDay } from './calendar.mjs'
 export { todayRoute, validDay }
@@ -365,12 +366,19 @@ export const evolved = (gear) =>
     (recipe) => gear[recipe.weapon] >= MAX_GEAR_LEVEL && gear[recipe.chip] >= MAX_GEAR_LEVEL,
   ).map((recipe) => recipe.weapon)
 const PITCHES = [60, 64, 67, 69, 72, 76]
-export function clampPoint(previous, desired) {
+export function farmMoveStep(state) {
+  return MOVE_STEP * (1 + (state.permanent?.stride ?? 0) * 0.01)
+}
+export function clampPoint(previous, desired, step = MOVE_STEP) {
   const dx = desired[0] - previous[0],
     dy = desired[1] - previous[1],
     length = Math.hypot(dx, dy),
-    scale = length > MOVE_STEP ? MOVE_STEP / length : 1
-  return [Math.round(previous[0] + dx * scale), Math.round(previous[1] + dy * scale)]
+    scale = length > step ? step / length : 1,
+    precision = step === MOVE_STEP ? 1 : 100
+  return [
+    Math.round((previous[0] + dx * scale) * precision) / precision,
+    Math.round((previous[1] + dy * scale) * precision) / precision,
+  ]
 }
 export function synergies(gear) {
   return RECIPES.filter(
@@ -404,11 +412,14 @@ function placeAtEdge(state, enemy, respawn = false) {
   enemy.y = state.position[1] + Math.sin(angle) * radius
   enemy.spawnAt = state.tick + 12
 }
-export function createFarm(day) {
+export function createFarm(day, permanent) {
+  const levels = Object.freeze(normalizePermanentLevels(permanent))
+  const stats = permanentStats(levels)
   if (!validDay(day)) throw new Error('Invalid farm date')
   const modifier = farmModifier(day)
   const state = {
     day,
+    permanent: levels,
     seed: routeSeed(day, 'farm-v3'),
     tick: 0,
     position: [...START],
@@ -441,12 +452,15 @@ export function createFarm(day) {
       MONSTERS.find((monster) => monster.id === 'bass-boss').starts * FPS * (modifier.boss ?? 1),
     ),
     surgeUntil: -1,
-    hp: 100,
-    maxHp: 100,
+    hp: stats.maxHp,
+    maxHp: stats.maxHp,
     hurtUntil: 32,
     nextHeal: 0,
     nextShield: 0,
     shields: 0,
+    lastHit: -Infinity,
+    regenTicks: 0,
+    shieldTicks: 0,
     aim: [1, 0],
     shots: [],
     dangers: [],
@@ -545,6 +559,7 @@ export function chooseTalent(previous, id) {
         ? { ...previous.gear }
         : { ...previous.gear, [id]: previous.gear[id] + 1 },
     hp: id === FULL_HEAL_CARD.id ? previous.maxHp : previous.hp,
+    regenTicks: id === FULL_HEAL_CARD.id ? 0 : previous.regenTicks,
     level: previous.level + 1,
     offered: [],
   }
@@ -552,14 +567,23 @@ export function chooseTalent(previous, id) {
   return state
 }
 export function stepFarm(previous, point, useSurge = false) {
+  const moveStep = farmMoveStep(previous)
+  const fractionalMovement = moveStep !== MOVE_STEP
   if (
     previous.offered.length ||
     previous.hp <= 0 ||
     !Array.isArray(point) ||
     point.length !== 2 ||
-    point.some((value) => !Number.isSafeInteger(value)) ||
+    point.some(
+      (value) =>
+        !Number.isFinite(value) ||
+        Math.abs(value) > 1e9 ||
+        (fractionalMovement
+          ? Math.abs(value * 100 - Math.round(value * 100)) > 1e-5
+          : !Number.isSafeInteger(value)),
+    ) ||
     Math.hypot(point[0] - previous.position[0], point[1] - previous.position[1]) >
-      MOVE_STEP + Math.SQRT1_2 ||
+      moveStep + Math.SQRT1_2 / (fractionalMovement ? 100 : 1) ||
     (useSurge && previous.charge < 100)
   )
     return null
@@ -580,6 +604,8 @@ export function stepFarm(previous, point, useSurge = false) {
   }
   const events = []
   const gear = state.gear
+  const stats = permanentStats(state.permanent)
+  let shieldReset = false
   const modifier = FARM_MODIFIERS.find((item) => item.id === state.modifier)
   const forms = evolved(gear)
   const boomFlow = gear.orbit && gear.drum
@@ -616,11 +642,16 @@ export function stepFarm(previous, point, useSurge = false) {
     )
     const reward = modifier?.reward ?? 1
     const xpMultiplier = EXPERIENCE_STAGES[crop.xpStage ?? 0].multiplier
-    const dropXp = Math.round(
-        (crop.bass ? 110 : crop.boss ? 60 : crop.elite ? 30 : 5 + gear.lucky) *
-          xpMultiplier *
-          reward,
-      ),
+    const dropXp =
+        Math.round(
+          Math.round(
+            (crop.bass ? 110 : crop.boss ? 60 : crop.elite ? 30 : 5 + gear.lucky) *
+              xpMultiplier *
+              reward,
+          ) *
+            stats.xp *
+            100,
+        ) / 100,
       dropCoins = Math.round(
         (crop.bass ? 340 : crop.boss ? 200 : crop.elite ? 60 : 8 + crop.kind * 2 + gear.lucky * 5) *
           reward,
@@ -690,7 +721,7 @@ export function stepFarm(previous, point, useSurge = false) {
   const damage = (crop, amount, chain = false) => {
     if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) return
     const critical = gear.lucky > 0 && (crop.id + state.tick) % Math.max(3, 8 - gear.lucky) === 0
-    crop.hp -= amount * (critical ? 2 : 1)
+    crop.hp = Math.round((crop.hp - amount * (critical ? 2 : 1) * stats.damage) * 100) / 100
     if (crop.hp <= 0) {
       crop.hp = 0.001
       harvest(crop, chain)
@@ -1111,7 +1142,7 @@ export function stepFarm(previous, point, useSurge = false) {
             crop,
             (gear.orbit + (boomFlow ? 1 : 0)) * (forms.includes('orbit') ? 2 : 1) + powerBonus,
           )
-  const attraction = 15 + gear.magnet * 15
+  const attraction = (15 + gear.magnet * 15) * stats.attraction
   for (const drop of state.loot) {
     const dist = distance(drop.x, drop.y, point[0], point[1])
     if (dist <= attraction || state.tick < state.surgeUntil) {
@@ -1120,9 +1151,11 @@ export function stepFarm(previous, point, useSurge = false) {
       drop.y += (point[1] - drop.y) * amount
     }
     if (distance(drop.x, drop.y, point[0], point[1]) <= 4) {
-      state.xp += drop.xp
+      state.xp = Math.round((state.xp + drop.xp) * 100) / 100
       state.coins += drop.coins
       if (drop.shield) {
+        state.shieldTicks = 0
+        shieldReset = true
         state.shields = Math.min(SHIELD_LIMIT, state.shields + drop.shield)
         state.maxShields = Math.max(state.maxShields, state.shields)
       }
@@ -1154,9 +1187,15 @@ export function stepFarm(previous, point, useSurge = false) {
   const hurt = (amount) => {
     if (state.tick < state.hurtUntil || state.hp <= 0) return
     state.hurtUntil = state.tick + FPS
+    state.lastHit = state.tick
+    state.regenTicks = 0
     // A held shield eats the whole hit instead of reducing it.
     if (state.shields > 0) {
       state.shields--
+      if (!state.shields) {
+        state.shieldTicks = 0
+        shieldReset = true
+      }
       state.blocks++
       events.push({
         id: state.nextId++,
@@ -1167,13 +1206,14 @@ export function stepFarm(previous, point, useSurge = false) {
         lane: 1,
       })
     } else {
-      state.hp = Math.max(0, state.hp - amount)
+      const taken = Math.round(amount * stats.damageTaken * 100) / 100
+      state.hp = Math.max(0, Math.round((state.hp - taken) * 100) / 100)
       events.push({
         id: state.nextId++,
         kind: 'hurt',
         x: point[0],
         y: point[1],
-        points: amount,
+        points: taken,
         lane: 0,
       })
     }
@@ -1376,13 +1416,52 @@ export function stepFarm(previous, point, useSurge = false) {
     if (distance(danger.x, danger.y, point[0], point[1]) < danger.radius) hurt(danger.damage ?? 26)
     return false
   })
+  // Recover only after all attacks resolve; a lethal hit cannot be undone.
+  if (state.hp > 0) {
+    if (state.hp >= state.maxHp) state.regenTicks = 0
+    else if (stats.regen && state.tick - state.lastHit > FPS * 4) {
+      state.regenTicks++
+      if (state.regenTicks >= FPS * 6) {
+        const healed = Math.min(stats.regen, state.maxHp - state.hp)
+        state.hp = Math.round((state.hp + healed) * 100) / 100
+        state.regenTicks = 0
+        events.push({
+          id: state.nextId++,
+          kind: 'heal',
+          x: point[0],
+          y: point[1],
+          points: healed,
+          lane: 1,
+        })
+      }
+    }
+    if (state.shields) state.shieldTicks = 0
+    else if (stats.shieldSeconds) {
+      // A shield broken on this frame starts its empty timer on the next frame.
+      if (previous.shields === 0 && !shieldReset) state.shieldTicks++
+      if (state.shieldTicks >= stats.shieldSeconds * FPS && state.tick - state.lastHit >= FPS * 8) {
+        state.shields = 1
+        state.maxShields = Math.max(state.maxShields, 1)
+        state.shieldTicks = 0
+        events.push({
+          id: state.nextId++,
+          kind: 'block',
+          x: point[0],
+          y: point[1],
+          points: 1,
+          lane: 1,
+        })
+      }
+    }
+  }
   state.tick++
   offer(state)
   return { state, events }
 }
-export function replayFarm(day, frames, choices, surges = []) {
+export function replayFarm(day, frames, choices, surges = [], permanent = {}) {
   if (
     !validDay(day) ||
+    !validPermanentLevels(permanent) ||
     !Array.isArray(frames) ||
     !frames.length ||
     !Array.isArray(choices) ||
@@ -1397,7 +1476,7 @@ export function replayFarm(day, frames, choices, surges = []) {
     )
   )
     return null
-  let state = createFarm(day),
+  let state = createFarm(day, permanent),
     cursor = 0
   const surgeSet = new Set(surges)
   for (let tick = 0; tick < frames.length; tick++) {
@@ -1422,6 +1501,7 @@ export function finishFarm(state, frames, choices, surges) {
   return {
     ruleset: FARM_RULESET,
     day: state.day,
+    permanent: state.permanent,
     frames,
     choices,
     surges,

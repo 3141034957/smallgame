@@ -28,12 +28,13 @@ export function advanceFarmPosition(
   target: Point,
   authoritative: Point,
   deltaMs: number,
+  moveStep = MOVE_STEP,
 ): Point {
   const destination = target
   const dx = destination[0] - position[0],
     dy = destination[1] - position[1]
   const distance = Math.hypot(dx, dy)
-  const travel = Math.min(distance, (Math.max(0, Math.min(125, deltaMs)) * FPS * MOVE_STEP) / 1000)
+  const travel = Math.min(distance, (Math.max(0, Math.min(125, deltaMs)) * FPS * moveStep) / 1000)
   const scale = distance ? travel / distance : 0
   const next: Point = [position[0] + dx * scale, position[1] + dy * scale]
   // Predict at most one simulation step. A delayed frame cannot visually
@@ -41,7 +42,7 @@ export function advanceFarmPosition(
   const aheadX = next[0] - authoritative[0],
     aheadY = next[1] - authoritative[1]
   const ahead = Math.hypot(aheadX, aheadY)
-  const limit = MOVE_STEP + Math.SQRT1_2
+  const limit = moveStep + Math.SQRT1_2
   if (ahead > limit)
     return [
       authoritative[0] + (aheadX * limit) / ahead,

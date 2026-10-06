@@ -15,6 +15,7 @@ import {
   chooseTalent,
   clampPoint,
   createFarm,
+  farmMoveStep,
   replayFarm,
   stepFarm,
 } from '../src/features/farm/rules.mjs'
@@ -44,13 +45,13 @@ const flee = (state, target) => {
 // It also plays one focused build: late runs now meet a second boss, and a
 // scattered build would not survive long enough to exercise the big payload.
 const FOCUS = 'echo'
-function playFixture(active = true) {
-  let state = createFarm(day)
+function playFixture(active = true, permanent = {}, movingSeconds = 600) {
+  let state = createFarm(day, permanent)
   const frames = [],
     choices = [],
     surges = []
   const recipe = RECIPES.find((item) => item.weapon === FOCUS)
-  for (let tick = 0; tick < FPS * 60 * 10 && state.hp > 0; tick++) {
+  for (let tick = 0; tick < FPS * movingSeconds && state.hp > 0; tick++) {
     while (state.offered.length) {
       const id =
         state.offered.includes(FOCUS) && state.gear[FOCUS] < MAX_GEAR_LEVEL
@@ -66,6 +67,7 @@ function playFixture(active = true) {
       active
         ? flee(state, [50 + 32 * Math.sin(tick / 45), 50 + 30 * Math.cos(tick / 61)])
         : state.position,
+      farmMoveStep(state),
     )
     const surge = active && state.charge === 100
     if (surge) surges.push(tick)
@@ -82,11 +84,15 @@ function playFixture(active = true) {
       state = chooseTalent(state, id)
     }
     const target = state.crops.find((crop) => crop.hp > 0)
-    const point = clampPoint(state.position, target ? [target.x, target.y] : [...state.position])
+    const point = clampPoint(
+      state.position,
+      target ? [target.x, target.y] : [...state.position],
+      farmMoveStep(state),
+    )
     frames.push(point)
     state = stepFarm(state, point, false).state
   }
-  return replayFarm(day, frames, choices, surges)
+  return replayFarm(day, frames, choices, surges, permanent)
 }
 const round = playFixture()
 const lowerRound = playFixture(false)
@@ -114,6 +120,29 @@ function createRequest(store) {
 }
 
 describe('replay-verified all-time farm leaderboard', () => {
+  it('replays purchased attributes from the run snapshot and rejects invalid growth levels', () => {
+    const grown = playFixture(
+      true,
+      {
+        vitality: 12,
+        power: 4,
+        stride: 1,
+        armor: 2,
+        regen: 5,
+        shield: 1,
+      },
+      90,
+    )
+    expect(grown).not.toBeNull()
+    expect(grown.permanent.vitality).toBe(12)
+    expect(grown.frames.some((point) => point.some((value) => !Number.isInteger(value)))).toBe(true)
+    const submission = { ...grown, name: '成长乐手', playerId: 'farm_grown_player' }
+    expect(verifyFarm(submission)?.score).toBe(grown.score)
+    expect(verifyFarm({ ...submission, permanent: { vitality: 99 } })).toBeNull()
+    expect(verifyFarm({ ...submission, permanent: null })).toBeNull()
+    expect(verifyFarm({ ...submission, permanent: { stride: 1.5 } })).toBeNull()
+    expect(verifyFarm({ ...submission, permanent: { unknown: 1 } })).toBeNull()
+  })
   it('derives the ranking from a completed endless run, ignoring client-provided rewards', () => {
     expect(round.frames.length).toBeGreaterThan(FPS * 60)
     expect(round.outcome).toBe('defeated')
@@ -159,7 +188,7 @@ describe('replay-verified all-time farm leaderboard', () => {
       verifyFarm({ ...defeat, frames: [...lowerRound.frames, lowerRound.frames.at(-1)] }),
     ).toBeNull()
     expect(verifyFarm({ ...defeat, surges: [lowerRound.frames.length] })).toBeNull()
-    expect(farmKey(day)).toBe(`farm:v6-levels:${day}`)
+    expect(farmKey(day)).toBe(`farm:v7-growth:${day}`)
   })
 
   it('rejects the former one-minute finish while the player is alive', () => {
