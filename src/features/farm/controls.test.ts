@@ -9,6 +9,7 @@ function harness(pointerEvents = true) {
     setPointerCapture: (id: number) => void
     hasPointerCapture: (id: number) => boolean
     releasePointerCapture: (id: number) => void
+    contains: (node: EventTarget) => boolean
   }
   field.ownerDocument = { defaultView: pointerEvents ? { PointerEvent: class {} } : {} }
   const captures = new Set<number>()
@@ -19,29 +20,28 @@ function harness(pointerEvents = true) {
   field.releasePointerCapture = (id) => {
     captures.delete(id)
   }
-  const canvas = new EventTarget(),
-    moves: Point[] = [],
+  const canvas = new EventTarget()
+  // Everything the field owns takes part in aiming, like a HUD overlay would.
+  const owned = new Set<EventTarget>([field, canvas])
+  field.contains = (node) => owned.has(node)
+  const moves: Point[] = [],
     sticks: FarmStick[] = []
   let playing = true,
     stops = 0
-  const controls = bindFarmControls(
-    field as unknown as HTMLElement,
-    canvas as unknown as HTMLCanvasElement,
-    {
-      canMove: () => playing,
-      bounds: () => ({ left: 10, top: 20, width: 360, height: 430 }),
-      refreshBounds: () => {},
-      target: (point) => {
-        moves.push(point)
-      },
-      stick: (stick) => {
-        sticks.push(stick)
-      },
-      stop: () => {
-        stops++
-      },
+  const controls = bindFarmControls(field as unknown as HTMLElement, {
+    canMove: () => playing,
+    bounds: () => ({ left: 10, top: 20, width: 360, height: 430 }),
+    refreshBounds: () => {},
+    target: (point) => {
+      moves.push(point)
     },
-  )
+    stick: (stick) => {
+      sticks.push(stick)
+    },
+    stop: () => {
+      stops++
+    },
+  })
   const send = (name: string, data: object = {}, target: EventTarget = field) => {
     const event = new Event(name, { cancelable: true })
     Object.assign(
@@ -50,9 +50,10 @@ function harness(pointerEvents = true) {
         pointerId: 1,
         pointerType: 'mouse',
         isPrimary: true,
+        button: 0,
+        buttons: 0,
         clientX: 190,
         clientY: 235,
-        buttons: 0,
       },
       data,
     )
@@ -67,6 +68,7 @@ function harness(pointerEvents = true) {
     captures,
     controls,
     canvas,
+    owned,
     setPlaying: (value: boolean) => {
       playing = value
     },
@@ -115,6 +117,24 @@ describe('farm controls across devices', () => {
     h.send('pointerdown', { pointerId: 3, pointerType: 'touch' })
     h.send('pointerup', { pointerId: 3, pointerType: 'touch' })
     expect(h.stops()).toBe(2)
+    h.controls.dispose()
+  })
+  it('only aims on the primary button and takes presses from overlays inside the field', () => {
+    const h = harness()
+    h.send('pointerdown', { button: 2 })
+    h.send('pointerdown', { button: 1 })
+    expect(h.moves).toHaveLength(0)
+    h.send('pointerdown', { button: 0 })
+    expect(h.moves).toHaveLength(1)
+    // A HUD layer that forgets `pointer-events: none` must still steer the hero.
+    const overlay = new EventTarget()
+    h.owned.add(overlay)
+    h.send('pointerdown', { pointerId: 2, pointerType: 'touch' }, overlay)
+    expect(h.sticks).toHaveLength(1)
+    h.controls.reset()
+    h.send('pointerdown', { pointerId: 3 }, new EventTarget())
+    expect(h.moves).toHaveLength(1)
+    expect(h.sticks).toHaveLength(1)
     h.controls.dispose()
   })
   it('does not hijack buttons or paused menus and retains pointer direction outside the canonical view', () => {

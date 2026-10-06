@@ -47,14 +47,13 @@ export function FarmBoard({
   const submitRef = useRef<AbortController | null>(null)
   const attempted = useRef<FarmRound | null>(null)
 
-  // StrictMode replays setup after cleanup; a cancelled attempt must be allowed
-  // to restart, and its old promise must not clear a newer request's busy state.
+  // StrictMode replays setup after cleanup. An in-flight score is never
+  // aborted: cancelling the fetch does not undo a request the server already
+  // handled, and `attempted` survives the replay so the run is posted once.
   useEffect(() => {
     setBusy(false)
     return () => {
-      submitRef.current?.abort()
       submitRef.current = null
-      attempted.current = null
     }
   }, [])
 

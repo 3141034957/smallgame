@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import MusicFarm from './index'
-import { awardFarmCoins } from '@/features/farm/characters'
+import { awardFarmCoins, FARM_PROFILE_KEY } from '@/features/farm/characters'
 import { FARM_HELP_SEEN_KEY } from '@/features/farm/help'
+import { activateAccount, installAccountSave } from '@/utils/accountStorage'
 import { testStorage } from '@/test/storage'
 
 vi.mock('./FarmBoard', () => ({ FarmBoard: () => <div>测试总榜</div> }))
@@ -26,6 +27,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   cleanup()
+  activateAccount(null)
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
@@ -62,4 +64,33 @@ it('uses purchases made on the ready screen at start, then keeps the running sna
   expect(screen.getByRole('progressbar', { name: '生命值' }).getAttribute('aria-valuemax')).toBe(
     '100',
   )
+})
+
+it('refreshes the wallet when another tab of the same account saves progress', async () => {
+  const owner = 'account_sync_test'
+  activateAccount(owner)
+  installAccountSave(owner, { data: {}, revision: 1, dirty: false })
+  render(
+    <MemoryRouter initialEntries={['/farm?day=2026-10-06']}>
+      <MusicFarm />
+    </MemoryRouter>,
+  )
+  fireEvent.click(screen.getByRole('button', { name: '打开永久强化' }))
+  const wallet = () => within(screen.getByRole('dialog'))
+  expect(wallet().getByText('✦ 0')).toBeTruthy()
+  // The other tab of this account writes the cloud save, not the legacy keys.
+  const saved = JSON.stringify({
+    coins: 9000,
+    owned: [],
+    selected: 'bear-drums',
+    rewardedRuns: [],
+  })
+  localStorage.setItem(
+    `farm-account-save-v1:${owner}`,
+    JSON.stringify({ data: { [FARM_PROFILE_KEY]: saved }, revision: 2, dirty: false }),
+  )
+  await act(async () => {
+    fireEvent(window, new StorageEvent('storage', { key: `farm-account-save-v1:${owner}` }))
+  })
+  expect(wallet().getByText('✦ 9,000')).toBeTruthy()
 })

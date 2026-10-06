@@ -1,4 +1,4 @@
-import { accountStorage } from '@/utils/accountStorage'
+import { accountStorage, ACCOUNT_SAVE_EVENT, activeAccountId } from '@/utils/accountStorage'
 import { farmBestKey } from '@/features/farm/monsters.mjs'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -78,6 +78,9 @@ type Phase = 'ready' | 'play' | 'result'
 type Panel = 'help' | 'board' | 'pause' | 'shop' | 'growth' | 'badges' | null
 const talent = (id: UpgradeId) => UPGRADE_CARDS.find((item) => item.id === id)!
 const number = (value: number) => value.toLocaleString()
+// Cloud progress is stored per account, so another tab of the same account
+// writes this key instead of the legacy local ones.
+const accountSaveKey = (id: string) => `farm-account-save-v1:${id}`
 
 export default function MusicFarm() {
   const [params] = useSearchParams()
@@ -133,6 +136,8 @@ export default function MusicFarm() {
   const [celebration, setCelebration] = useState('')
   const [notice, setNotice] = useState('')
   const [best, setBest] = useState(() => loadBestScore(farmBestKey(day)))
+  // Only a finished run writes the record back; the mounted value is already stored.
+  const bestRecorded = useRef(false)
   const canvas = useRef<HTMLCanvasElement>(null)
   const page = useRef<HTMLDivElement>(null)
   const modal = useRef<HTMLElement>(null)
@@ -176,7 +181,6 @@ export default function MusicFarm() {
     panelRef.current = null
     setPanel(null)
     if (phaseRef.current === 'play') void prepare()
-    previousFocus.current?.focus({ preventScroll: true })
   }
   const initializeBattle = () => {
     const latest = loadFarmProfile()
@@ -283,9 +287,16 @@ export default function MusicFarm() {
     if (model.current.day === day) return
     setQuests(loadFarmQuests(day))
     setFreshQuests([])
+    bestRecorded.current = false
     setBest(loadBestScore(farmBestKey(day)))
     restartRef.current()
   }, [day])
+  // Persisting outside the updater: StrictMode calls updaters twice, which
+  // would store the same record twice and mark the save dirty for no reason.
+  useEffect(() => {
+    if (!bestRecorded.current) return
+    saveBestScore(farmBestKey(day), best)
+  }, [best, day])
   useEffect(
     () => () => {
       if (copiedTimer.current) clearTimeout(copiedTimer.current)
@@ -293,12 +304,24 @@ export default function MusicFarm() {
     [],
   )
   useEffect(() => {
-    const sync = (event: StorageEvent) => {
-      if (!event.key || event.key === FARM_PROFILE_KEY || event.key === 'character-unlocks-v1')
-        setProfile(loadFarmProfile())
+    const sync = () => setProfile(loadFarmProfile())
+    const onStorage = (event: StorageEvent) => {
+      const owner = activeAccountId()
+      if (
+        !event.key ||
+        event.key === FARM_PROFILE_KEY ||
+        event.key === 'character-unlocks-v1' ||
+        (!!owner && event.key === accountSaveKey(owner))
+      )
+        sync()
     }
-    window.addEventListener('storage', sync)
-    return () => window.removeEventListener('storage', sync)
+    window.addEventListener('storage', onStorage)
+    // Same-tab writes go through `accountStorage`, which broadcasts its own event.
+    window.addEventListener(ACCOUNT_SAVE_EVENT, sync)
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener(ACCOUNT_SAVE_EVENT, sync)
+    }
   }, [])
   const select = (id: UpgradeId) => {
     const before = model.current
@@ -309,7 +332,8 @@ export default function MusicFarm() {
     model.current = next
     setView(next)
     // Picking an instrument for the first time reads as the member joining.
-    const card = talent(selection.choices.at(-1)!.id)
+    // The chain of automatic picks that follows must not overwrite it.
+    const card = talent(selection.choices[0].id)
     if (card.kind === 'recovery') {
       setNotice(`${card.icon} 已恢复满血！`)
       noticeUntil.current = performance.now() + 2600
@@ -357,6 +381,17 @@ export default function MusicFarm() {
       box = element.getBoundingClientRect()
       rect = farmWorldBounds(box)
     }
+    // Scrolling inside a dialog also moves the field: measure at most once a
+    // frame, and stay passive so the scroll itself is never blocked.
+    let scrollFrame = 0
+    const onScroll = () => {
+      if (scrollFrame) return
+      scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = 0
+        refreshBounds()
+      })
+    }
+    const scrollSettings = { capture: true, passive: true } as const
     const resize = () => {
       refreshBounds()
       controls.current?.reset()
@@ -376,8 +411,8 @@ export default function MusicFarm() {
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(resize)
     observer?.observe(element)
     window.addEventListener('resize', resize)
-    window.addEventListener('scroll', refreshBounds, true)
-    controls.current = bindFarmControls(controlField, element, {
+    window.addEventListener('scroll', onScroll, scrollSettings)
+    controls.current = bindFarmControls(controlField, {
       canMove: () =>
         phaseRef.current === 'play' && !panelRef.current && !model.current.offered.length,
       bounds: () => rect,
@@ -561,12 +596,10 @@ export default function MusicFarm() {
               setGoalError(goals.error ?? '')
               if (goals.completed.length) setProfile(loadFarmProfile())
             }
-            if (finished)
-              setBest((previous) => {
-                const value = Math.max(previous, finished.score)
-                saveBestScore(farmBestKey(day), value)
-                return value
-              })
+            if (finished) {
+              bestRecorded.current = true
+              setBest((previous) => Math.max(previous, finished.score))
+            }
             break
           }
         }
@@ -677,8 +710,9 @@ export default function MusicFarm() {
       cancelAnimationFrame(frame)
       document.removeEventListener('visibilitychange', visibility)
       observer?.disconnect()
+      if (scrollFrame) cancelAnimationFrame(scrollFrame)
       window.removeEventListener('resize', resize)
-      window.removeEventListener('scroll', refreshBounds, true)
+      window.removeEventListener('scroll', onScroll, scrollSettings)
       input.dispose()
       sound.dispose()
     }
@@ -690,6 +724,12 @@ export default function MusicFarm() {
       modal.current?.querySelector<HTMLButtonElement>('button')?.focus()
     } else if (phaseRef.current === 'play') field.current?.focus({ preventScroll: true })
   }, [panel, offeredKey, offeredCount])
+  // The shell is inert until React commits `panel === null`, so the element
+  // that opened the dialog can only take focus back after that render.
+  useEffect(() => {
+    if (panel || phaseRef.current === 'play') return
+    previousFocus.current?.focus({ preventScroll: true })
+  }, [panel])
   useEffect(() => {
     if (phase === 'result') {
       page.current?.scrollIntoView({ block: 'start' })

@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
+import { StrictMode } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import MusicFarm from './index'
+import { farmBestKey } from '@/features/farm/monsters.mjs'
+import { saveBestScore } from '@/utils/localScores'
 import { FARM_HELP_SEEN_KEY } from '@/features/farm/help'
 import { testStorage } from '@/test/storage'
 import {
@@ -24,6 +27,10 @@ vi.mock('@/features/farm/rules.mjs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/features/farm/rules.mjs')>()
   return { ...actual, stepFarm: vi.fn(actual.stepFarm), finishFarm: vi.fn(actual.finishFarm) }
 })
+vi.mock('@/utils/localScores', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/utils/localScores')>()
+  return { loadBestScore: actual.loadBestScore, saveBestScore: vi.fn(actual.saveBestScore) }
+})
 
 let frame: FrameRequestCallback
 beforeEach(() => {
@@ -40,6 +47,7 @@ beforeEach(() => {
   Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
   vi.mocked(stepFarm).mockClear()
   vi.mocked(finishFarm).mockClear()
+  vi.mocked(saveBestScore).mockClear()
 })
 afterEach(() => {
   cleanup()
@@ -66,12 +74,13 @@ const simulate = (offered: FarmState) => {
     events: [],
   }))
 }
-const start = async () => {
-  render(
+const start = async (strict = false) => {
+  const tree = (
     <MemoryRouter initialEntries={['/farm?day=2026-10-04']}>
       <MusicFarm />
-    </MemoryRouter>,
+    </MemoryRouter>
   )
+  render(strict ? <StrictMode>{tree}</StrictMode> : tree)
   await act(async () => fireEvent.click(screen.getByRole('button', { name: /开始玩/ })))
   act(() => frame(1000))
   act(() => frame(1063))
@@ -94,6 +103,44 @@ it('automatically heals and continues play without mounting a single-option dial
   )
   expect(screen.getByText('Lv.54')).toBeTruthy()
   expectRecorded(['heal', 'heal', 'heal'])
+})
+
+it('announces the card the player picked, not the last card of an automatic chain', async () => {
+  const state = loadout()
+  state.gear.range = MAX_GEAR_LEVEL - 1
+  state.offered = ['range', 'heal']
+  simulate(state)
+  await start()
+  fireEvent.click(screen.getByRole('button', { name: /共鸣音箱/ }))
+  // The automatic heals behind the pick are not the player's choice and must
+  // not announce themselves as one.
+  expect(screen.queryByText(/已恢复满血/)).toBeNull()
+  act(() => frame(1126))
+  // The picked card leads the replay log, whatever follows it.
+  expect(vi.mocked(finishFarm).mock.calls[0][2][0]).toEqual({ tick: 1, id: 'range' })
+})
+
+it('gives focus back to the button that opened a panel after the run ends', async () => {
+  simulate({ ...loadout(), offered: [], score: 4321 })
+  await start()
+  act(() => frame(1126))
+  expect(screen.getByText('演出落幕，再战一场！')).toBeTruthy()
+  const opener = screen.getByRole('button', { name: '去永久强化 ↗' })
+  opener.focus()
+  fireEvent.click(opener)
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '返回游戏' })))
+  expect(document.activeElement).toBe(opener)
+})
+
+it('stores the daily best score once when a run ends', async () => {
+  simulate({ ...loadout(), offered: [], score: 4321 })
+  await start(true)
+  act(() => frame(1126))
+  expect(vi.mocked(finishFarm)).toHaveBeenCalledOnce()
+  expect(vi.mocked(saveBestScore).mock.calls).toHaveLength(1)
+  const [key, score] = vi.mocked(saveBestScore).mock.calls[0]
+  expect(key).toBe(farmBestKey('2026-10-04'))
+  expect(score).toBeGreaterThan(0)
 })
 
 it('waits for a manual choice when there are multiple options, then skips following sole offers', async () => {

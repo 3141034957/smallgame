@@ -1207,7 +1207,8 @@
 }
 .farm-performance {
   position: fixed;
-  z-index: 101;
+  /* Below `.farm-backdrop` (100) so ?stats=1 never covers a dialog. */
+  z-index: 99;
   bottom: 3px;
   right: 4px;
   padding: 4px 6px;

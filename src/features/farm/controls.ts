@@ -13,7 +13,7 @@ type Options = {
   stop: () => void
 }
 
-export function bindFarmControls(field: HTMLElement, canvas: HTMLCanvasElement, options: Options) {
+export function bindFarmControls(field: HTMLElement, options: Options) {
   let activePointer: number | null = null
   let origin: [number, number] | null = null
   const removers: (() => void)[] = []
@@ -46,7 +46,9 @@ export function bindFarmControls(field: HTMLElement, canvas: HTMLCanvasElement, 
       knob: percent(origin[0] + dx * pull, origin[1] + dy * pull),
     })
   }
-  const onField = (event: Event) => event.target === field || event.target === canvas
+  // HUD overlays inside the field are fair game; anything else belongs to a
+  // button or a dialog and must keep its own pointer handling.
+  const onField = (event: Event) => field.contains(event.target as Node)
   const reset = () => {
     const pointer = activePointer
     activePointer = null
@@ -58,6 +60,8 @@ export function bindFarmControls(field: HTMLElement, canvas: HTMLCanvasElement, 
     listen('pointerenter', () => options.refreshBounds())
     listen('pointerdown', (raw) => {
       const event = raw as PointerEvent
+      // Only the primary button aims: a right or middle click must not turn the hero.
+      if (event.button !== 0) return
       if (!options.canMove() || !onField(event) || event.isPrimary === false) return
       options.refreshBounds()
       if (event.pointerType !== 'mouse') {

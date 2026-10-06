@@ -53,6 +53,17 @@ it('completes automatic submission under the StrictMode used by the app', async 
   )
 })
 
+it('posts the score once when the effect is replayed after a cleanup', async () => {
+  render(
+    <StrictMode>
+      <FarmBoard round={round} />
+    </StrictMode>,
+  )
+  await waitFor(() => expect(screen.getByText(/上榜啦/)).toBeTruthy())
+  // A replayed mount must not resend: the server already stored this run.
+  expect(vi.mocked(farmRequest).mock.calls.filter(([path]) => path === 'score')).toHaveLength(1)
+})
+
 it('lets the player retry a failed submission without submitting on every render', async () => {
   vi.mocked(farmRequest).mockImplementation(async (path) => {
     if (path === 'score') throw new Error('网络断开')

@@ -826,6 +826,8 @@ export function drawFarm(
     // Low-effect mode keeps the telegraphs that must be dodged and drops the rest.
     if (pose?.simple && event.kind !== 'slam' && event.kind !== 'surge') continue
     if (event.kind === 'blast' && event.id % 3 !== 0) continue
+    // A telegraph can be wider than the screen: keep the margin as wide as it is.
+    if (!visibleAt(event.x, event.y, 48 + Y(event.radius ?? 15))) continue
     const duration =
       event.kind === 'pulse'
         ? 650
@@ -843,6 +845,9 @@ export function drawFarm(
       .map(({ event }) => `${event.x}:${event.y}`),
   )
   for (const danger of state.dangers) {
+    // Long runs pile up off-screen warnings; only circles touching the view
+    // are worth drawing. The off-screen boss arrows below stay untouched.
+    if (!visibleAt(danger.x, danger.y, 48 + Y(danger.radius))) continue
     const progress = Math.max(0, Math.min(1, 1 - (danger.due - moving.tick) / 16))
     ellipse(
       ctx,
@@ -1025,7 +1030,10 @@ export function drawFarm(
     }
   }
   drawHero(ctx, moving, now, assets, pose?.character)
-  for (const { event, born } of active) airEffect(ctx, event, (now - born) / 900)
+  for (const { event, born } of active) {
+    if (!visibleAt(event.x, event.y)) continue
+    airEffect(ctx, event, (now - born) / 900)
+  }
   ctx.restore()
   ctx.save()
   if (state.tick < state.surgeUntil) {

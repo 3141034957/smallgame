@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { PermanentTree } from './PermanentTree'
-import { awardFarmCoins, loadFarmProfile } from '@/features/farm/characters'
+import { awardFarmCoins, loadFarmProfile, type FarmProfile } from '@/features/farm/characters'
+import { PERMANENT_UPGRADES } from '@/features/farm/permanent.mjs'
 import { testStorage } from '@/test/storage'
 
 beforeEach(() => vi.stubGlobal('localStorage', testStorage()))
@@ -25,6 +26,24 @@ it('shows all eight nodes immediately and prevents unaffordable purchases', () =
   ).toBe(true)
   expect(screen.getByText('还差 18,000 金币')).toBeTruthy()
 })
+it('labels a maxed node as finished instead of offering a null price', () => {
+  const levels = Object.fromEntries(
+    PERMANENT_UPGRADES.map((item) => [item.id, item.max]),
+  ) as NonNullable<FarmProfile['growth']>['levels']
+  render(
+    <PermanentTree
+      profile={{ ...loadFarmProfile(), growth: { levels, spent: 0 } }}
+      onChange={() => {}}
+      onClose={() => {}}
+    />,
+  )
+  for (const item of PERMANENT_UPGRADES) {
+    const node = screen.getByRole('article', { name: item.name })
+    expect(node.querySelector('button')!.getAttribute('aria-label')).toBe(`${item.name}已满级`)
+  }
+  expect(document.body.textContent).not.toContain('null')
+})
+
 it('buys from any branch, updates levels and price, persists across remounts, and confirms refunds', () => {
   awardFarmCoins('first', 20000)
   const mounted = render(<Tree />)
