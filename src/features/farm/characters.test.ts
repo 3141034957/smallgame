@@ -6,8 +6,10 @@ import {
   FARM_DEFAULT_CHARACTER,
   FARM_PROFILE_KEY,
   loadFarmProfile,
+  resetFarmUpgrades,
   selectFarmCharacter,
 } from './characters'
+import { permanentPrice, type PermanentId } from './permanent.mjs'
 
 let data: Map<string, string>
 beforeEach(() => {
@@ -109,6 +111,35 @@ describe('survivor character shop', () => {
       JSON.stringify({ coins: 42, selected: 'fox-sax', owned: ['missing'], rewardedRuns: null }),
     )
     expect(loadFarmProfile()).toMatchObject({ coins: 42, selected: FARM_DEFAULT_CHARACTER })
+  })
+
+  it('refunds the ranks a save actually owns when the spend ledger is missing or short', () => {
+    const paid = (id: PermanentId, levels: number) =>
+      Array.from({ length: levels }, (_, rank) => permanentPrice(id, rank) ?? 0).reduce(
+        (sum, price) => sum + price,
+        0,
+      )
+    // A legacy save predates the ledger: the ranks alone prove what was paid.
+    accountStorage.setItem(
+      FARM_PROFILE_KEY,
+      JSON.stringify({ coins: 100, growth: { levels: { regen: 2 } } }),
+    )
+    expect(loadFarmProfile().growth?.spent).toBe(paid('regen', 2))
+    const legacy = resetFarmUpgrades()
+    expect(legacy.error).toBeUndefined()
+    expect(legacy.profile.coins).toBe(100 + paid('regen', 2))
+    expect(legacy.profile.growth).toEqual(
+      expect.objectContaining({ spent: 0, levels: expect.objectContaining({ regen: 0 }) }),
+    )
+    // A damaged value is still sanitized to zero: it must not mint coins.
+    accountStorage.setItem(
+      FARM_PROFILE_KEY,
+      JSON.stringify({ coins: 7, growth: { levels: { vitality: 3 }, spent: -50 } }),
+    )
+    expect(loadFarmProfile().growth?.spent).toBe(0)
+    expect(loadFarmProfile().growth?.levels.vitality).toBe(3)
+    expect(resetFarmUpgrades().profile.coins).toBe(7)
+    expect(loadFarmProfile().growth?.levels.vitality).toBe(0)
   })
 
   it('handles corrupt saves independently and does not report purchases as saved if storage fails', () => {

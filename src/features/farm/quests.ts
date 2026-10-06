@@ -150,14 +150,17 @@ export function applyFarmQuests(
     total = { ...previous.total },
     claimed = [...previous.claimed]
   const appliedRuns = [...(previous.appliedRuns ?? [])]
-  if (!runId || !appliedRuns.includes(runId)) {
+  // Runs without an id cannot be told apart, so they share one dedupe key: a
+  // retry must never count the same round twice, and the log stays string-only.
+  const key = typeof runId === 'string' ? runId : ''
+  if (!appliedRuns.includes(key)) {
     for (const quest of farmQuests(day)) {
       const value = quest.metric(round)
       if (!Number.isFinite(value) || value < 0) continue
       best[quest.id] = Math.max(best[quest.id] ?? 0, value)
       total[quest.id] = (total[quest.id] ?? 0) + value
     }
-    if (runId) appliedRuns.push(runId)
+    appliedRuns.push(key)
   }
   const log = { day, best, total, claimed, appliedRuns: appliedRuns.slice(-64) }
   // Save progress before paying: retries must not count this run twice, even

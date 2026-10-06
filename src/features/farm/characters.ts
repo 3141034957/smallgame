@@ -33,6 +33,18 @@ const defaults = (): FarmProfile => ({
   selected: FARM_DEFAULT_CHARACTER,
   rewardedRuns: [],
 })
+// Old saves predate the spend ledger, and a damaged one can lose it: the owned
+// ranks themselves prove what was paid, so rebuild the cheapest possible total.
+const permanentSpend = (levels: unknown) =>
+  Object.entries(normalizePermanentLevels(levels)).reduce(
+    (sum, [id, level]) =>
+      sum +
+      Array.from({ length: level }, (_, rank) => permanentPrice(id, rank) ?? 0).reduce(
+        (total, price) => total + price,
+        0,
+      ),
+    0,
+  )
 function readJSON(key: string) {
   try {
     return JSON.parse(accountStorage.getItem(key) ?? 'null')
@@ -64,11 +76,14 @@ export function loadFarmProfile(): FarmProfile {
             growth: {
               levels: normalizePermanentLevels(stored.growth.levels),
               spent:
-                permanentLevelCount(stored.growth.levels) &&
-                Number.isSafeInteger(stored.growth.spent) &&
-                stored.growth.spent >= 0
+                Number.isSafeInteger(stored.growth.spent) && stored.growth.spent >= 0
                   ? stored.growth.spent
-                  : 0,
+                  : // Old saves predate the ledger: rebuild it from the ranks
+                    // they own instead of refunding nothing. A damaged value
+                    // stays at zero, so a hand-edited save cannot mint coins.
+                    stored.growth.spent == null
+                    ? permanentSpend(stored.growth.levels)
+                    : 0,
             },
           }
         : {}),

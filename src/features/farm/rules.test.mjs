@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   FARM_MODIFIERS,
   FPS,
+  MAX_BOSSES,
   MAX_GEAR_LEVEL,
   STARTER_CHOICES,
   RECIPES,
@@ -31,6 +32,7 @@ const crop = (id, x, y, hp = 1) => ({
   regrow: -1,
   boss: false,
 })
+const boss = (id, hp = 1) => ({ id, x: 50, y: 68, kind: 3, hp, maxHp: hp, regrow: -1, boss: true })
 function arena(gear, crops, tick = 0) {
   const state = createFarm(day)
   Object.assign(state, {
@@ -381,6 +383,79 @@ describe('music roguelite farming', () => {
     expect(days.size).toBeGreaterThan(1)
     for (const id of days) expect(FARM_MODIFIERS.some((item) => item.id === id)).toBe(true)
   })
+  it('keeps a boss slot free for a bass arrival that is due on the same tick', () => {
+    const interval = 240 * FPS
+    const start = 480 * FPS
+    const state = arena(
+      {},
+      [1, 2, 3].map((id) => boss(id)),
+      start,
+    )
+    state.nextBoss = start
+    state.nextBass = start
+    const shared = stepFarm(state, state.position).state
+    // The drum boss stands down so the bass can land: both timers were due and
+    // only one slot was left below the cap.
+    expect(shared.crops.filter((crop) => crop.bass)).toHaveLength(1)
+    expect(shared.crops.filter((crop) => crop.boss)).toHaveLength(MAX_BOSSES)
+    expect(shared.nextBass).toBe(start + interval)
+  })
+
+  it('gives an elite a clean state when it takes over a dead monster slot', () => {
+    const tick = 45 * FPS
+    const state = arena(
+      {},
+      [
+        {
+          id: 1,
+          x: 50,
+          y: 68,
+          kind: 0,
+          hp: 0,
+          maxHp: 1,
+          // Far future: the slot stays dead so the elite can claim it.
+          regrow: tick + 1000,
+          boss: false,
+          slowUntil: tick + 100,
+          dashUntil: tick + 100,
+        },
+      ],
+      tick,
+    )
+    const next = stepFarm(state, state.position).state
+    expect(next.crops[0].elite).toBe(true)
+    expect(next.crops[0].hp).toBeGreaterThan(0)
+    expect(next.crops[0].slowUntil).toBe(-1)
+    expect(next.crops[0].dashUntil).toBe(-1)
+  })
+
+  it('clears the slow of a dead monster before it regrows into a fresh one', () => {
+    const tick = 30 * FPS
+    const state = arena(
+      {},
+      [
+        {
+          id: 1,
+          x: 50,
+          y: 68,
+          kind: 0,
+          hp: 0,
+          maxHp: 1,
+          regrow: tick,
+          boss: false,
+          slowUntil: tick + 100,
+          dashUntil: tick + 100,
+        },
+      ],
+      tick,
+    )
+    const next = stepFarm(state, state.position).state
+    expect(next.crops[0].hp).toBeGreaterThan(0)
+    expect(next.crops[0].elite).toBe(false)
+    expect(next.crops[0].slowUntil).toBe(-1)
+    expect(next.crops[0].dashUntil).toBe(-1)
+  })
+
   it('lets elites, shields and bosses actually show up during a wandering run', () => {
     // Regression guard: these mechanics are gated by timers and by the monster
     // pool, so a small refactor can silently make them never fire.

@@ -745,6 +745,7 @@ export function stepFarm(previous, point, useSurge = false) {
       crop.attackUntil = -1
       crop.dashDx = undefined
       crop.dashDy = undefined
+      crop.slowUntil = -1
       crop.hp = enemyHealth(state.tick, crop.kind) + (modifier?.health ?? 0)
       crop.maxHp = crop.hp
       placeAtEdge(state, crop, true)
@@ -794,6 +795,7 @@ export function stepFarm(previous, point, useSurge = false) {
       slot.attackUntil = -1
       slot.dashDx = undefined
       slot.dashDy = undefined
+      slot.slowUntil = -1
       placeAtEdge(state, slot, true)
     } else if (state.crops.filter((crop) => !crop.boss).length < 100) {
       const elite = {
@@ -814,12 +816,10 @@ export function stepFarm(previous, point, useSurge = false) {
   }
   if (state.tick >= state.nextBoss) {
     state.nextBoss += MONSTERS.find((monster) => monster.id === 'drum-boss').interval * FPS
-    if (
-      state.crops.filter((crop) => crop.boss).length <
-      (state.tick >= state.nextBass && !state.crops.some((crop) => crop.bass)
-        ? MAX_BOSSES - 1
-        : MAX_BOSSES)
-    ) {
+    // Bass shares the boss cap, so an arrival due on this very tick reserves a
+    // slot for it even though it spawns later in the same frame.
+    const limit = state.nextBass <= state.tick ? MAX_BOSSES - 1 : MAX_BOSSES
+    if (state.crops.filter((crop) => crop.boss).length < limit) {
       const index = state.bosses + state.crops.filter((crop) => crop.boss).length
       const maxHp = 65 + index * 45
       const boss = {

@@ -78,12 +78,14 @@ describe('daily survivor quests', () => {
       score: value,
       maxCombo: value,
     })
-    const first = applyFarmQuests(day, round(patch(3)))
+    const first = applyFarmQuests(day, round(patch(3)), 'run-1')
     expect(farmQuestProgress(totalQuest, first.log)).toBe(3)
     expect(farmQuestProgress(bestQuest, first.log)).toBe(3)
-    const second = applyFarmQuests(day, round(patch(1)))
+    const second = applyFarmQuests(day, round(patch(1)), 'run-2')
     expect(farmQuestProgress(totalQuest, second.log)).toBe(4)
     expect(farmQuestProgress(bestQuest, second.log)).toBe(3)
+    // The same id again adds nothing, whatever the metrics say.
+    expect(applyFarmQuests(day, round(patch(9)), 'run-2').log.total).toEqual(second.log.total)
     const finished = applyFarmQuests(day, round(patch(999)))
     expect(finished.completed.length).toBeGreaterThan(0)
     expect(finished.log.claimed).toEqual(finished.completed)
@@ -145,6 +147,18 @@ describe('daily survivor quests', () => {
     expect(second.log.total.hunt).toBe(6)
     expect(second.completed).toContain('hunt')
     expect(loadFarmProfile().coins).toBe(400)
+  })
+  it('counts an unidentified run once and keeps named runs apart', () => {
+    const first = applyFarmQuests(day, round({ bosses: 3 }))
+    const retry = applyFarmQuests(day, round({ bosses: 3 }))
+    expect(retry.log.total.hunt).toBe(first.log.total.hunt)
+    expect(loadFarmQuests(day).appliedRuns).toEqual([''])
+    const named = applyFarmQuests(day, round({ bosses: 3 }), 'run-x')
+    expect(named.log.total.hunt).toBe(first.log.total.hunt + 3)
+    expect(loadFarmQuests(day).appliedRuns).toEqual(['', 'run-x'])
+    // A non-string id is not a usable key and must never enter the log.
+    applyFarmQuests(day, round({ bosses: 3 }), 7 as unknown as string)
+    expect(loadFarmQuests(day).appliedRuns?.every((id) => typeof id === 'string')).toBe(true)
   })
   it('retries a failed wallet payment without increasing progress', () => {
     const original = accountStorage.setItem
