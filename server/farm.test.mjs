@@ -12,13 +12,13 @@ import {
   FPS,
   MAX_GEAR_LEVEL,
   RECIPES,
-  chooseTalent,
   clampPoint,
   createFarm,
   farmMoveStep,
   replayFarm,
   stepFarm,
 } from '../src/features/farm/rules.mjs'
+import { selectFarmUpgrade } from '../src/features/farm/upgradeSelection.ts'
 
 const day = '2026-10-04'
 // The fixture farmer keeps its distance from the closest monster instead of
@@ -59,8 +59,9 @@ function playFixture(active = true, permanent = {}, movingSeconds = MAX_FARM_FRA
           : state.offered.includes(recipe.chip) && state.gear[recipe.chip] < MAX_GEAR_LEVEL
             ? recipe.chip
             : state.offered[0]
-      choices.push({ tick, id })
-      state = chooseTalent(state, id)
+      const selected = selectFarmUpgrade(state, id)
+      choices.push(...selected.choices)
+      state = selected.state
     }
     const point = clampPoint(
       state.position,
@@ -80,8 +81,9 @@ function playFixture(active = true, permanent = {}, movingSeconds = MAX_FARM_FRA
   while (state.hp > 0 && frames.length < FPS * 60 * 12) {
     while (state.offered.length) {
       const id = state.offered[0]
-      choices.push({ tick: state.tick, id })
-      state = chooseTalent(state, id)
+      const selected = selectFarmUpgrade(state, id)
+      choices.push(...selected.choices)
+      state = selected.state
     }
     const target = state.crops.find((crop) => crop.hp > 0)
     const point = clampPoint(

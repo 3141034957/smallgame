@@ -12,7 +12,6 @@ import {
 import { bindFarmControls, type FarmStick } from '@/features/farm/controls'
 import { FarmAudio } from '@/features/farm/audio'
 import {
-  chooseTalent,
   clampPoint,
   createFarm,
   evolved,
@@ -30,6 +29,7 @@ import {
   validDay,
 } from '@/features/farm/rules.mjs'
 import type { Choice, FarmEvent, FarmRound, Point, UpgradeId } from '@/features/farm/rules.mjs'
+import { selectFarmUpgrade } from '@/features/farm/upgradeSelection'
 import { drawFarm } from './render'
 import { FarmBoard } from './FarmBoard'
 import { CharacterShop } from './CharacterShop'
@@ -301,13 +301,14 @@ export default function MusicFarm() {
   }, [])
   const select = (id: UpgradeId) => {
     const before = model.current
-    const next = chooseTalent(before, id)
-    if (!next) return
-    logs.current.choices.push({ tick: before.tick, id })
+    const selection = selectFarmUpgrade(before, id)
+    if (!selection) return
+    const next = selection.state
+    logs.current.choices.push(...selection.choices)
     model.current = next
     setView(next)
     // Picking an instrument for the first time reads as the member joining.
-    const card = talent(id)
+    const card = talent(selection.choices.at(-1)!.id)
     if (card.kind === 'recovery') {
       setNotice(`${card.icon} 已恢复满血！`)
       noticeUntil.current = performance.now() + 2600
@@ -330,6 +331,8 @@ export default function MusicFarm() {
     }
     if (!next.offered.length) field.current?.focus({ preventScroll: true })
   }
+  const selectRef = useRef(select)
+  selectRef.current = select
   useEffect(() => {
     const sound = new FarmAudio()
     audio.current = sound
@@ -515,6 +518,11 @@ export default function MusicFarm() {
           previousLoot = new Map(state.loot.map((drop) => [drop.id, { x: drop.x, y: drop.y }]))
           state = result.state
           model.current = state
+          // Resolve a lone offer before publishing or interrupting movement for a dialog.
+          if (state.offered.length === 1) {
+            selectRef.current(state.offered[0])
+            state = model.current
+          }
           if (state.hp <= 0) {
             const finished = finishFarm(
               state,

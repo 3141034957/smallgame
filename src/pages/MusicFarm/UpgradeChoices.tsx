@@ -27,7 +27,7 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, onSelect 
       <h2>组建乐队，选你喜欢的！</h2>
       <p>
         成员负责攻击，装备负责强化；一局最多带 {MAX_EQUIPPED} 件乐器和 {MAX_EQUIPPED}{' '}
-        件芯片。恢复满血卡随机出现，不占槽位；角色等级可以持续提升。
+        件芯片。恢复满血卡随机出现，不占槽位；角色等级可以持续提升。只有一个选项时自动选择，继续战斗。
       </p>
       <p className="farm-slot-note">
         槽位 {carried('weapon')}/{MAX_EQUIPPED} 件乐器 · {carried('chip')}/{MAX_EQUIPPED} 件芯片

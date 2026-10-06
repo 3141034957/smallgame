@@ -5,6 +5,7 @@
 - `src/App.tsx`：仅保留 `/` 与 `/farm` 两个游戏入口；其他旧地址回到首页。分享链接继续携带日期和挑战参数。
 - `src/pages/MusicFarm/index.tsx`：串联对局生命周期、动画循环、输入、音频与本地结算。可变的逐帧状态在 ref 中，界面状态在 React state 中。
 - `src/pages/MusicFarm/UpgradeChoices.tsx`、`FarmHelp.tsx`：升级选项与玩法说明，接收数据和回调，不修改存档或推进游戏。
+- `src/features/farm/upgradeSelection.ts`：执行选择及后续单选项的连续自动升级，返回每次选择的日志；页面在发布画面前处理单选项，多选项继续等待玩家，服务端仍按原规则回放日志。
 - `src/pages/MusicFarm/FarmBoard.tsx`：生存榜读取、提交与重试。
 - `src/pages/MusicFarm/render.ts`、`background.ts`：绘图和背景；不改变游戏规则。
 - `src/features/farm/`：战斗规则、控制器、本地角色钱包、成就、任务、生涯统计等独立模块。
