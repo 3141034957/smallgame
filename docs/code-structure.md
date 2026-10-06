@@ -12,6 +12,7 @@
 - `src/utils/playerIdentity.ts`：跳跃游戏与生存榜共用的身份、昵称和旧存档迁移。
 - `src/utils/localScores.ts`：最佳成绩的存档校验和容错读写；`starCurrency.ts` 管理旧跳跃游戏的星星。
 - `server/`：HTTP 接口与 SQLite 存储；每种游戏的接口独立，客户端成绩由共享规则回放校验。
+- `server/static.mjs`：静态文件、页面回退、缓存和压缩协商。缺失的构建资源返回 404，页面回退使用 HTML 类型和 `no-cache`；压缩协商依据 [RFC 9110 §12.5.3](https://www.rfc-editor.org/rfc/rfc9110.html#section-12.5.3)。
 - `scripts/game-service.sh`：部署与守护管理；运行状态文件位于 `.service/`，不提交到 Git。
 
 ## 修改时的约定
@@ -33,5 +34,7 @@ npm test
 npm run lint
 npm run build
 ```
+
+`server/static.test.mjs` 使用独立临时文件验证响应内容和缓存头；`server/index.test.mjs` 在系统分配的临时端口启动真实服务，验证异常请求不会终止进程及中文昵称的分块传输。测试数据库位于系统临时目录，不使用 `server/data`。
 
 这次统一整理了农场主页面、排行榜、任务和控制模块以及涉及的旧游戏页面。其余页面保持原有格式，后续随实际修改逐步整理。农场动画循环仍在主页面中；以后调整它时，应先保留固定步长模拟、显示插值、暂停和回放日志之间的关系，再决定是否抽出 hook。
