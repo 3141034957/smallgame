@@ -76,7 +76,11 @@ function playFixture(active = true) {
   // Walk into the horde until it ends: contact damage outpaces capped healing,
   // so this finishes on every platform instead of depending on float details.
   while (state.hp > 0 && frames.length < FPS * 60 * 12) {
-    while (state.offered.length) state = chooseTalent(state, state.offered[0])
+    while (state.offered.length) {
+      const id = state.offered[0]
+      choices.push({ tick: state.tick, id })
+      state = chooseTalent(state, id)
+    }
     const target = state.crops.find((crop) => crop.hp > 0)
     const point = clampPoint(state.position, target ? [target.x, target.y] : [...state.position])
     frames.push(point)
@@ -155,7 +159,7 @@ describe('replay-verified all-time farm leaderboard', () => {
       verifyFarm({ ...defeat, frames: [...lowerRound.frames, lowerRound.frames.at(-1)] }),
     ).toBeNull()
     expect(verifyFarm({ ...defeat, surges: [lowerRound.frames.length] })).toBeNull()
-    expect(farmKey(day)).toBe(`farm:v5-monsters:${day}`)
+    expect(farmKey(day)).toBe(`farm:v6-levels:${day}`)
   })
 
   it('rejects the former one-minute finish while the player is alive', () => {

@@ -21,12 +21,13 @@ import {
   MOVE_STEP,
   RECIPES,
   stepFarm,
-  TALENTS,
-  THRESHOLDS,
+  farmUpgradeXp,
+  farmXpThreshold,
+  UPGRADE_CARDS,
   todayRoute,
   validDay,
 } from '@/features/farm/rules.mjs'
-import type { Choice, FarmEvent, FarmRound, Point, TalentId } from '@/features/farm/rules.mjs'
+import type { Choice, FarmEvent, FarmRound, Point, UpgradeId } from '@/features/farm/rules.mjs'
 import { drawFarm } from './render'
 import { FarmBoard } from './FarmBoard'
 import { CharacterShop } from './CharacterShop'
@@ -70,7 +71,7 @@ import './style.css'
 
 type Phase = 'ready' | 'play' | 'result'
 type Panel = 'help' | 'board' | 'pause' | 'shop' | 'badges' | null
-const talent = (id: TalentId) => TALENTS.find((item) => item.id === id)!
+const talent = (id: UpgradeId) => UPGRADE_CARDS.find((item) => item.id === id)!
 const number = (value: number) => value.toLocaleString()
 
 export default function MusicFarm() {
@@ -283,7 +284,7 @@ export default function MusicFarm() {
     window.addEventListener('storage', sync)
     return () => window.removeEventListener('storage', sync)
   }, [])
-  const select = (id: TalentId) => {
+  const select = (id: UpgradeId) => {
     const before = model.current
     const next = chooseTalent(before, id)
     if (!next) return
@@ -291,10 +292,12 @@ export default function MusicFarm() {
     model.current = next
     setView(next)
     // Picking an instrument for the first time reads as the member joining.
-    if (talent(id).kind === 'weapon' && next.gear[id] === 1) {
-      setNotice(
-        `${talent(id).icon} ${talent(id).name} ${talent(id).characterId ? '加入乐队！' : '就位！'}`,
-      )
+    const card = talent(id)
+    if (card.kind === 'recovery') {
+      setNotice(`${card.icon} 已恢复满血！`)
+      noticeUntil.current = performance.now() + 2600
+    } else if (card.kind === 'weapon' && next.gear[card.id] === 1) {
+      setNotice(`${card.icon} ${card.name} ${card.characterId ? '加入乐队！' : '就位！'}`)
       noticeUntil.current = performance.now() + 2600
     }
     const newForm = evolved(next.gear).find((weapon) => !evolved(before.gear).includes(weapon))
@@ -662,9 +665,8 @@ export default function MusicFarm() {
     }
   }, [phase])
   const upgrade = phase === 'play' && view.offered.length > 0
-  const previousThreshold = view.level ? THRESHOLDS[view.level - 1] : 0
-  const nextThreshold = THRESHOLDS[view.level] ?? view.xp
-  const requiredXp = nextThreshold - previousThreshold
+  const previousThreshold = farmXpThreshold(view.level)
+  const requiredXp = farmUpgradeXp(view.level)
   const currentXp = Math.max(0, Math.min(requiredXp, view.xp - previousThreshold))
   const progress = requiredXp > 0 ? (currentXp / requiredXp) * 100 : 100
   const forms = evolved(view.gear)
@@ -800,9 +802,7 @@ export default function MusicFarm() {
                 <i style={{ width: `${progress}%` }} />
               </div>
               <span>
-                {view.level >= THRESHOLDS.length
-                  ? 'MAX'
-                  : `${number(currentXp)} / ${number(requiredXp)} 经验`}
+                {number(currentXp)} / {number(requiredXp)} 经验
               </span>
             </div>
             <div className="farm-hud">
@@ -1075,7 +1075,13 @@ export default function MusicFarm() {
             onKeyDown={trap}
           >
             {upgrade ? (
-              <UpgradeChoices gear={view.gear} offered={view.offered} onSelect={select} />
+              <UpgradeChoices
+                gear={view.gear}
+                offered={view.offered}
+                hp={view.hp}
+                maxHp={view.maxHp}
+                onSelect={select}
+              />
             ) : (
               <>
                 {panel !== 'shop' && (

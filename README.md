@@ -43,7 +43,7 @@ bash scripts/game-service.sh update
 
 ## 数据
 
-SQLite 位于 `server/data/game.db`，可以通过 `DATA_DIR` 指定其他目录。服务保留既有的 `melody_scores` 表名，以兼容已经保存的怪潮乐队成绩；当前榜单只读取 `farm:v5-monsters:日期` 且玩法键为 `farm` 的记录。其他游戏的接口、运行代码和素材已移除，历史数据库记录不再参与当前榜单。服务不导入旧跳跃游戏的 JSON 备份。
+SQLite 位于 `server/data/game.db`，可以通过 `DATA_DIR` 指定其他目录。服务保留既有的 `melody_scores` 表名，以兼容已经保存的怪潮乐队成绩；当前榜单只读取 `farm:v6-levels:日期` 且玩法键为 `farm` 的记录。其他游戏的接口、运行代码和素材已移除，历史数据库记录不再参与当前榜单。服务不导入旧跳跃游戏的 JSON 备份。
 
 浏览器身份键和旧角色 ID 的读取仅用于迁移玩家进度，不提供旧玩法或星星商店。生产升级前请备份 SQLite；服务启用 WAL，应使用在线备份，或停服后完整备份数据目录。
 

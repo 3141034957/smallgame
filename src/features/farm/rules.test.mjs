@@ -113,7 +113,11 @@ function run(focus = 'drum', routeDay = day) {
   // contact damage ends the run: healing is capped, so this always kills, and
   // the replay has a death to verify on every platform.
   while (state.hp > 0 && frames.length < FPS * 60 * 12) {
-    while (state.offered.length) state = chooseTalent(state, state.offered[0])
+    while (state.offered.length) {
+      const id = state.offered[0]
+      choices.push({ tick: state.tick, id })
+      state = chooseTalent(state, id)
+    }
     const point = clampPoint(state.position, chase(state))
     frames.push(point)
     state = stepFarm(state, point, false).state
@@ -144,7 +148,9 @@ describe('music roguelite farming', () => {
     expect(state.tick / FPS).toBeLessThan(5)
     expect(new Set(state.offered).size).toBe(state.offered.length)
     expect(
-      state.offered.every((id) => TALENTS.find((talent) => talent.id === id).kind === 'weapon'),
+      state.offered.every(
+        (id) => id === 'heal' || TALENTS.find((talent) => talent.id === id).kind === 'weapon',
+      ),
     ).toBe(true)
     expect(stepFarm(state, state.position)).toBeNull()
     expect(chooseTalent(state, 'not-a-weapon')).toBeNull()
@@ -195,7 +201,7 @@ describe('music roguelite farming', () => {
       const state = createFarm(`2026-10-${String(date).padStart(2, '0')}`)
       state.xp = THRESHOLDS[0]
       const offered = stepFarm(state, state.position).state
-      offered.offered.forEach((id) => seen.add(id))
+      offered.offered.filter((id) => id !== 'heal').forEach((id) => seen.add(id))
       const id = offered.offered[0]
       const partner = TALENTS.find((item) => item.id === id).partner
       let selected = chooseTalent(offered, id)
@@ -205,9 +211,11 @@ describe('music roguelite farming', () => {
         const needed = selected.gear[id] < MAX_GEAR_LEVEL ? id : partner
         expect(selected.offered).toContain(needed)
         expect(new Set(selected.offered).size).toBe(3)
-        expect(selected.offered.every((choice) => selected.gear[choice] < MAX_GEAR_LEVEL)).toBe(
-          true,
-        )
+        expect(
+          selected.offered.every(
+            (choice) => choice === 'heal' || selected.gear[choice] < MAX_GEAR_LEVEL,
+          ),
+        ).toBe(true)
         selected = chooseTalent(selected, needed)
       }
       expect(evolved(selected.gear)).toContain(id)
@@ -423,6 +431,8 @@ describe('music roguelite farming', () => {
       // with a margin that survives those differences.
       expect(round.terminalAt).toBeLessThan(FPS * 150)
       expect(round.state.tick).toBeGreaterThan(FPS * 20)
+      expect(round.choices).toHaveLength(round.state.level)
+      if (focus === 'drum') expect(round.choices.length).toBeGreaterThan(50)
       const replay = replayFarm(routeDay, round.frames, round.choices, round.surges)
       expect(replay).toMatchObject({
         score: round.state.score,

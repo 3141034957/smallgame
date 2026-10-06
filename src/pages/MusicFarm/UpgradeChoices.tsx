@@ -1,10 +1,23 @@
 import type { CSSProperties } from 'react'
-import { evolved, MAX_EQUIPPED, MAX_GEAR_LEVEL, RECIPES, TALENTS } from '@/features/farm/rules.mjs'
-import type { Gear, TalentId } from '@/features/farm/rules.mjs'
+import {
+  evolved,
+  MAX_EQUIPPED,
+  MAX_GEAR_LEVEL,
+  RECIPES,
+  TALENTS,
+  UPGRADE_CARDS,
+} from '@/features/farm/rules.mjs'
+import type { Gear, UpgradeId } from '@/features/farm/rules.mjs'
 
-type Props = { gear: Gear; offered: TalentId[]; onSelect: (id: TalentId) => void }
+type Props = {
+  gear: Gear
+  offered: UpgradeId[]
+  hp?: number
+  maxHp?: number
+  onSelect: (id: UpgradeId) => void
+}
 
-export function UpgradeChoices({ gear, offered, onSelect }: Props) {
+export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, onSelect }: Props) {
   const forms = evolved(gear)
   const carried = (kind: 'weapon' | 'chip') =>
     TALENTS.filter((item) => item.kind === kind && gear[item.id] > 0).length
@@ -14,16 +27,39 @@ export function UpgradeChoices({ gear, offered, onSelect }: Props) {
       <h2>组建乐队，选你喜欢的！</h2>
       <p>
         成员负责攻击，装备负责强化；一局最多带 {MAX_EQUIPPED} 件乐器和 {MAX_EQUIPPED}{' '}
-        件芯片，槽位满了只会升级已有的。
+        件芯片。恢复满血卡随机出现，不占槽位；角色等级可以持续提升。
       </p>
       <p className="farm-slot-note">
         槽位 {carried('weapon')}/{MAX_EQUIPPED} 件乐器 · {carried('chip')}/{MAX_EQUIPPED} 件芯片
       </p>
       <div className="farm-choices">
         {offered.map((id, index) => {
-          const item = TALENTS.find((talent) => talent.id === id)!
+          const item = UPGRADE_CARDS.find((card) => card.id === id)!
+          if (item.kind === 'recovery')
+            return (
+              <button
+                key={id}
+                onClick={() => onSelect(id)}
+                style={{ '--talent-color': item.color } as CSSProperties}
+              >
+                <i className="farm-choice-key" aria-hidden="true">
+                  {index + 1}
+                </i>
+                <span className="farm-choice-icon">{item.icon}</span>
+                <small>恢复卡 · {item.tag}</small>
+                <b>
+                  {item.name}
+                  <em>
+                    生命 {hp} → {maxHp}
+                  </em>
+                </b>
+                <p>{item.description}</p>
+                <strong>{hp >= maxHp ? '已满血，也可选择继续升级' : '选择后立即回满生命'}</strong>
+              </button>
+            )
+          const gearId = item.id
           const recipe = RECIPES.find((entry) => entry.weapon === id || entry.chip === id)!
-          const nextGear = { ...gear, [id]: gear[id] + 1 }
+          const nextGear = { ...gear, [gearId]: gear[gearId] + 1 }
           const willEvolve =
             evolved(nextGear).includes(recipe.weapon) && !forms.includes(recipe.weapon)
           return (
@@ -43,7 +79,7 @@ export function UpgradeChoices({ gear, offered, onSelect }: Props) {
               <b>
                 {item.name}
                 <em>
-                  Lv.{gear[id]} → {gear[id] + 1}
+                  Lv.{gear[gearId]} → {gear[gearId] + 1}
                 </em>
               </b>
               <p>{item.description}</p>

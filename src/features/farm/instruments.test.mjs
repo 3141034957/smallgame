@@ -130,7 +130,8 @@ describe('loadout slots', () => {
     state.xp = 1e9
     const offered = stepFarm(state, state.position).state.offered
     expect(offered.length).toBeGreaterThan(0)
-    for (const id of offered) expect(state.gear[id]).toBeGreaterThan(0)
+    for (const id of offered.filter((id) => id !== 'heal'))
+      expect(state.gear[id]).toBeGreaterThan(0)
     // A fresh instrument cannot appear while every slot of its kind is taken.
     const fresh = TALENTS.filter((talent) => state.gear[talent.id] === 0).map((talent) => talent.id)
     for (const id of offered) expect(fresh).not.toContain(id)

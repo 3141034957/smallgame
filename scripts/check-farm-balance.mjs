@@ -51,7 +51,7 @@ export function simulateFarm(
           : state.offered.includes(chip) && state.gear[chip] < MAX_GEAR_LEVEL
             ? chip
             : (state.offered.find(
-                (choice) => TALENTS.find((talent) => talent.id === choice).kind === 'weapon',
+                (choice) => TALENTS.find((talent) => talent.id === choice)?.kind === 'weapon',
               ) ?? state.offered[0])
       state = chooseTalent(state, id)
       upgrades.push(tick / FPS)

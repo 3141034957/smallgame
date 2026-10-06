@@ -17,8 +17,8 @@ export const START = [50, 76]
 // upgrade. XP is cumulative; picking a talent never discards overflow.
 // Five levels per item means more picks before a form evolves, so each step
 // costs less than before: the first evolution still lands inside a normal run.
-// A loadout of five instruments and five chips at five levels each is the
-// longest possible run, so the table only needs that many steps.
+// This table describes the first full loadout, not a cap on player levels.
+// Runtime thresholds below continue the same curve beyond these 50 upgrades.
 export const UPGRADE_STEPS = MAX_EQUIPPED * 2 * MAX_GEAR_LEVEL
 export const UPGRADE_XP = Array.from({ length: UPGRADE_STEPS }, (_, index) =>
   Math.round(20 + 20 * index + 0.55 * index ** 2),
@@ -26,6 +26,21 @@ export const UPGRADE_XP = Array.from({ length: UPGRADE_STEPS }, (_, index) =>
 export const THRESHOLDS = UPGRADE_XP.map((_, index) =>
   UPGRADE_XP.slice(0, index + 1).reduce((sum, cost) => sum + cost, 0),
 )
+// Rounding the quadratic repeats every 20 levels. Summing its correction
+// keeps arbitrary level thresholds exact without allocating an expanding table.
+const XP_ROUNDING = [0]
+for (let index = 0; index < 20; index++)
+  XP_ROUNDING.push(
+    XP_ROUNDING.at(-1) + 20 * Math.round((11 * index * index) / 20) - 11 * index * index,
+  )
+export const farmUpgradeXp = (level) => Math.round(20 + 20 * level + 0.55 * level ** 2)
+export function farmXpThreshold(completedUpgrades) {
+  const n = completedUpgrades
+  const correction = Math.floor(n / 20) * XP_ROUNDING[20] + XP_ROUNDING[n % 20]
+  return (
+    20 * n + 10 * n * (n - 1) + Math.round((11 * n * (n - 1) * (2 * n - 1) + 6 * correction) / 120)
+  )
+}
 export const EXPERIENCE_STAGES = [
   { seconds: 0, multiplier: 1 },
   { seconds: 30, multiplier: 1.25 },
@@ -236,6 +251,17 @@ export const TALENTS = TALENT_DEFINITIONS.map((talent) => {
     ? { ...talent, characterId: character.id, name: character.name, icon: character.icon }
     : talent
 })
+export const FULL_HEAL_CARD = {
+  id: 'heal',
+  kind: 'recovery',
+  name: '恢复满血',
+  icon: '❤️',
+  color: '#e5a3ae',
+  description: '立即恢复至生命上限。本次选择用于回血，不提升乐器或装备等级。',
+  tag: '即时恢复',
+}
+export const UPGRADE_CARDS = [...TALENTS, FULL_HEAL_CARD]
+export const HEAL_CARD_CHANCE = 0.25
 export const RECIPES = [
   {
     weapon: 'drum',
@@ -456,16 +482,24 @@ export function orbitPositions(state) {
     ]
   })
 }
+function dealRecovery(state, choices) {
+  // Preserve the focused recipe (and two starter weapons); healing is a
+  // repeatable consumable and never takes an instrument or chip slot.
+  if (!choices.length || random(state) < HEAL_CARD_CHANCE) {
+    if (choices.length >= STARTER_CHOICES) choices[choices.length - 1] = FULL_HEAL_CARD.id
+    else choices.push(FULL_HEAL_CARD.id)
+  }
+  state.offered = choices
+}
 function offer(state) {
-  if (state.level >= THRESHOLDS.length || state.xp < THRESHOLDS[state.level] || state.hp <= 0)
-    return
+  if (state.xp < farmXpThreshold(state.level + 1) || state.hp <= 0) return
   if (!state.level) {
     // Ten instruments would flood the dialog: deal three starters instead.
     const weapons = TALENTS.filter((talent) => talent.kind === 'weapon').map((talent) => talent.id)
     const starters = []
     while (starters.length < STARTER_CHOICES && weapons.length)
       starters.push(weapons.splice(Math.floor(random(state) * weapons.length), 1)[0])
-    state.offered = starters
+    dealRecovery(state, starters)
     return
   }
   const carried = (kind) =>
@@ -500,13 +534,17 @@ function offer(state) {
     if (!pool.length) break
     choices.push(pool.splice(Math.floor(random(state) * pool.length), 1)[0])
   }
-  state.offered = choices
+  dealRecovery(state, choices)
 }
 export function chooseTalent(previous, id) {
-  if (!previous.offered.includes(id)) return null
+  if (previous.hp <= 0 || !previous.offered.includes(id)) return null
   const state = {
     ...previous,
-    gear: { ...previous.gear, [id]: previous.gear[id] + 1 },
+    gear:
+      id === FULL_HEAL_CARD.id
+        ? { ...previous.gear }
+        : { ...previous.gear, [id]: previous.gear[id] + 1 },
+    hp: id === FULL_HEAL_CARD.id ? previous.maxHp : previous.hp,
     level: previous.level + 1,
     offered: [],
   }
@@ -1348,7 +1386,6 @@ export function replayFarm(day, frames, choices, surges = []) {
     !Array.isArray(frames) ||
     !frames.length ||
     !Array.isArray(choices) ||
-    choices.length > THRESHOLDS.length ||
     !Array.isArray(surges) ||
     surges.length > frames.length ||
     !surges.every(

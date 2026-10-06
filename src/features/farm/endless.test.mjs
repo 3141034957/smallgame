@@ -38,11 +38,16 @@ describe('endless survival', () => {
     let state = arena(2 * 60 * FPS)
     state.xp = THRESHOLDS.at(-1)
     state = stepFarm(state, state.position).state
-    // Five instruments and five chips at five levels is the longest possible run.
+    // Finish all gear upgrades without consuming optional healing cards.
     for (let index = 0; index < UPGRADE_STEPS; index++) {
       expect(state.offered.length).toBeGreaterThan(0)
-      expect(state.offered.every((id) => state.gear[id] < MAX_GEAR_LEVEL)).toBe(true)
-      state = chooseTalent(state, state.offered[0])
+      expect(state.offered.every((id) => id === 'heal' || state.gear[id] < MAX_GEAR_LEVEL)).toBe(
+        true,
+      )
+      state = chooseTalent(
+        state,
+        state.offered.find((id) => id !== 'heal'),
+      )
     }
     expect(state.level).toBe(UPGRADE_STEPS)
     expect(state.offered).toEqual([])

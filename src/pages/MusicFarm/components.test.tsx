@@ -13,7 +13,7 @@ import { FarmHelp } from './FarmHelp'
 import { loadFarmAchievements } from '@/features/farm/achievements'
 import { loadFarmCareer } from '@/features/farm/stats'
 import { farmQuests, loadFarmQuests } from '@/features/farm/quests'
-import { createFarm, MAX_GEAR_LEVEL, TALENTS } from '@/features/farm/rules.mjs'
+import { createFarm, MAX_GEAR_LEVEL, TALENTS, UPGRADE_CARDS } from '@/features/farm/rules.mjs'
 
 // SSR catches missing copy without running effects; the *.dom.test.tsx suites
 // also mount the real screens and exercise lifecycle and player interactions.
@@ -162,7 +162,7 @@ describe('farm screens render', () => {
     expect(html).toContain('LEVEL UP')
     expect(html).toContain('farm-choices')
     for (const id of state.offered)
-      expect(html).toContain(TALENTS.find((item) => item.id === id)!.name)
+      expect(html).toContain(UPGRADE_CARDS.find((item) => item.id === id)!.name)
     const help = renderToStaticMarkup(<FarmHelp onClose={() => {}} />)
     expect(help).toContain('懂啦，开战')
     expect(help).toContain(`Lv.${MAX_GEAR_LEVEL}`)

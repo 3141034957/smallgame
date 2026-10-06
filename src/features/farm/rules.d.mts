@@ -29,6 +29,9 @@ export const MOVE_STEP: number
 export const START: Point
 export const THRESHOLDS: number[]
 export const UPGRADE_XP: number[]
+export function farmUpgradeXp(level: number): number
+export function farmXpThreshold(completedUpgrades: number): number
+export const HEAL_CARD_CHANCE: number
 export const EXPERIENCE_STAGES: { seconds: number; multiplier: number }[]
 export type Point = [number, number]
 export type TalentId =
@@ -63,6 +66,17 @@ export const TALENTS: {
   description: string
   tag: string
 }[]
+export type UpgradeId = TalentId | 'heal'
+export const FULL_HEAL_CARD: {
+  id: 'heal'
+  kind: 'recovery'
+  name: string
+  icon: string
+  color: string
+  description: string
+  tag: string
+}
+export const UPGRADE_CARDS: ((typeof TALENTS)[number] | typeof FULL_HEAL_CARD)[]
 export const RECIPES: {
   weapon: TalentId
   chip: TalentId
@@ -172,7 +186,7 @@ export type FarmState = {
   gear: Gear
   xp: number
   level: number
-  offered: TalentId[]
+  offered: UpgradeId[]
   score: number
   coins: number
   harvested: number
@@ -205,7 +219,7 @@ export type FarmState = {
   mines: Mine[]
   nextWave: number
 }
-export type Choice = { tick: number; id: TalentId }
+export type Choice = { tick: number; id: UpgradeId }
 export type FarmRound = {
   outcome: 'defeated'
   hp: number
@@ -230,7 +244,7 @@ export function clampPoint(previous: Point, desired: Point): Point
 export function synergies(gear: Gear): string[]
 export function createFarm(day: string): FarmState
 export function orbitPositions(state: FarmState): Point[]
-export function chooseTalent(state: FarmState, id: TalentId): FarmState | null
+export function chooseTalent(state: FarmState, id: UpgradeId): FarmState | null
 export function stepFarm(
   state: FarmState,
   point: Point,
