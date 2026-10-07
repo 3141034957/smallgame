@@ -4,7 +4,7 @@ import { activeAccountId } from '@/utils/accountStorage'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { farmRequest } from '@/features/farm/leaderboard'
 import type { Board } from '@/features/farm/leaderboard'
-import { FARM_CHARACTERS } from '@/features/farm/characters'
+import { FARM_CHARACTERS, FARM_DEFAULT_CHARACTER } from '@/features/farm/characters'
 import type { FarmRound } from '@/features/farm/rules.mjs'
 import { migrateCharacterId } from '@/features/farm/characterRoster.mjs'
 import './FarmBoard.css'
@@ -99,7 +99,9 @@ export function FarmBoard({
         score: target.score,
         playerId,
         name: next,
-        characterId: characterId ?? '',
+        // An empty member would replay as a legacy run without an opening
+        // instrument and fail verification, so always name the member.
+        characterId: characterId || FARM_DEFAULT_CHARACTER,
       }
       void farmRequest<Board>('score', controller.signal, submission)
         .then((value) => {
