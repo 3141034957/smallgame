@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState, type CSSProperties } from 'react'
 import { buyFarmUpgrade, resetFarmUpgrades, type FarmProfile } from '@/features/farm/characters'
 import {
   normalizePermanentLevels,
@@ -25,6 +25,13 @@ export function PermanentTree({
   const [message, setMessage] = useState('')
   const [failed, setFailed] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [pending, setPending] = useState<string | null>(null)
+  // Blocks a second purchase before the first one has settled.
+  const settled = useRef(true)
+  const settle = () => {
+    settled.current = true
+    setPending(null)
+  }
   return (
     <div className="farm-growth">
       <header className="farm-growth-bar">
@@ -63,85 +70,114 @@ export function PermanentTree({
         </p>
       )}
       <div className="farm-growth-tree">
-        {PERMANENT_BRANCHES.map((branch) => (
-          <section
-            className={`farm-growth-branch is-${branch.id}`}
-            key={branch.id}
-            aria-label={branch.name}
-          >
-            <header>
-              <span aria-hidden="true">{branch.icon}</span>
-              <h3>{branch.name}</h3>
-            </header>
-            <div className="farm-growth-nodes">
-              {PERMANENT_UPGRADES.filter((item) => item.branch === branch.id).map((item) => {
-                const level = levels[item.id]
-                const price = permanentPrice(item.id, level)
-                const maxed = price === null
-                const affordable = price !== null && profile.coins >= price
-                return (
-                  <article
-                    className={`farm-growth-node${level ? ' is-trained' : ''}${maxed ? ' is-maxed' : ''}`}
-                    key={item.id}
-                    aria-label={item.name}
-                  >
-                    <div className="farm-growth-node-title">
-                      <span aria-hidden="true">{item.icon}</span>
-                      <h4>{item.name}</h4>
-                      <b>
-                        Lv.{level}
-                        <small> / {item.max}</small>
-                      </b>
-                    </div>
-                    <div
-                      className="farm-growth-meter"
-                      role="progressbar"
-                      aria-label={`${item.name}强化进度`}
-                      aria-valuenow={level}
-                      aria-valuemin={0}
-                      aria-valuemax={item.max}
+        {PERMANENT_BRANCHES.map((branch) => {
+          const items = PERMANENT_UPGRADES.filter((item) => item.branch === branch.id)
+          const trained = items.reduce((sum, item) => sum + levels[item.id], 0)
+          const capacity = items.reduce((sum, item) => sum + item.max, 0)
+          return (
+            <section
+              className={`farm-growth-branch is-${branch.id}`}
+              key={branch.id}
+              aria-label={branch.name}
+              style={{ '--branch-fill': `${(trained / capacity) * 100}%` } as CSSProperties}
+            >
+              <header>
+                <span aria-hidden="true">{branch.icon}</span>
+                <h3>{branch.name}</h3>
+                <small>
+                  {trained} / {capacity} 级
+                </small>
+              </header>
+              <div className="farm-growth-nodes">
+                {items.map((item) => {
+                  const level = levels[item.id]
+                  const price = permanentPrice(item.id, level)
+                  const maxed = price === null
+                  const affordable = price !== null && profile.coins >= price
+                  const busy = pending === item.id
+                  return (
+                    <article
+                      className={`farm-growth-node${level ? ' is-trained' : ''}${maxed ? ' is-maxed' : ''}`}
+                      key={item.id}
+                      aria-label={item.name}
                     >
-                      <i style={{ width: `${(level / item.max) * 100}%` }} />
-                    </div>
-                    <p>{item.description}</p>
-                    <dl>
-                      <div>
-                        <dt>当前</dt>
-                        <dd>{permanentEffect(item.id, level)}</dd>
+                      <span className="farm-growth-badge" aria-hidden="true">
+                        {item.icon}
+                      </span>
+                      <small className="farm-growth-tag">{branch.name} · 永久强化</small>
+                      <h4>
+                        {item.name}
+                        <em>
+                          Lv.{level} / {item.max}
+                        </em>
+                      </h4>
+                      <div
+                        className="farm-growth-pips"
+                        role="progressbar"
+                        aria-label={`${item.name}强化进度`}
+                        aria-valuenow={level}
+                        aria-valuemin={0}
+                        aria-valuemax={item.max}
+                      >
+                        {Array.from({ length: item.max }, (_, index) => (
+                          <i
+                            key={index}
+                            className={index < level ? 'is-on' : undefined}
+                            aria-hidden="true"
+                          />
+                        ))}
                       </div>
-                      {!maxed && (
+                      <p>{item.description}</p>
+                      <dl>
                         <div>
-                          <dt>下级</dt>
-                          <dd>{permanentEffect(item.id, level + 1)}</dd>
+                          <dt>当前</dt>
+                          <dd>{permanentEffect(item.id, level)}</dd>
                         </div>
+                        {!maxed && (
+                          <div className="is-next">
+                            <dt>下级</dt>
+                            <dd>{permanentEffect(item.id, level + 1)}</dd>
+                          </div>
+                        )}
+                      </dl>
+                      <button
+                        type="button"
+                        className={`farm-growth-buy${maxed ? ' is-maxed' : ''}${affordable ? ' is-affordable' : ''}`}
+                        disabled={!affordable || busy}
+                        aria-busy={busy || undefined}
+                        aria-label={
+                          maxed ? `${item.name}已满级` : `升级${item.name}，花费${price}金币`
+                        }
+                        onClick={() => {
+                          if (!settled.current) return
+                          settled.current = false
+                          setPending(item.id)
+                          try {
+                            const result = buyFarmUpgrade(item.id, level)
+                            onChange(result.profile)
+                            setFailed(!!result.error)
+                            setMessage(
+                              result.error ?? `${item.name}升至 Lv.${level + 1}，下一局生效。`,
+                            )
+                          } finally {
+                            queueMicrotask(settle)
+                          }
+                        }}
+                      >
+                        {maxed ? '已满级 ✓' : `升级 · ✦ ${price.toLocaleString()}`}
+                      </button>
+                      {!maxed && !affordable && (
+                        <small className="farm-growth-shortfall">
+                          还差 {(price - profile.coins).toLocaleString()} 金币
+                        </small>
                       )}
-                    </dl>
-                    <button
-                      type="button"
-                      disabled={!affordable}
-                      aria-label={
-                        maxed ? `${item.name}已满级` : `升级${item.name}，花费${price}金币`
-                      }
-                      onClick={() => {
-                        const result = buyFarmUpgrade(item.id, level)
-                        onChange(result.profile)
-                        setFailed(!!result.error)
-                        setMessage(result.error ?? `${item.name}升至 Lv.${level + 1}，下一局生效。`)
-                      }}
-                    >
-                      {maxed ? '已满级 ✓' : `升级 · ✦ ${price.toLocaleString()}`}
-                    </button>
-                    {!maxed && !affordable && (
-                      <small className="farm-growth-shortfall">
-                        还差 {(price - profile.coins).toLocaleString()} 金币
-                      </small>
-                    )}
-                  </article>
-                )
-              })}
-            </div>
-          </section>
-        ))}
+                    </article>
+                  )
+                })}
+              </div>
+            </section>
+          )
+        })}
       </div>
       <footer className="farm-growth-reset">
         {confirmReset ? (
@@ -155,6 +191,7 @@ export function PermanentTree({
             </button>
             <button
               type="button"
+              className="is-primary"
               onClick={() => {
                 const result = resetFarmUpgrades()
                 onChange(result.profile)

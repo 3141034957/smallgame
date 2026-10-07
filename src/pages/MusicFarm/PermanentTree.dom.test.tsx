@@ -25,6 +25,12 @@ it('shows all eight nodes immediately and prevents unaffordable purchases', () =
       .disabled,
   ).toBe(true)
   expect(screen.getByText('还差 18,000 金币')).toBeTruthy()
+  const meter = within(screen.getByRole('article', { name: '舞台体魄' })).getByRole('progressbar', {
+    name: '舞台体魄强化进度',
+  })
+  expect(meter.getAttribute('aria-valuemax')).toBe('12')
+  expect(meter.querySelectorAll('i')).toHaveLength(12)
+  expect(meter.querySelectorAll('i.is-on')).toHaveLength(0)
 })
 it('labels a maxed node as finished instead of offering a null price', () => {
   const levels = Object.fromEntries(
@@ -40,8 +46,25 @@ it('labels a maxed node as finished instead of offering a null price', () => {
   for (const item of PERMANENT_UPGRADES) {
     const node = screen.getByRole('article', { name: item.name })
     expect(node.querySelector('button')!.getAttribute('aria-label')).toBe(`${item.name}已满级`)
+    expect(node.querySelector('button')!.className).toContain('is-maxed')
+    expect(node.className).toContain('is-maxed')
+    const meter = within(node).getByRole('progressbar')
+    expect(meter.querySelectorAll('i.is-on')).toHaveLength(item.max)
   }
   expect(document.body.textContent).not.toContain('null')
+})
+it('lights one level pip per purchase and ignores a click that repeats before it settles', () => {
+  awardFarmCoins('pips', 10000)
+  render(<Tree />)
+  const buy = screen.getByRole('button', { name: '升级舞台体魄，花费1500金币' })
+  fireEvent.click(buy)
+  fireEvent.click(buy)
+  const node = screen.getByRole('article', { name: '舞台体魄' })
+  expect(node.className).toContain('is-trained')
+  const meter = within(node).getByRole('progressbar')
+  expect(meter.getAttribute('aria-valuenow')).toBe('1')
+  expect(meter.querySelectorAll('i.is-on')).toHaveLength(1)
+  expect(loadFarmProfile().coins).toBe(8500)
 })
 
 it('buys from any branch, updates levels and price, persists across remounts, and confirms refunds', () => {

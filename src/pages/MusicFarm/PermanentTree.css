@@ -82,6 +82,11 @@
 .farm-growth-total {
   flex-shrink: 0;
   text-align: center;
+  padding: 14px 22px;
+  background: #fffef5;
+  border: 2px solid #d9e4d5;
+  border-radius: 18px;
+  box-shadow: 0 5px 0 #e5ecdf;
 }
 .farm-growth-total strong {
   display: block;
@@ -91,6 +96,11 @@
   font-size: 16px;
   color: #789081;
 }
+.farm-growth-total > span {
+  font-size: 11px;
+}
+
+/* Three branches, always side by side. */
 .farm-growth-tree {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -100,6 +110,8 @@
 .farm-growth-branch {
   min-width: 0;
   --branch-color: #38775b;
+  --talent-color: var(--branch-color);
+  --branch-fill: 0%;
 }
 .farm-growth-branch.is-power {
   --branch-color: #ae7138;
@@ -117,89 +129,155 @@
 .farm-growth-branch > header > span {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  font-size: 22px;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  border: 2px solid var(--branch-color);
+  background: color-mix(in srgb, var(--branch-color) 14%, white);
+  font-size: 21px;
+}
+.farm-growth-branch > header > small {
+  margin-left: auto;
+  font-size: 10px;
+  color: color-mix(in srgb, var(--branch-color) 60%, #8f957f);
+  white-space: nowrap;
 }
 .farm-growth-branch h3 {
   font-size: 17px;
   margin: 0;
 }
+
+/* Growth path: a branch-colored trunk behind the node cards. */
 .farm-growth-nodes {
   position: relative;
   display: grid;
-  gap: 18px;
+  gap: 20px;
+  padding-left: 32px;
 }
-.farm-growth-nodes::before {
+.farm-growth-nodes::before,
+.farm-growth-nodes::after {
   content: '';
   position: absolute;
-  left: 22px;
+  left: 10px;
+  width: 8px;
+  border-radius: 8px;
+}
+.farm-growth-nodes::before {
   top: 0;
   bottom: 0;
-  width: 2px;
-  background: #cddfd3;
+  background: linear-gradient(to bottom, #d3dfd5, color-mix(in srgb, #d3dfd5 25%, #f4faf6));
 }
+.farm-growth-nodes::after {
+  top: 0;
+  height: var(--branch-fill);
+  background: linear-gradient(
+    to bottom,
+    var(--branch-color),
+    color-mix(in srgb, var(--branch-color) 55%, white)
+  );
+  box-shadow: 0 0 12px color-mix(in srgb, var(--branch-color) 45%, transparent);
+  transition: height 0.35s ease;
+}
+
+/* Same card language as the in-run upgrade cards. */
 .farm-growth-node {
   position: relative;
-  border: 1px solid #d0ded5;
-  border-radius: 16px;
-  background: #fff;
-  padding: 18px;
-  box-shadow: 0 3px 12px #29473708;
+  border: 2px solid color-mix(in srgb, var(--talent-color) 28%, #fffef5);
+  border-radius: 18px;
+  background: #fffef5;
+  padding: 15px 14px 14px;
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--talent-color) 22%, #fffaf0);
+  transition:
+    transform 0.15s,
+    background 0.15s,
+    box-shadow 0.15s;
+}
+.farm-growth-node:hover {
+  transform: translateY(-4px);
+  background: color-mix(in srgb, var(--talent-color) 10%, #fffef5);
 }
 .farm-growth-node.is-trained {
-  border-color: var(--branch-color);
+  border-color: var(--talent-color);
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--talent-color) 45%, #fffaf0);
 }
 .farm-growth-node.is-maxed {
-  background: #edf5ef;
+  background: color-mix(in srgb, var(--talent-color) 8%, #fffef5);
 }
-.farm-growth-node-title {
-  display: flex;
-  align-items: center;
-  gap: 9px;
+/* Twig linking the card to the trunk. */
+.farm-growth-node::before {
+  content: '';
+  position: absolute;
+  left: -24px;
+  top: 32px;
+  width: 24px;
+  height: 4px;
+  border-radius: 4px;
+  background: #d3dfd5;
 }
-.farm-growth-node-title > span {
-  color: var(--branch-color);
-  font-size: 24px;
+.farm-growth-node.is-trained::before {
+  background: var(--talent-color);
+}
+.farm-growth-badge {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  font-size: 28px;
+  margin-bottom: 12px;
+  background: color-mix(in srgb, var(--talent-color) 25%, white);
+  color: var(--talent-color);
+}
+.farm-growth-tag {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: #9a9b88;
 }
 .farm-growth-node h4 {
-  margin: 0;
-  font-size: 16px;
+  margin: 6px 0 0;
+  font-size: 17px;
+  line-height: 1.3;
 }
-.farm-growth-node b {
-  margin-left: auto;
-  white-space: nowrap;
-  font-size: 13px;
-}
-.farm-growth-node b small {
-  color: #7e9285;
-  font-weight: normal;
-}
-.farm-growth-meter {
-  height: 4px;
-  background: #e9efeb;
-  border-radius: 4px;
-  margin: 12px 0;
-  overflow: hidden;
-}
-.farm-growth-meter i {
+.farm-growth-node h4 em {
   display: block;
-  height: 100%;
-  background: var(--branch-color);
+  font-style: normal;
+  font-size: 10px;
+  color: #a3a38e;
+  margin-top: 6px;
+}
+.farm-growth-pips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 10px 0 12px;
+}
+.farm-growth-pips > i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--talent-color) 35%, #dedfcc);
+  background: #f1f2e6;
+}
+.farm-growth-pips > i.is-on {
+  border-color: var(--talent-color);
+  background: var(--talent-color);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--talent-color) 45%, #fffaf0);
 }
 .farm-growth-node p {
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.7;
-  color: #6b7e73;
-  margin: 0 0 14px;
+  color: #8f957f;
+  margin: 0 0 12px;
 }
 .farm-growth-node dl {
-  margin: 0 0 16px;
-  font-size: 12px;
+  margin: 0;
+  font-size: 11px;
+  border-top: 1px dashed #dedfcc;
+  padding-top: 10px;
   display: grid;
-  gap: 8px;
+  gap: 5px;
 }
 .farm-growth-node dl > div {
   display: flex;
@@ -212,19 +290,47 @@
 }
 .farm-growth-node dd {
   margin: 0;
+  color: #6b7e73;
 }
-.farm-growth-node dl > div:last-child dd {
-  font-weight: 600;
+.farm-growth-node dl > div.is-next dt {
+  color: var(--talent-color);
 }
-.farm-growth-node > button {
+.farm-growth-node dl > div.is-next dd {
+  font-weight: 700;
+  color: var(--talent-color);
+}
+.farm-growth-buy {
   width: 100%;
-  padding: 11px 6px;
-  background: var(--branch-color);
-  color: #fff;
-  border: 0;
-  border-radius: 10px;
-  font-weight: 600;
+  margin-top: 12px;
+  padding: 11px 8px;
+  border: 2px solid color-mix(in srgb, var(--talent-color) 30%, #fffef5);
+  border-radius: 14px;
+  background: #fffef5;
+  color: color-mix(in srgb, var(--talent-color) 70%, #6b7e73);
+  font-weight: 700;
   font-size: 13px;
+  transition:
+    transform 0.15s,
+    background 0.15s,
+    color 0.15s;
+}
+.farm-growth-buy.is-affordable {
+  border-color: var(--talent-color);
+  background: var(--talent-color);
+  color: #fff;
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--talent-color) 62%, #1d3327);
+}
+.farm-growth-buy.is-affordable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 color-mix(in srgb, var(--talent-color) 62%, #1d3327);
+}
+.farm-growth-buy.is-affordable:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--talent-color) 62%, #1d3327);
+}
+.farm-growth-buy.is-maxed {
+  border-style: dashed;
+  color: var(--talent-color);
 }
 .farm-growth-shortfall {
   display: block;
@@ -235,19 +341,22 @@
 }
 .farm-growth-message {
   padding: 12px 16px;
-  border-radius: 10px;
+  border-radius: 12px;
   background: #e0eee3;
   font-size: 13px;
+  border: 1px solid #c9ded0;
 }
 .farm-growth-message.is-error {
   background: #fbe9dc;
+  border-color: #f0d3bd;
   color: #974b26;
 }
 .farm-growth-reset {
   margin-top: 30px;
-  padding: 22px;
-  border: 1px dashed #bbcebf;
-  border-radius: 14px;
+  padding: 20px;
+  border: 2px dashed #bbcebf;
+  border-radius: 18px;
+  background: #fffef5;
   text-align: center;
 }
 .farm-growth-reset p {
@@ -256,37 +365,65 @@
   margin: 0 0 12px;
 }
 .farm-growth-reset button {
-  border: 1px solid #b5cbbb;
-  border-radius: 9px;
+  border: 2px solid #b5cbbb;
+  border-radius: 12px;
   background: #fff;
   color: #305f48;
-  padding: 9px 16px;
+  padding: 9px 18px;
   margin: 0 6px;
+  font-weight: 600;
+  box-shadow: 0 4px 0 #e3eade;
 }
-@media (max-width: 850px) {
+.farm-growth-reset button.is-primary {
+  border-color: #38775b;
+  background: #38775b;
+  color: #fff;
+  box-shadow: 0 4px 0 #24503c;
+}
+@media (max-width: 1000px) {
   .farm-growth-tree {
     gap: 14px;
   }
+  .farm-growth-nodes {
+    padding-left: 22px;
+    gap: 16px;
+  }
+  .farm-growth-nodes::before,
+  .farm-growth-nodes::after {
+    left: 5px;
+    width: 6px;
+  }
+  .farm-growth-node::before {
+    left: -16px;
+    width: 16px;
+    top: 26px;
+  }
   .farm-growth-node {
-    padding: 12px;
+    padding: 12px 10px;
+    border-radius: 14px;
   }
-  .farm-growth-node-title {
-    display: grid;
-    grid-template-columns: 24px minmax(0, 1fr);
-    gap: 6px;
+  .farm-growth-badge {
+    width: 38px;
+    height: 38px;
+    border-radius: 13px;
+    font-size: 22px;
+    margin-bottom: 9px;
   }
-  .farm-growth-node b {
-    grid-column: 1 / -1;
-    margin-left: 0;
+  .farm-growth-node h4 {
+    font-size: 14px;
   }
-  .farm-growth-node dl > div {
-    display: grid;
+  .farm-growth-pips {
     gap: 3px;
+    margin: 8px 0 10px;
+  }
+  .farm-growth-pips > i {
+    width: 9px;
+    height: 9px;
   }
 }
-@media (max-width: 560px) {
+@media (max-width: 700px) {
   .farm-growth {
-    padding: 16px 14px 30px;
+    padding: 16px 12px 30px;
   }
   .farm-growth-tree {
     gap: 8px;
@@ -300,42 +437,48 @@
   .farm-growth-branch > header > span {
     width: 30px;
     height: 30px;
-    font-size: 18px;
+    border-radius: 11px;
+    font-size: 17px;
+  }
+  .farm-growth-branch > header > small {
+    margin-left: 0;
+    font-size: 9px;
   }
   .farm-growth-branch h3 {
     font-size: 14px;
   }
+  /* Too narrow for a side rail: the trunk runs behind the cards. */
   .farm-growth-nodes {
-    gap: 12px;
+    padding-left: 0;
+    gap: 14px;
+  }
+  .farm-growth-nodes::before,
+  .farm-growth-nodes::after {
+    left: 18px;
+    width: 6px;
+  }
+  .farm-growth-node::before {
+    display: none;
   }
   .farm-growth-node {
     padding: 10px 8px;
-    border-radius: 12px;
     overflow-wrap: anywhere;
   }
-  .farm-growth-node-title {
-    grid-template-columns: 18px minmax(0, 1fr);
-    gap: 4px;
-  }
-  .farm-growth-node-title > span {
-    font-size: 18px;
-  }
   .farm-growth-node h4 {
-    font-size: 12px;
-    line-height: 1.5;
-  }
-  .farm-growth-node b {
-    font-size: 11px;
+    font-size: 13px;
   }
   .farm-growth-node p,
-  .farm-growth-node dl {
+  .farm-growth-node dl,
+  .farm-growth-buy {
     font-size: 11px;
     line-height: 1.6;
   }
-  .farm-growth-node > button {
+  .farm-growth-node dl > div {
+    display: grid;
+    gap: 2px;
+  }
+  .farm-growth-buy {
     padding: 10px 4px;
-    font-size: 11px;
-    line-height: 1.6;
   }
   .farm-growth-shortfall {
     font-size: 10px;
@@ -344,6 +487,9 @@
     align-items: start;
     gap: 12px;
     padding: 24px 0;
+  }
+  .farm-growth-total {
+    padding: 10px 14px;
   }
   .farm-growth-total strong {
     font-size: 28px;
@@ -356,5 +502,17 @@
   }
   .farm-growth-bar h2 {
     font-size: 20px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .farm-growth-node,
+  .farm-growth-buy,
+  .farm-growth-nodes::after {
+    transition: none;
+  }
+  .farm-growth-node:hover,
+  .farm-growth-buy.is-affordable:hover,
+  .farm-growth-buy.is-affordable:active {
+    transform: none;
   }
 }
