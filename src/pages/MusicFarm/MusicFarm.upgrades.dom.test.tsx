@@ -154,7 +154,7 @@ it('gives focus back to the button that opened a panel after the run ends', asyn
   simulate({ ...loadout(), offered: [], score: 4321 })
   await start()
   act(() => frame(1126))
-  expect(screen.getByText('演出落幕，再战一场！')).toBeTruthy()
+  expect(screen.getByText('演出落幕')).toBeTruthy()
   const opener = screen.getByRole('button', { name: '永久强化' })
   opener.focus()
   fireEvent.click(opener)

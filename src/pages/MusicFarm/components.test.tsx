@@ -116,7 +116,9 @@ describe('farm screens render', () => {
     )
     expect(build).toContain('farm-school-ladder')
     expect(build).toContain('鼓组流')
-    expect(build).toContain('终极')
+    // Pinned to the layer span: "终极" alone would also match the evolved
+    // badge on the same card.
+    expect(build).toContain('<span class="farm-school-layer">终极</span>')
     expect(build).toContain('本局组合技')
     expect(build).toContain('共振风暴')
     // The wording comes from the data layer, never recomputed here.

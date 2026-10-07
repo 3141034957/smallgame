@@ -34,9 +34,9 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
   return (
     <>
       <small className="farm-eyebrow">LEVEL UP · 时间已暂停</small>
-      <h2>组建乐队，选你喜欢的！</h2>
+      <h2>选择升级</h2>
       <p className="farm-slot-note">
-        槽位 {carried('weapon')}/{MAX_EQUIPPED} 件乐器 · {carried('chip')}/{MAX_EQUIPPED} 件芯片
+        乐器 {carried('weapon')}/{MAX_EQUIPPED} · 芯片 {carried('chip')}/{MAX_EQUIPPED}
       </p>
       <div className="farm-choices">
         {offered.map((id, index) => {

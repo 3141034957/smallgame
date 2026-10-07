@@ -894,12 +894,12 @@ export default function MusicFarm() {
               )}
               {heroError && (
                 <p role="status" className="farm-audio-error">
-                  角色图片暂时未加载，先由默认乐手上场。
+                  角色图未加载
                 </p>
               )}
               {audioError && (
                 <p role="status" className="farm-audio-error">
-                  静音中，可继续战斗
+                  静音中
                 </p>
               )}
             </div>
@@ -1048,7 +1048,7 @@ export default function MusicFarm() {
               {phase === 'ready' && (
                 <div className="farm-ready">
                   <div className="farm-start-card">
-                    <h2>带上你的乐队，冲出怪潮！</h2>
+                    <h2>带上你的乐队</h2>
                     <p>撑越久分越高</p>
                     <FarmBoard compact />
                     <button className="farm-primary" onClick={start} aria-label="开始无限模式">
@@ -1147,7 +1147,7 @@ export default function MusicFarm() {
                   </div>
                 </div>
               )}
-              <h2 tabIndex={-1}>演出落幕，再战一场！</h2>
+              <h2 tabIndex={-1}>演出落幕</h2>
               <div className="farm-stars">{'★'.repeat(round?.stars ?? 0)}</div>
               <strong className="farm-final-score">{number(view.score)}</strong>
               <small className="farm-personal-best">
@@ -1300,7 +1300,6 @@ export default function MusicFarm() {
                   <>
                     <div className="farm-modal-icon">☾</div>
                     <h2>乐队等你回来 ♡</h2>
-                    <p>战斗和计时已暂停，乐队和构筑都还在。</p>
                     <button className="farm-primary" onClick={closePanel}>
                       继续战斗
                     </button>

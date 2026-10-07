@@ -12,12 +12,8 @@ export function FarmHelp({ onClose }: { onClose: () => void }) {
       <h2>用你的乐队，击退怪潮</h2>
       <p>拖动走位，乐队自动攻击。</p>
       <p>躲开弹幕，捡经验升级。</p>
-      <h3 className="farm-monsters-title">流派与组合技 · 10 条路，跨流派共鸣</h3>
-      <p>
-        一件乐器 ＋ 它的专属芯片＝一个流派，两条都升到 Lv.{MAX_GEAR_LEVEL} 就进化成终极形态。层进共
-        5 层：拿到乐器 → 芯片齐备 → 一件满级 → 另一件满级 →
-        终极。不同流派同时成型，会自动触发跨流派组合技。
-      </p>
+      <h3 className="farm-monsters-title">流派与组合技</h3>
+      <p>乐器 ＋ 芯片 都到 Lv.{MAX_GEAR_LEVEL} → 终极形态；多个流派成型自动触发组合技。</p>
       <div className="farm-school-list">
         {SCHOOL_LIST.map((school) => (
           <div key={school.id} style={{ '--school-color': school.color } as CSSProperties}>
@@ -59,11 +55,8 @@ export function FarmHelp({ onClose }: { onClose: () => void }) {
           </div>
         ))}
       </div>
-      <h3 className="farm-monsters-title">怪潮图鉴 · 什么时候来？</h3>
-      <p>
-        时间按本局生存秒数计算，暂停与升级不计时。每 2
-        分钟出现一只巨兽，两种巨兽轮流登场；满场时跳过本次登场，传送预警期间不会攻击。
-      </p>
+      <h3 className="farm-monsters-title">怪潮图鉴</h3>
+      <p>每 2 分钟一只巨兽，两种轮流登场。</p>
       <div className="farm-monsters">
         {MONSTERS.map((monster) => (
           <article key={monster.id}>
