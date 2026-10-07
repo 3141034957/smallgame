@@ -6,6 +6,11 @@ import {
   MAX_GEAR_LEVEL,
   STARTER_CHOICES,
   RECIPES,
+  STAT_CARDS,
+  STAT_CARD_DAMAGE,
+  STAT_CARD_HP,
+  STAT_CARD_STRIDE,
+  SURGE_COOLDOWN,
   TALENTS,
   THRESHOLDS,
   chooseTalent,
@@ -13,6 +18,8 @@ import {
   createFarm,
   evolved,
   farmModifier,
+  farmMoveStep,
+  farmXpThreshold,
   orbitPositions,
   replayFarm,
   stepFarm,
@@ -195,6 +202,77 @@ describe('music roguelite farming', () => {
     }
     expect(stepFarm(state, state.position, true)).toBeNull()
     expect(stepFarm({ ...state, hp: 0 }, state.position)).toBeNull()
+  })
+
+  it('spaces surges out by a tick-counted cooldown and keeps a spammed button replayable', () => {
+    const charged = { ...arena({}, [], 0), charge: 100 }
+    const fired = stepFarm(charged, charged.position, true).state
+    expect(fired).toMatchObject({ charge: 0, surgeUntil: FPS * 3, nextSurge: SURGE_COOLDOWN })
+    // The wait is measured in ticks, never in wall-clock time, so a replay of
+    // the same run reaches the same verdict on any machine.
+    const waiting = { ...fired, tick: SURGE_COOLDOWN - 1, charge: 100 }
+    // A surge asked for during the cooldown is dropped, not rejected: a replay
+    // that holds the button down still has to verify instead of failing the
+    // whole round, and the charge stays banked for the tick it unlocks on.
+    const spammed = stepFarm(waiting, waiting.position, true)
+    expect(spammed).not.toBeNull()
+    expect(spammed.state).toMatchObject({
+      charge: 100,
+      nextSurge: SURGE_COOLDOWN,
+      surgeUntil: FPS * 3,
+    })
+    expect(
+      stepFarm({ ...waiting, tick: SURGE_COOLDOWN }, waiting.position, true).state,
+    ).toMatchObject({ charge: 0, nextSurge: SURGE_COOLDOWN * 2 })
+    // A new run starts with the button live again.
+    expect(createFarm(day).nextSurge).toBe(0)
+  })
+
+  it('grows the run itself once every instrument and chip is maxed, and only that run', () => {
+    // Regression guard: growth cards have to move the numbers the player can
+    // feel, not just sit in the hand as a fourth flavour of level up.
+    const dryHand = () => {
+      const state = arena({}, [], 0)
+      for (const talent of TALENTS) state.gear[talent.id] = MAX_GEAR_LEVEL
+      state.level = 50
+      state.hp = 40
+      state.xp = farmXpThreshold(51)
+      return stepFarm(state, state.position).state
+    }
+    const dealt = (state) => {
+      let running = {
+        ...state,
+        offered: [],
+        crops: [{ id: 1, x: 53, y: 76, hp: 1e6, maxHp: 1e6, kind: 0, regrow: -1, boss: false }],
+      }
+      for (let tick = 0; tick < 96; tick++) running = stepFarm(running, running.position).state
+      return 1e6 - running.crops[0].hp
+    }
+    const hand = dryHand()
+    expect(hand.offered[0]).toBe('heal')
+    expect(hand.offered).toHaveLength(STARTER_CHOICES)
+    expect(hand.offered.slice(1).every((id) => STAT_CARDS.some((card) => card.id === id))).toBe(
+      true,
+    )
+    // Spending the level any other way leaves the rest of the run identical,
+    // so the healing pick is the baseline the growth cards are measured against.
+    const pick = (id) => chooseTalent({ ...hand, offered: [id] }, id)
+    const plain = pick('heal')
+    // Vigor widens the cap and pays the same amount back at once, so the card
+    // never reads as doing nothing until the next healing drop happens to land.
+    const vigor = pick('vigor')
+    expect(vigor.maxHp).toBe(hand.maxHp + STAT_CARD_HP)
+    expect(vigor.hp).toBe(hand.hp + STAT_CARD_HP)
+    // Footwork lengthens the step the movement check actually allows.
+    expect(farmMoveStep(pick('footwork')) / farmMoveStep(plain)).toBeCloseTo(
+      1 + STAT_CARD_STRIDE,
+      5,
+    )
+    // Overload makes every hit land harder, the surge included, because both
+    // run through the same damage path.
+    expect(dealt(pick('overdrive')) / dealt(plain)).toBeCloseTo(1 + STAT_CARD_DAMAGE, 2)
+    // Growth belongs to the run: the next one starts from zero again.
+    expect(createFarm(day).growth).toEqual({ hp: 0, power: 0, stride: 0 })
   })
 
   it('rotates starter options across days and keeps the chosen instrument recipe available', () => {

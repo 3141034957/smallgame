@@ -17,6 +17,9 @@ export async function farmRequest<T>(
   signal?: AbortSignal,
   body?: unknown,
 ): Promise<T> {
+  // A score carries every frame of the run, so the upload itself needs more
+  // time than a leaderboard read: on mobile the body can take seconds.
+  const timeout = body ? 15_000 : 6_000
   const response = await fetch(`/api/farm/${path}`, {
     method: body ? 'POST' : 'GET',
     credentials: 'same-origin',
@@ -26,8 +29,8 @@ export async function farmRequest<T>(
     },
     body: body ? JSON.stringify(body) : undefined,
     signal: signal
-      ? AbortSignal.any([signal, AbortSignal.timeout(6000)])
-      : AbortSignal.timeout(6000),
+      ? AbortSignal.any([signal, AbortSignal.timeout(timeout)])
+      : AbortSignal.timeout(timeout),
   })
   const result = await response.json().catch(() => null)
   if (response.status === 401) notifyAccountExpired()

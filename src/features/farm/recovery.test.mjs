@@ -8,6 +8,7 @@ import {
   THRESHOLDS,
   TALENTS,
   MAX_GEAR_LEVEL,
+  STARTER_CHOICES,
   replayFarm,
   clampPoint,
 } from './rules.mjs'
@@ -96,7 +97,11 @@ describe('unlimited player levels and recovery cards', () => {
     const originalGear = { ...state.gear },
       tick = state.tick
     for (let index = 0; index < 200; index++) {
-      expect(state.offered).toEqual(['heal'])
+      // A dry pool still has to deal a full hand: the healing card always
+      // leads, and growth cards fill the rest, so leveling never stalls on an
+      // empty deal and never repeats one lone card either.
+      expect(state.offered[0]).toBe('heal')
+      expect(state.offered).toHaveLength(STARTER_CHOICES)
       state = chooseTalent(state, 'heal')
       expect(state.hp).toBe(100)
       expect(state.gear).toEqual(originalGear)

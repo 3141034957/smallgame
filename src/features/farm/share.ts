@@ -1,5 +1,13 @@
-import { evolved, RECIPES, TALENTS, type FarmRound } from './rules.mjs'
+import { evolved, FPS, RECIPES, TALENTS, type FarmRound } from './rules.mjs'
 
+// The server replays every frame to check the score, so a long run cannot be
+// trimmed for upload: dropping frames changes the simulation and the replay
+// then disagrees with the score the player actually reached. Runs past this
+// budget stay on the device, and the player is told why they are not ranked.
+export const FARM_MAX_SUBMIT_FRAMES = 10 * 60 * FPS
+export const FARM_TOO_LONG_MESSAGE = `本局时长超出排行榜上限（约 ${FARM_MAX_SUBMIT_FRAMES / FPS / 60} 分钟），成绩未能提交；本机成绩仍然保留。`
+export const farmTooLongToSubmit = (round: FarmRound | null) =>
+  !!round && round.frames.length > FARM_MAX_SUBMIT_FRAMES
 const clock = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`
 const digits = (value: number) => Math.round(value).toLocaleString()

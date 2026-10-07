@@ -15,6 +15,7 @@ export type FarmModifier = {
 export const FARM_MODIFIERS: FarmModifier[]
 export function farmModifier(day: string): FarmModifier
 export const MAX_BOSSES: number
+export const SURGE_COOLDOWN: number
 export const MAX_GEAR_LEVEL: number
 export const STARTER_CHOICES: number
 export const MAX_EQUIPPED: number
@@ -66,7 +67,7 @@ export const TALENTS: {
   description: string
   tag: string
 }[]
-export type UpgradeId = TalentId | 'heal'
+export type UpgradeId = TalentId | 'heal' | StatCardId
 export const FULL_HEAL_CARD: {
   id: 'heal'
   kind: 'recovery'
@@ -76,7 +77,25 @@ export const FULL_HEAL_CARD: {
   description: string
   tag: string
 }
-export const UPGRADE_CARDS: ((typeof TALENTS)[number] | typeof FULL_HEAL_CARD)[]
+// Late levels past a full loadout grow the player one step at a time, and the
+// growth lasts for that run only.
+export type StatCardId = 'vigor' | 'overdrive' | 'footwork'
+export const STAT_CARD_HP: number
+export const STAT_CARD_DAMAGE: number
+export const STAT_CARD_STRIDE: number
+export const STAT_CARDS: {
+  id: StatCardId
+  kind: 'stat'
+  stat: 'hp' | 'power' | 'stride'
+  name: string
+  icon: string
+  color: string
+  description: string
+  tag: string
+}[]
+export const UPGRADE_CARDS: (
+  (typeof TALENTS)[number] | typeof FULL_HEAL_CARD | (typeof STAT_CARDS)[number]
+)[]
 export const RECIPES: {
   weapon: TalentId
   chip: TalentId
@@ -202,6 +221,8 @@ export type FarmState = {
   maxCombo: number
   lastHarvest: number
   charge: number
+  nextSurge: number
+  growth: { hp: number; power: number; stride: number }
   nextId: number
   lastPulse: number
   echoDue: number

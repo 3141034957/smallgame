@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { farmShareText } from './share'
+import {
+  FARM_MAX_SUBMIT_FRAMES,
+  FARM_TOO_LONG_MESSAGE,
+  farmShareText,
+  farmTooLongToSubmit,
+} from './share'
 import { MAX_GEAR_LEVEL, TALENTS } from './rules.mjs'
 import type { FarmRound } from './rules.mjs'
 
@@ -40,6 +45,19 @@ describe('result share text', () => {
     expect(text).toContain(`主力 鼓手咚咚 Lv.${MAX_GEAR_LEVEL}`)
     expect(text).toContain('终极 雷霆鼓组')
     expect(text.length).toBeLessThan(200)
+  })
+  it('flags a run that is longer than the server can replay', () => {
+    const long = round({
+      frames: Array.from(
+        { length: FARM_MAX_SUBMIT_FRAMES + 1 },
+        () => [50, 76] as FarmRound['frames'][number],
+      ),
+    })
+    expect(farmTooLongToSubmit(round())).toBe(false)
+    expect(farmTooLongToSubmit(null)).toBe(false)
+    expect(farmTooLongToSubmit(long)).toBe(true)
+    // The player is told why, instead of "成绩未通过校验".
+    expect(FARM_TOO_LONG_MESSAGE).toContain('超出排行榜上限')
   })
   it('omits empty counters and works before the first run', () => {
     const text = farmShareText(round({ elites: 0, blocks: 0 }), '2026-10-04')

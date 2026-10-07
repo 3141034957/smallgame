@@ -160,6 +160,13 @@ export function farmBossCountdown(state: {
   return Math.max(0, Math.ceil((due - state.tick) / FPS))
 }
 
+// The surge is only usable once both the charge is full and the cooldown has
+// run out, so the HUD dims the button and counts the wait down.
+export function farmSurgeStatus(state: { tick: number; charge: number; nextSurge: number }) {
+  const seconds = Math.max(0, Math.ceil((state.nextSurge - state.tick) / FPS))
+  return { charged: state.charge >= 100, seconds, ready: state.charge >= 100 && !seconds }
+}
+
 export function formatFarmTime(ticks: number) {
   const seconds = Math.floor(ticks / FPS)
   const hours = Math.floor(seconds / 3600)

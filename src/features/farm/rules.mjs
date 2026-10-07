@@ -56,6 +56,13 @@ export const EXPERIENCE_STAGES = [
   { seconds: 300, multiplier: 3 },
 ]
 export const MAX_BOSSES = 4
+// A surge clears every shot and danger and grants a second of invulnerability,
+// so it must cost far more than the kills it takes to refill the charge.
+// Without this cooldown the button can be held down and a run lasts twice
+// as long as one played without touching it. Ten seconds is the longest wait
+// that still lets every committed balance route survive: the calm circular
+// route dies at 80s on 2026-10-04 once the wait reaches fifteen.
+export const SURGE_COOLDOWN = 10 * FPS
 // Healing drops are limited: at most one pack on the field, one every
 // HEAL_COOLDOWN, and each pack vanishes after HEAL_TTL. Without this the
 // endless mode never ends once the build harvests faster than enemies hurt.
@@ -266,7 +273,47 @@ export const FULL_HEAL_CARD = {
   description: '立即恢复至生命上限。本次选择用于回血，不提升乐器或装备等级。',
   tag: '即时恢复',
 }
-export const UPGRADE_CARDS = [...TALENTS, FULL_HEAL_CARD]
+// A full loadout exhausts the instrument and chip pool a couple of minutes in,
+// and the run keeps leveling long after that. Late levels then deal one step of
+// raw growth instead of repeating the same full heal until the run ends. The
+// steps are sized like a fraction of a permanent level and only last this run.
+export const STAT_CARD_HP = 5
+export const STAT_CARD_DAMAGE = 0.02
+export const STAT_CARD_STRIDE = 0.01
+const STAT_CARD_DEFINITIONS = [
+  {
+    id: 'vigor',
+    kind: 'stat',
+    stat: 'hp',
+    name: '返场体能',
+    icon: '♡',
+    color: '#e2878f',
+    description: `生命上限 +${STAT_CARD_HP}，并立刻回复同样多的生命，不占用乐器与芯片槽位。`,
+    tag: '生命上限',
+  },
+  {
+    id: 'overdrive',
+    kind: 'stat',
+    stat: 'power',
+    name: '过载音压',
+    icon: '♫',
+    color: '#cfa46b',
+    description: `所有乐器与音浪爆发的伤害 +${STAT_CARD_DAMAGE * 100}%。`,
+    tag: '全部伤害',
+  },
+  {
+    id: 'footwork',
+    kind: 'stat',
+    stat: 'stride',
+    name: '轻快走位',
+    icon: '➜',
+    color: '#8fb7a8',
+    description: `移动速度 +${STAT_CARD_STRIDE * 100}%，键盘、鼠标与触控都生效。`,
+    tag: '移动速度',
+  },
+]
+export const STAT_CARDS = STAT_CARD_DEFINITIONS
+export const UPGRADE_CARDS = [...TALENTS, FULL_HEAL_CARD, ...STAT_CARDS]
 export const HEAL_CARD_CHANCE = 0.25
 export const RECIPES = [
   {
@@ -371,7 +418,10 @@ export const evolved = (gear) =>
   ).map((recipe) => recipe.weapon)
 const PITCHES = [60, 64, 67, 69, 72, 76]
 export function farmMoveStep(state) {
-  return MOVE_STEP * (1 + (state.permanent?.stride ?? 0) * 0.01)
+  return (
+    MOVE_STEP *
+    (1 + (state.permanent?.stride ?? 0) * 0.01 + (state.growth?.stride ?? 0) * STAT_CARD_STRIDE)
+  )
 }
 export function clampPoint(previous, desired, step = MOVE_STEP) {
   const dx = desired[0] - previous[0],
@@ -467,6 +517,8 @@ export function createFarm(day, permanent) {
     trails: [],
     mines: [],
     nextWave: 32,
+    nextSurge: 0,
+    growth: { hp: 0, power: 0, stride: 0 },
   }
   for (let id = 0; id < 24; id++) {
     const enemy = { id, x: 0, y: 0, kind: 0, hp: 1, maxHp: 1, regrow: -1, boss: false }
@@ -497,9 +549,24 @@ export function orbitPositions(state) {
   })
 }
 function dealRecovery(state, choices) {
+  // Every instrument and chip maxed leaves the pool dry while the run keeps
+  // leveling. A dry hand keeps the size of a normal one: the healing card
+  // always leads, because a late run dies without it, and one step of raw
+  // growth fills the rest, so levelling stays a choice instead of a reflex.
+  // An empty hand would freeze the run, so this branch never deals nothing.
+  if (!choices.length) {
+    const hand = [FULL_HEAL_CARD.id]
+    const growth = STAT_CARDS.map((card) => card.id)
+    while (hand.length < STARTER_CHOICES && growth.length)
+      hand.push(growth.splice(Math.floor(random(state) * growth.length), 1)[0])
+    state.offered = hand
+    return
+  }
   // Preserve the focused recipe (and two starter weapons); healing is a
-  // repeatable consumable and never takes an instrument or chip slot.
-  if (!choices.length || random(state) < HEAL_CARD_CHANCE) {
+  // repeatable consumable and never takes an instrument or chip slot. It is
+  // worth taking even at full health, because the next wave is what takes the
+  // health away.
+  if (random(state) < HEAL_CARD_CHANCE) {
     if (choices.length >= STARTER_CHOICES) choices[choices.length - 1] = FULL_HEAL_CARD.id
     else choices.push(FULL_HEAL_CARD.id)
   }
@@ -552,13 +619,26 @@ function offer(state) {
 }
 export function chooseTalent(previous, id) {
   if (previous.hp <= 0 || !previous.offered.includes(id)) return null
+  // Growth cards are run-only: they never touch the instrument, chip or
+  // permanent levels, so nothing about them is saved past this run.
+  const card = STAT_CARDS.find((item) => item.id === id)
+  const growth = card
+    ? { ...previous.growth, [card.stat]: previous.growth[card.stat] + 1 }
+    : previous.growth
   const state = {
     ...previous,
     gear:
-      id === FULL_HEAL_CARD.id
+      id === FULL_HEAL_CARD.id || card
         ? { ...previous.gear }
         : { ...previous.gear, [id]: previous.gear[id] + 1 },
-    hp: id === FULL_HEAL_CARD.id ? previous.maxHp : previous.hp,
+    growth,
+    // A wider health cap pays the same amount back at once, otherwise the card
+    // reads as doing nothing until the next healing drop happens to land.
+    maxHp: previous.maxHp + (card?.stat === 'hp' ? STAT_CARD_HP : 0),
+    hp:
+      id === FULL_HEAL_CARD.id
+        ? previous.maxHp
+        : previous.hp + (card?.stat === 'hp' ? STAT_CARD_HP : 0),
     regenTicks: id === FULL_HEAL_CARD.id ? 0 : previous.regenTicks,
     level: previous.level + 1,
     offered: [],
@@ -718,10 +798,14 @@ export function stepFarm(previous, point, useSurge = false) {
         drop.y = state.position[1]
       }
   }
+  // Every hit this run lands harder once overload cards are picked; the
+  // permanent power level stays the baseline they stack on. This also covers
+  // the surge, which fires through the same damage path.
+  const runDamage = stats.damage * (1 + state.growth.power * STAT_CARD_DAMAGE)
   const damage = (crop, amount, chain = false) => {
     if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) return
     const critical = gear.lucky > 0 && (crop.id + state.tick) % Math.max(3, 8 - gear.lucky) === 0
-    crop.hp = Math.round((crop.hp - amount * (critical ? 2 : 1) * stats.damage) * 100) / 100
+    crop.hp = Math.round((crop.hp - amount * (critical ? 2 : 1) * runDamage) * 100) / 100
     if (crop.hp <= 0) {
       crop.hp = 0.001
       harvest(crop, chain)
@@ -867,8 +951,12 @@ export function stepFarm(previous, point, useSurge = false) {
       })
     }
   }
-  if (useSurge) {
+  // A surge asked for while the cooldown runs is simply dropped: the charge
+  // stays full and the HUD shows the wait, so a replay of a spammed button
+  // stays legal instead of failing the whole run.
+  if (useSurge && state.tick >= state.nextSurge) {
     state.charge = 0
+    state.nextSurge = state.tick + SURGE_COOLDOWN
     state.surgeUntil = state.tick + FPS * 3
     state.hurtUntil = Math.max(state.hurtUntil, state.tick + FPS)
     state.shots = []

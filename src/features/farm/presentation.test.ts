@@ -3,6 +3,7 @@ import {
   advanceFarmPosition,
   farmBossCountdown,
   farmPointerTarget,
+  farmSurgeStatus,
   farmStickRadius,
   farmStickVector,
   farmCamera,
@@ -11,7 +12,15 @@ import {
   formatFarmTime,
   FARM_STICK_DEAD_ZONE,
 } from './presentation'
-import { clampPoint, createFarm, FPS, MOVE_STEP, stepFarm, type Point } from './rules.mjs'
+import {
+  clampPoint,
+  createFarm,
+  FPS,
+  MOVE_STEP,
+  stepFarm,
+  SURGE_COOLDOWN,
+  type Point,
+} from './rules.mjs'
 
 describe('farm display motion', () => {
   it('shows elapsed survival time across minute and hour boundaries', () => {
@@ -146,6 +155,30 @@ describe('endless world camera', () => {
     const afterArrival = stepFarm(state, state.position)!.state
     expect(farmBossCountdown(afterArrival)).toBe(120)
     expect(afterArrival.nextBass).toBe(240 * FPS)
+  })
+  it('only lights the surge button up once the charge is full and the cooldown is over', () => {
+    expect(farmSurgeStatus({ tick: 0, charge: 0, nextSurge: 0 })).toEqual({
+      charged: false,
+      seconds: 0,
+      ready: false,
+    })
+    expect(farmSurgeStatus({ tick: 0, charge: 100, nextSurge: 0 }).ready).toBe(true)
+    // Still charged, but spent: the HUD has to count the wait down instead of
+    // offering a button that does nothing.
+    const waiting = farmSurgeStatus({
+      tick: SURGE_COOLDOWN - 1,
+      charge: 100,
+      nextSurge: SURGE_COOLDOWN,
+    })
+    expect(waiting).toMatchObject({ charged: true, seconds: 1, ready: false })
+    expect(
+      farmSurgeStatus({ tick: SURGE_COOLDOWN, charge: 100, nextSurge: SURGE_COOLDOWN }),
+    ).toEqual({ charged: true, seconds: 0, ready: true })
+    // A fresh run has nothing to wait for.
+    expect(farmSurgeStatus(createFarm('2026-10-04'))).toMatchObject({
+      charged: false,
+      ready: false,
+    })
   })
   it('keeps a held pointer direction moving as the player passes the original arena', () => {
     let position: Point = [50, 76]
