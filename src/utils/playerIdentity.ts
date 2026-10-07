@@ -1,7 +1,6 @@
 import { accountStorage, activeAccountId } from '@/utils/accountStorage'
 export const PLAYER_ID_STORAGE_KEY = 'clockwork-player-id-v1'
 export const NICKNAME_STORAGE_KEY = 'clockwork-player-nickname-v1'
-const LEGACY_PLAYER_KEY = 'mochi-melody-player-v1'
 export const MAX_NAME_LENGTH = 12
 
 function read(key: string) {
@@ -22,14 +21,6 @@ function write(key: string, value: string) {
 
 const validId = (value: unknown): value is string =>
   typeof value === 'string' && /^[a-zA-Z0-9_-]{8,96}$/.test(value)
-
-function legacyPlayer(): { id?: unknown; name?: unknown } | null {
-  try {
-    return JSON.parse(read(LEGACY_PLAYER_KEY) ?? 'null')
-  } catch {
-    return null
-  }
-}
 
 export function createCompatiblePlayerId(): string {
   try {
@@ -60,16 +51,13 @@ export function getOrCreatePlayerId(): string {
   if (accountId) return accountId
   const stored = read(PLAYER_ID_STORAGE_KEY)?.trim()
   if (validId(stored)) return stored
-  const legacy = legacyPlayer()?.id
-  const id = validId(legacy) ? legacy : createCompatiblePlayerId()
+  const id = createCompatiblePlayerId()
   write(PLAYER_ID_STORAGE_KEY, id)
   return id
 }
 
 export function getStoredNickname(): string {
-  const stored = read(NICKNAME_STORAGE_KEY)
-  const legacy = legacyPlayer()?.name
-  return normalizeNickname(stored?.trim() ? stored : typeof legacy === 'string' ? legacy : '')
+  return normalizeNickname(read(NICKNAME_STORAGE_KEY) ?? '')
 }
 
 export function normalizeNickname(value: string): string {

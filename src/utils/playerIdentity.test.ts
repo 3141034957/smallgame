@@ -25,15 +25,16 @@ it('keeps valid identities and repairs ids the server would reject', () => {
   expect(repaired).toMatch(/^[a-zA-Z0-9_-]{8,96}$/)
   expect(getOrCreatePlayerId()).toBe(repaired)
 })
-it('migrates a valid legacy player and nickname', () => {
-  data.set('mochi-melody-player-v1', JSON.stringify({ id: 'melody-player-1', name: ' 小  猫 ' }))
-  expect(getOrCreatePlayerId()).toBe('melody-player-1')
-  expect(getStoredNickname()).toBe('小 猫')
+it('stores a fresh player id and reads back the saved nickname', () => {
+  const id = getOrCreatePlayerId()
+  expect(id).toMatch(/^[a-zA-Z0-9_-]{8,96}$/)
+  expect(getOrCreatePlayerId()).toBe(id)
+  expect(getStoredNickname()).toBe('')
   saveNickname('现在的名字')
   expect(getStoredNickname()).toBe('现在的名字')
 })
-it('survives corrupt legacy saves and unavailable storage', () => {
-  data.set('mochi-melody-player-v1', '{invalid')
+it('survives corrupt saves and unavailable storage', () => {
+  data.set(PLAYER_ID_STORAGE_KEY, '{invalid')
   expect(getOrCreatePlayerId()).toMatch(/^[a-zA-Z0-9_-]{8,96}$/)
   vi.stubGlobal('localStorage', {
     getItem: () => {

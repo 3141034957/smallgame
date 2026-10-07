@@ -47,6 +47,8 @@ bash scripts/game-service.sh update
 
 ## 数据
 
+服务端只读取进程环境变量：`PORT`（默认 3001，`npm start` 默认设为 80）、`DATA_DIR`（数据库目录）、`AUTH_COOKIE_SECURE=1`（仅 HTTPS 部署）。Node 端不加载 `.env` 文件，请用 `PORT=3001 node server/index.mjs` 或 systemd 的 `[Service] Environment=` 传入；`.env.local` 只影响 Vite 的 `/api` 代理目标。
+
 SQLite 位于 `server/data/game.db`，可以通过 `DATA_DIR` 指定其他目录。服务保留既有的 `melody_scores` 表名，以兼容已经保存的怪潮乐队成绩；当前榜单只读取 `farm:v9-boss-interval:日期` 且玩法键为 `farm` 的记录。其他游戏的接口、运行代码和素材已移除，历史数据库记录不再参与当前榜单。服务不导入旧跳跃游戏的 JSON 备份。
 
 浏览器身份键和旧角色 ID 的读取仅用于迁移玩家进度，不提供旧玩法或星星商店。生产升级前请备份 SQLite；服务启用 WAL，应使用在线备份，或停服后完整备份数据目录。

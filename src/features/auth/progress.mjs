@@ -7,7 +7,6 @@ export const PROGRESS_KEYS = [
   'farm-settings-v1',
   'farm-seen-help-v1',
   'clockwork-player-nickname-v1',
-  'mochi-melody-player-v1',
   'clockwork-player-profile-v1',
   'character-unlocks-v1',
   'character-selected-v1',
