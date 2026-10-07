@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { FARM_CHARACTERS, selectFarmCharacter, type FarmProfile } from '@/features/farm/characters'
+import { schoolById } from '@/features/farm/schools.mjs'
 import './CharacterShop.css'
 
 export function CharacterShop({
@@ -121,6 +122,8 @@ export function CharacterShop({
           {FARM_CHARACTERS.map((item) => {
             const unlocked = profile.owned.includes(item.id),
               active = profile.selected === item.id
+            // Every member opens with their own instrument, so the card names it.
+            const school = schoolById(item.talentId)
             return (
               <button
                 type="button"
@@ -137,6 +140,11 @@ export function CharacterShop({
                   <img src={item.image} alt="" loading="lazy" />
                 </span>
                 <strong>{item.name}</strong>
+                {school && (
+                  <small className="farm-shop-school">
+                    {school.weaponIcon} {school.name}
+                  </small>
+                )}
               </button>
             )
           })}

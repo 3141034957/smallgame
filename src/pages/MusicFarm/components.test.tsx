@@ -9,12 +9,14 @@ import { QuestList } from './QuestList'
 import { RunTimeline } from './RunTimeline'
 import { FarmBoard } from './FarmBoard'
 import { UpgradeChoices } from './UpgradeChoices'
-import { activateAccount, installAccountSave } from '@/utils/accountStorage'
+import { activateAccount, GUEST_SAVE_KEY, installAccountSave } from '@/utils/accountStorage'
 import { FarmHelp } from './FarmHelp'
 import { loadFarmAchievements } from '@/features/farm/achievements'
 import { loadFarmCareer } from '@/features/farm/stats'
 import { farmQuests, loadFarmQuests } from '@/features/farm/quests'
 import { createFarm, MAX_GEAR_LEVEL, TALENTS, UPGRADE_CARDS } from '@/features/farm/rules.mjs'
+import { schoolById } from '@/features/farm/schools.mjs'
+import { FARM_PROFILE_KEY } from '@/features/farm/characters'
 import { SCHOOL_COMBOS, SCHOOL_LIST } from '@/features/farm/help'
 
 const resonance = SCHOOL_COMBOS.find((combo) => combo.id === 'resonance')!
@@ -60,6 +62,33 @@ describe('farm screens render', () => {
     expect(html).toContain('无限总榜')
     expect(html).not.toContain('今日词缀')
     expect(html).not.toContain('今日目标')
+  })
+  it('opens the run with the instrument of the selected character', () => {
+    const saved = localStorage.getItem(GUEST_SAVE_KEY)
+    localStorage.setItem(
+      GUEST_SAVE_KEY,
+      JSON.stringify({
+        [FARM_PROFILE_KEY]: JSON.stringify({
+          coins: 0,
+          owned: ['cat-guitar'],
+          selected: 'cat-guitar',
+          rewardedRuns: [],
+        }),
+      }),
+    )
+    const html = renderToStaticMarkup(
+      <MemoryRouter initialEntries={[`/farm?day=${day}`]}>
+        <MusicFarm />
+      </MemoryRouter>,
+    )
+    const school = schoolById('orbit')!
+    expect(html).toContain('起始')
+    expect(html).toContain(school.weaponIcon)
+    expect(html).toContain(school.name)
+    // The ready screen announces the same loadout the run actually opens with.
+    expect(createFarm(day, undefined, 'cat-guitar').gear.orbit).toBe(1)
+    if (saved === null) localStorage.removeItem(GUEST_SAVE_KEY)
+    else localStorage.setItem(GUEST_SAVE_KEY, saved)
   })
   it('renders the badge wall, quest list, build summary and recap', () => {
     const log = loadFarmAchievements()

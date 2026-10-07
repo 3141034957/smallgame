@@ -413,7 +413,7 @@
   position: relative;
   min-width: 0;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto auto;
   gap: 5px;
   padding: 7px 7px 8px;
   overflow: hidden;
@@ -492,6 +492,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.farm-shop-school {
+  overflow: hidden;
+  color: #8a7f9b;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.farm-shop-list > button.is-focused .farm-shop-school {
+  color: #6f6583;
 }
 /* On wide screens the page keeps its phone-sized column, like the reference shop. */
 @media (min-width: 681px) {

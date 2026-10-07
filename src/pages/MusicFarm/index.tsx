@@ -28,6 +28,7 @@ import {
   farmMoveStep,
   MOVE_STEP,
   RECIPES,
+  starterTalent,
   stepFarm,
   farmUpgradeXp,
   farmXpThreshold,
@@ -37,6 +38,7 @@ import {
 } from '@/features/farm/rules.mjs'
 import type { Choice, FarmEvent, FarmRound, Point, UpgradeId } from '@/features/farm/rules.mjs'
 import { selectFarmUpgrade } from '@/features/farm/upgradeSelection'
+import { schoolById } from '@/features/farm/schools.mjs'
 import { AUTH_FORM_EVENT } from '@/features/auth/context'
 import { drawFarm } from './render'
 import { FarmBoard } from './FarmBoard'
@@ -92,7 +94,11 @@ const accountSaveKey = (id: string) => `farm-account-save-v1:${id}`
 export default function MusicFarm() {
   const [params] = useSearchParams()
   const day = validDay(params.get('day')) ? params.get('day')! : todayRoute()
-  const [initial] = useState(() => createFarm(day, loadFarmProfile().growth?.levels))
+  // The band member is the loadout: the run opens holding their own instrument.
+  const [initial] = useState(() => {
+    const saved = loadFarmProfile()
+    return createFarm(day, saved.growth?.levels, saved.selected)
+  })
   const dayRef = useRef(day)
   dayRef.current = day
   const model = useRef(initial)
@@ -110,6 +116,7 @@ export default function MusicFarm() {
   const [round, setRound] = useState<FarmRound | null>(null)
   const [profile, setProfile] = useState(loadFarmProfile)
   const character = FARM_CHARACTERS.find((item) => item.id === profile.selected)!
+  const openingSchool = schoolById(starterTalent(character.id) ?? '')
   const modifier = farmModifier(day)
   const bossesAlive = view.crops.filter((crop) => crop.boss).length
   const growthStats = permanentStats(view.permanent)
@@ -221,7 +228,7 @@ export default function MusicFarm() {
   const initializeBattle = () => {
     const latest = loadFarmProfile()
     setProfile(latest)
-    model.current = createFarm(dayRef.current, latest.growth?.levels)
+    model.current = createFarm(dayRef.current, latest.growth?.levels, latest.selected)
     desired.current = [...model.current.position]
     displayPosition.current = [...model.current.position]
     controls.current?.reset()
@@ -1049,6 +1056,11 @@ export default function MusicFarm() {
                 <div className="farm-ready">
                   <div className="farm-start-card">
                     <h2>带上你的乐队</h2>
+                    {openingSchool && (
+                      <p className="farm-start-gear">
+                        起始 {openingSchool.weaponIcon} {openingSchool.name}
+                      </p>
+                    )}
                     <p>撑越久分越高</p>
                     <FarmBoard compact />
                     <button className="farm-primary" onClick={start} aria-label="开始无限模式">

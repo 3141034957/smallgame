@@ -7,6 +7,7 @@ import MusicFarm from './index'
 import { farmBestKey } from '@/features/farm/monsters.mjs'
 import { saveBestScore } from '@/utils/localScores'
 import { FARM_HELP_SEEN_KEY } from '@/features/farm/help'
+import { FARM_PROFILE_KEY } from '@/features/farm/characters'
 import { testStorage } from '@/test/storage'
 import {
   createFarm,
@@ -171,6 +172,24 @@ it('stores the daily best score once when a run ends', async () => {
   const [key, score] = vi.mocked(saveBestScore).mock.calls[0]
   expect(key).toBe(farmBestKey('2026-10-04'))
   expect(score).toBeGreaterThan(0)
+})
+
+it('opens the run already holding the instrument of the selected character', async () => {
+  localStorage.setItem(
+    FARM_PROFILE_KEY,
+    JSON.stringify({
+      coins: 0,
+      owned: ['cat-guitar'],
+      selected: 'cat-guitar',
+      rewardedRuns: [],
+    }),
+  )
+  await start()
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '暂停游戏' })))
+  // No starter hand is dealt: the guitarist is on stage from the first frame.
+  const build = screen.getByLabelText('本局乐队')
+  expect(build.textContent).toContain('吉他手弦弦')
+  expect(build.textContent).toContain('Lv.1 ＋ Lv.0')
 })
 
 it('waits for a manual choice, and keeps waiting: a dry pool deals a hand, not a sole offer', async () => {

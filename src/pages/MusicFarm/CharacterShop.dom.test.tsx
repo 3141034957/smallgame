@@ -10,6 +10,7 @@ import { BadgeWall } from './BadgeWall'
 import { BAND_CHARACTERS } from '@/features/farm/characterRoster.mjs'
 import { FARM_PROFILE_KEY, loadFarmProfile } from '@/features/farm/characters'
 import { createFarm, type FarmRound, type TalentId, TALENTS } from '@/features/farm/rules.mjs'
+import { schoolById } from '@/features/farm/schools.mjs'
 import { farmShareText } from '@/features/farm/share'
 import { loadFarmCareer } from '@/features/farm/stats'
 import { loadFarmAchievements } from '@/features/farm/achievements'
@@ -57,6 +58,16 @@ it('keeps all nine previews, equipped identities and saved selections together',
   expect(screen.getByRole('button', { name: '预览打碟机哔哔' }).getAttribute('aria-pressed')).toBe(
     'true',
   )
+})
+
+it('names the instrument every character starts with on its card', () => {
+  render(<Shop />)
+  for (const character of BAND_CHARACTERS) {
+    const school = schoolById(character.talentId)!
+    const card = screen.getByRole('button', { name: `预览${character.name}` })
+    expect(card.textContent).toContain(school.weaponIcon)
+    expect(card.textContent).toContain(school.name)
+  }
 })
 
 it('uses the same identities across upgrades, help, builds, career and share text', () => {
