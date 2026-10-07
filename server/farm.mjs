@@ -20,16 +20,25 @@ export function verifyFarm(input) {
   if (!playerId || !name) return null
   if (!Array.isArray(input.frames) || !input.frames.length || input.frames.length > MAX_FARM_FRAMES)
     return null
+  // The member decides which instrument the run opens with, so the replay has
+  // to rebuild that loadout. A body without the field comes from an older
+  // client whose run opened with the random starter deal instead, and those
+  // scores must keep verifying: replay it without a member. A client that does
+  // send one always sends a real value, so an unusable id falls back to the
+  // default member rather than to the old path.
+  const characterId = normalizeCharacterId(input?.characterId)
+  const replayCharacterId =
+    typeof input?.characterId === 'string' && input.characterId ? characterId : null
   const round = replayFarm(
     input.day,
     input.frames,
     input.choices,
     input.surges,
     input.permanent === undefined ? {} : input.permanent,
+    replayCharacterId,
   )
   if (!round || !Number.isInteger(input.score) || input.score !== round.score || !round.score)
     return null
-  const characterId = normalizeCharacterId(input.characterId)
   return {
     playerId,
     name,

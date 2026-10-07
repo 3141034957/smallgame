@@ -22,6 +22,7 @@ import {
   stepFarm,
 } from '../src/features/farm/rules.mjs'
 import { selectFarmUpgrade } from '../src/features/farm/upgradeSelection.ts'
+import { DEFAULT_CHARACTER_ID } from './identity.mjs'
 
 const day = '2026-10-04'
 // The fixture farmer keeps its distance from the closest monster instead of
@@ -48,8 +49,13 @@ const flee = (state, target) => {
 // It also plays one focused build: late runs now meet a second boss, and a
 // scattered build would not survive long enough to exercise the big payload.
 const FOCUS = 'echo'
-function playFixture(active = true, permanent = {}, movingSeconds = MAX_FARM_FRAMES / FPS - 60) {
-  let state = createFarm(day, permanent)
+function playFixture(
+  active = true,
+  permanent = {},
+  movingSeconds = MAX_FARM_FRAMES / FPS - 60,
+  characterId = DEFAULT_CHARACTER_ID,
+) {
+  let state = createFarm(day, permanent, characterId)
   const frames = [],
     choices = [],
     surges = []
@@ -97,11 +103,23 @@ function playFixture(active = true, permanent = {}, movingSeconds = MAX_FARM_FRA
     frames.push(point)
     state = stepFarm(state, point, false).state
   }
-  return replayFarm(day, frames, choices, surges, permanent)
+  return replayFarm(day, frames, choices, surges, permanent, characterId)
 }
 const round = playFixture()
 const lowerRound = playFixture(false)
-const input = { ...round, name: '丰收小兔', playerId: 'farm_test_player' }
+const input = {
+  ...round,
+  name: '丰收小兔',
+  playerId: 'farm_test_player',
+  characterId: DEFAULT_CHARACTER_ID,
+}
+// Short runs for the member tests: the character is fixed for a whole run, so
+// two of them are enough to show the replay follows the chosen member.
+const drumRound = playFixture(true, {}, 90, 'bear-drums')
+const guitarRound = playFixture(true, {}, 90, 'cat-guitar')
+// The same fixture without a member: this is what an older client, whose run
+// opened with the random starter deal, uploads and has to keep verifying.
+const legacyRound = playFixture(false, {}, undefined, null)
 
 function createRequest(store, consumeAttempt) {
   return async (method, path, body) => {
@@ -156,7 +174,12 @@ describe('replay-verified all-time farm leaderboard', () => {
     expect(grown).not.toBeNull()
     expect(grown.permanent.vitality).toBe(12)
     expect(grown.frames.some((point) => point.some((value) => !Number.isInteger(value)))).toBe(true)
-    const submission = { ...grown, name: '成长乐手', playerId: 'farm_grown_player' }
+    const submission = {
+      ...grown,
+      name: '成长乐手',
+      playerId: 'farm_grown_player',
+      characterId: DEFAULT_CHARACTER_ID,
+    }
     expect(verifyFarm(submission)?.score).toBe(grown.score)
     expect(verifyFarm({ ...submission, permanent: { vitality: 99 } })).toBeNull()
     expect(verifyFarm({ ...submission, permanent: null })).toBeNull()
@@ -188,20 +211,26 @@ describe('replay-verified all-time farm leaderboard', () => {
       seconds: Math.round(round.seconds),
       characterId: 'bear-drums',
     })
-    // The avatar id is cosmetic and never influences the verified score.
-    expect(verifyFarm({ ...input, characterId: 'crocodile-beat' }).characterId).toBe(
-      'crocodile-beat',
-    )
-    expect(verifyFarm({ ...input, characterId: 'DROP TABLE melody_scores' }).characterId).toBe(
-      'bear-drums',
-    )
+    // The member is part of the run now: it decides the starting instrument, so
+    // the same recording only verifies under the member it was played with, and
+    // an unusable id falls back to the default member instead of being stored.
+    expect(verifyFarm({ ...input, characterId: 'crocodile-beat' })).toBeNull()
+    expect(verifyFarm({ ...input, characterId: 'DROP TABLE melody_scores' })).toMatchObject({
+      characterId: 'bear-drums',
+      score: round.score,
+    })
     expect(Math.round(round.seconds)).toBeGreaterThan(60)
   }, 120000)
 
   it('accepts a replay-verified defeat, but rejects truncation and frames after death', () => {
     expect(lowerRound.outcome).toBe('defeated')
     expect(lowerRound.frames.length).toBeLessThan(FPS * 60)
-    const defeat = { ...lowerRound, name: input.name, playerId: input.playerId }
+    const defeat = {
+      ...lowerRound,
+      name: input.name,
+      playerId: input.playerId,
+      characterId: DEFAULT_CHARACTER_ID,
+    }
     expect(verifyFarm(defeat)?.score).toBe(lowerRound.score)
     expect(verifyFarm({ ...defeat, frames: lowerRound.frames.slice(0, -1) })).toBeNull()
     expect(
@@ -210,6 +239,128 @@ describe('replay-verified all-time farm leaderboard', () => {
     expect(verifyFarm({ ...defeat, surges: [lowerRound.frames.length] })).toBeNull()
     expect(farmKey(day)).toBe(`farm:v9-boss-interval:${day}`)
   })
+
+  it('replays each run with the character it was submitted with', () => {
+    expect(drumRound).not.toBeNull()
+    expect(guitarRound).not.toBeNull()
+    const drummer = {
+      ...drumRound,
+      name: '鼓手咚咚',
+      playerId: 'farm_drum_player',
+      characterId: 'bear-drums',
+    }
+    const guitarist = {
+      ...guitarRound,
+      name: '吉他手弦弦',
+      playerId: 'farm_guitar_player',
+      characterId: 'cat-guitar',
+    }
+    // Both members own a verified score: the server rebuilt the same instrument.
+    expect(verifyFarm(drummer)).toMatchObject({
+      score: drumRound.score,
+      characterId: 'bear-drums',
+    })
+    expect(verifyFarm(guitarist)).toMatchObject({
+      score: guitarRound.score,
+      characterId: 'cat-guitar',
+    })
+  }, 120000)
+
+  it('starts each member on its own instrument, so a run replayed as another member no longer verifies', () => {
+    const replayAs = (round, characterId) =>
+      replayFarm(day, round.frames, round.choices, round.surges, {}, characterId)?.score ?? null
+    expect(replayAs(drumRound, 'bear-drums')).toBe(drumRound.score)
+    expect(replayAs(guitarRound, 'cat-guitar')).toBe(guitarRound.score)
+    // The same recording cannot pass as the other member: the opening instrument
+    // differs, so the replay diverges and the score no longer matches.
+    expect(replayAs(drumRound, 'cat-guitar')).not.toBe(drumRound.score)
+    expect(replayAs(guitarRound, 'bear-drums')).not.toBe(guitarRound.score)
+    expect(
+      verifyFarm({
+        ...drumRound,
+        name: input.name,
+        playerId: input.playerId,
+        characterId: 'cat-guitar',
+      })?.score ?? null,
+    ).not.toBe(drumRound.score)
+    expect(
+      verifyFarm({
+        ...guitarRound,
+        name: input.name,
+        playerId: input.playerId,
+        characterId: 'bear-drums',
+      })?.score ?? null,
+    ).not.toBe(guitarRound.score)
+  }, 120000)
+
+  it('keeps verifying older uploads, which carry no member and are replayed without one', async () => {
+    expect(legacyRound).not.toBeNull()
+    const legacy = { ...legacyRound, name: input.name, playerId: input.playerId }
+    // No field at all, an empty string and a null are all "the client did not
+    // pick a member": the run opened with the old random starter deal, so it is
+    // replayed on that path and keeps the score it was played with.
+    for (const characterId of [undefined, null, ''])
+      expect(verifyFarm({ ...legacy, characterId })).toMatchObject({
+        score: legacyRound.score,
+        characterId: DEFAULT_CHARACTER_ID,
+      })
+    // Proof that the old path really is a different run: replaying the same
+    // recording as a member diverges, because that run opens holding an
+    // instrument instead of being dealt three starters.
+    const asMember = (characterId) =>
+      replayFarm(day, legacyRound.frames, legacyRound.choices, legacyRound.surges, {}, characterId)
+        ?.score ?? null
+    expect(asMember(null)).toBe(legacyRound.score)
+    expect(asMember('bear-drums')).not.toBe(legacyRound.score)
+    expect(verifyFarm({ ...legacy, characterId: 'bear-drums' })?.score ?? null).not.toBe(
+      legacyRound.score,
+    )
+    const store = createFarmStore(':memory:')
+    const request = createRequest(store)
+    try {
+      const accepted = await request('POST', '/api/farm/score', JSON.stringify(legacy))
+      expect(accepted.status).toBe(200)
+      expect(accepted.data.acceptedScore).toBe(legacyRound.score)
+    } finally {
+      store.close()
+    }
+  }, 120000)
+
+  it('falls back to the default member when the submitted character is unusable', async () => {
+    const modern = {
+      ...lowerRound,
+      name: input.name,
+      playerId: input.playerId,
+      characterId: 'bear-drums',
+    }
+    // A client that sends the field always sends a real value, so junk means a
+    // broken or hostile body: replay it as the default member, never as the old
+    // path, and never store the junk.
+    for (const characterId of ['bear-drums', 'nope', 'DROP TABLE melody_scores', '   '])
+      expect(verifyFarm({ ...modern, characterId })).toMatchObject({
+        score: lowerRound.score,
+        characterId: DEFAULT_CHARACTER_ID,
+      })
+    // A retired id still migrates, and migrating means replaying as that member.
+    expect(verifyFarm({ ...modern, characterId: 'burger-dog' })?.score ?? null).not.toBe(
+      lowerRound.score,
+    )
+    const store = createFarmStore(':memory:')
+    const request = createRequest(store)
+    try {
+      for (const characterId of ['nope', 'DROP TABLE melody_scores']) {
+        const junk = await request(
+          'POST',
+          '/api/farm/score',
+          JSON.stringify({ ...modern, characterId }),
+        )
+        expect(junk.status).toBe(200)
+        expect(junk.data.acceptedScore).toBe(lowerRound.score)
+      }
+    } finally {
+      store.close()
+    }
+  }, 120000)
 
   it('rejects the former one-minute finish while the player is alive', () => {
     const frames = round.frames.slice(0, FPS * 60)
@@ -279,7 +430,7 @@ describe('replay-verified all-time farm leaderboard', () => {
       const accepted = await request(
         'POST',
         '/api/farm/score',
-        JSON.stringify({ ...input, characterId: 'crocodile-beat' }),
+        JSON.stringify({ ...input, characterId: 'bear-drums' }),
       )
       expect(Buffer.byteLength(JSON.stringify(input))).toBeGreaterThan(32768)
       expect(accepted.status).toBe(200)
@@ -293,21 +444,31 @@ describe('replay-verified all-time farm leaderboard', () => {
       const second = await request(
         'POST',
         '/api/farm/score',
-        JSON.stringify({ ...lowerRound, playerId: 'farm_second_player', name: '胡萝卜队长' }),
+        JSON.stringify({
+          ...lowerRound,
+          playerId: 'farm_second_player',
+          name: '胡萝卜队长',
+          characterId: DEFAULT_CHARACTER_ID,
+        }),
       )
       expect(second.data.own).toMatchObject({ rank: 2, score: lowerRound.score, isYou: true })
       const retry = await request(
         'POST',
         '/api/farm/score',
-        JSON.stringify({ ...lowerRound, playerId: input.playerId, name: '丰收小兔' }),
+        JSON.stringify({
+          ...lowerRound,
+          playerId: input.playerId,
+          name: '丰收小兔',
+          characterId: DEFAULT_CHARACTER_ID,
+        }),
       )
       expect(retry.data.own.score).toBe(round.score)
       expect(retry.data.total).toBe(2)
       const board = await request('GET', `/api/farm/leaderboard?playerId=${input.playerId}`)
       expect(board.data.data.map((entry) => entry.score)).toEqual([round.score, lowerRound.score])
       // The row avatar comes from the id sent with the run.
-      expect(board.data.data[0].characterId).toBe('crocodile-beat')
-      expect(board.data.own.characterId).toBe('crocodile-beat')
+      expect(board.data.data[0].characterId).toBe('bear-drums')
+      expect(board.data.own.characterId).toBe('bear-drums')
       expect(board.data.own.rank).toBe(1)
       expect((await request('GET', '/api/farm/leaderboard?day=2026-10-05')).data.total).toBe(2)
       expect(store.board(`wave:v1:${day}`, 'wave').total).toBe(0)

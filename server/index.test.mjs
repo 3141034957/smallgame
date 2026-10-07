@@ -128,7 +128,9 @@ it('preserves Chinese nicknames when request chunks split a UTF-8 character', as
   expect(registered.status).toBe(200)
   const cookie = registered.headers['set-cookie'][0].split(';')[0]
   const day = '2026-10-04'
-  let state = createFarm(day)
+  // The run has to be played as the member it is submitted as: that member
+  // decides the instrument the run opens with.
+  let state = createFarm(day, {}, 'bear-drums')
   const frames = [],
     choices = []
   while (state.hp > 0 && frames.length < FPS * 600) {
@@ -141,7 +143,7 @@ it('preserves Chinese nicknames when request chunks split a UTF-8 character', as
     frames.push(point)
     state = stepFarm(state, point, false).state
   }
-  const round = replayFarm(day, frames, choices, [])
+  const round = replayFarm(day, frames, choices, [], {}, 'bear-drums')
   expect(round).not.toBeNull()
   const body = Buffer.from(
     JSON.stringify({
