@@ -36,11 +36,10 @@ export type SchoolView = {
   layerLabel: string
 }
 
-const layerLabel = (tier: number, evolved: boolean) => {
-  if (evolved) return `已进化 · 第 ${MAX_GEAR_LEVEL} 层 / 共 ${MAX_GEAR_LEVEL} 层`
-  if (tier === 0) return `未接触 · 0 / ${MAX_GEAR_LEVEL} 层`
-  return `第 ${tier} 层 / 共 ${MAX_GEAR_LEVEL} 层`
-}
+// Short on purpose: the card already names the school, so the ladder only has
+// to say how far it got ("Lv.2/5") or that it is done ("终极").
+const layerLabel = (tier: number, evolved: boolean) =>
+  evolved ? '终极' : `Lv.${tier}/${MAX_GEAR_LEVEL}`
 
 export function schoolViews(source: ComboSource): SchoolView[] {
   return schoolProgress(source).map((entry) => ({

@@ -10,9 +10,8 @@ export function FarmHelp({ onClose }: { onClose: () => void }) {
     <>
       <small className="farm-eyebrow">YOUR LITTLE BAND</small>
       <h2>用你的乐队，击退怪潮</h2>
-      <p>
-        手机按住任意位置当摇杆，朝想去的方向拖动即可走位，松手停住；电脑移动鼠标指针即可走位，镜头跟随角色，无边界探索。鼠标移回中央或移出战场可停住，乐队成员自动攻击附近怪物。注意血条，躲开怪物、粉色弹幕和红色预警圈，捡回血爱心（掉落有限，会消失）。捡经验升级，三选一让新成员加入、强化已有装备，或选择随机出现的「恢复满血」卡；能量满了，点「音浪爆发」清弹幕并获得短暂无敌；吉他手的旋转音符会把飞来的弹幕打掉。
-      </p>
+      <p>拖动走位，乐队自动攻击。</p>
+      <p>躲开弹幕，捡经验升级。</p>
       <h3 className="farm-monsters-title">流派与组合技 · 10 条路，跨流派共鸣</h3>
       <p>
         一件乐器 ＋ 它的专属芯片＝一个流派，两条都升到 Lv.{MAX_GEAR_LEVEL} 就进化成终极形态。层进共
@@ -79,13 +78,12 @@ export function FarmHelp({ onClose }: { onClose: () => void }) {
           </article>
         ))}
       </div>
+      {/* Keyboard only: hidden on phones by the stylesheet. */}
       <p className="farm-help-keyboard">
-        升级弹窗里按数字键 1–9 直接选择。方向键 / WASD
-        移动，空格释放音浪爆发。离开页面自动暂停。角色等级无上限，乐器和装备最高
-        Lv.5；构筑满级后仍可选择回血升级。不限时，生命归零后结算；怪潮会持续增强，无限总榜保留每位玩家的历史最高分。
+        数字键 1–9 选择升级，方向键 / WASD 移动，空格释放音浪爆发。
       </p>
       <button className="farm-primary" onClick={onClose}>
-        懂啦，开战！ ↗
+        懂啦，开战
       </button>
     </>
   )

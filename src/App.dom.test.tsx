@@ -84,7 +84,7 @@ it('closes the open dialog on the back gesture instead of dropping the run', asy
     </MemoryRouter>,
   )
   await screen.findByRole('button', { name: '退出登录' })
-  fireEvent.click(screen.getByRole('button', { name: /开始玩/ }))
+  fireEvent.click(screen.getByRole('button', { name: '开始无限模式' }))
   fireEvent.click(screen.getByRole('button', { name: '查看进化配方' }))
   expect(screen.getByRole('dialog')).toBeTruthy()
   // The dialog owns the back gesture through a placeholder history entry.
@@ -94,7 +94,7 @@ it('closes the open dialog on the back gesture instead of dropping the run', asy
   })
   expect(screen.queryByRole('dialog')).toBeNull()
   // A remount would have thrown the player back to the start card.
-  expect(screen.queryByRole('button', { name: /开始玩/ })).toBeNull()
+  expect(screen.queryByRole('button', { name: '开始无限模式' })).toBeNull()
   expect(screen.getByRole('button', { name: '暂停游戏' })).toBeTruthy()
 })
 

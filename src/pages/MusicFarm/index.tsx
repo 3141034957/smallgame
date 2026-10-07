@@ -242,7 +242,7 @@ export default function MusicFarm() {
     runId.current = `farm_${Date.now()}_${random.join('_')}`
     phaseRef.current = 'play'
     setPhase('play') // The daily modifier left the start card, so the run announces itself.
-    setNotice(`今日词缀 ${modifier.icon} ${modifier.name}：${modifier.desc}`)
+    setNotice(`今日词缀 · ${modifier.name}`)
     noticeUntil.current = performance.now() + 3400
     void prepare()
     field.current?.focus({ preventScroll: true })
@@ -899,7 +899,7 @@ export default function MusicFarm() {
               )}
               {audioError && (
                 <p role="status" className="farm-audio-error">
-                  声音暂时无法开启，仍可继续战斗。点右上角声音按钮重试。
+                  静音中，可继续战斗
                 </p>
               )}
             </div>
@@ -922,10 +922,6 @@ export default function MusicFarm() {
                   🛡 {view.shields}
                 </em>
               )}
-              <small>
-                第 {1 + Math.floor(view.tick / (FPS * 15))} 波 ·{' '}
-                {bossesAlive ? `巨兽 ${bossesAlive} 只在场` : `巨兽 ${farmBossCountdown(view)}s`}
-              </small>
             </div>
             <div className="farm-xp">
               <span>Lv.{view.level + 1}</span>
@@ -1053,10 +1049,10 @@ export default function MusicFarm() {
                 <div className="farm-ready">
                   <div className="farm-start-card">
                     <h2>带上你的乐队，冲出怪潮！</h2>
-                    <p>无限舞台 · 自动攻击 · 看看能撑多久</p>
+                    <p>撑越久分越高</p>
                     <FarmBoard compact />
-                    <button className="farm-primary" onClick={start}>
-                      开始玩 <span>无限模式 ↗</span>
+                    <button className="farm-primary" onClick={start} aria-label="开始无限模式">
+                      开始
                     </button>
                     <button
                       className="farm-shop-pill"
@@ -1076,7 +1072,6 @@ export default function MusicFarm() {
                     >
                       ↗ 永久强化
                     </button>
-                    <small>{inputMode === 'touch' ? '拖动屏幕控制走位' : '移动鼠标控制走位'}</small>
                   </div>
                 </div>
               )}
@@ -1086,17 +1081,17 @@ export default function MusicFarm() {
                 </div>
               )}
               {phase === 'play' && celebration && !upgrade && (
-                <div className="farm-evolution" role="status">
-                  <small>成员 × 装备 · 终极乐器</small>
-                  <b>✦ {celebration} ✦</b>
-                  <span>奏响你的最强乐器！</span>
+                <div
+                  className="farm-evolution"
+                  role="status"
+                  aria-label={`终极乐器就位：${celebration}`}
+                >
+                  <b>✦ {celebration}</b>
                 </div>
               )}
               {phase === 'play' && view.tick < FPS * 4 && (
                 <div className="farm-drag-hint">
-                  {inputMode === 'touch'
-                    ? '按住任意位置当摇杆，朝想去的方向拖动'
-                    : '↔ 鼠标指向前方持续前进，移回中央停住'}
+                  {inputMode === 'touch' ? '拖动走位' : '移动鼠标走位'}
                 </div>
               )}
             </div>
@@ -1112,6 +1107,13 @@ export default function MusicFarm() {
                   surgeStatus.charged && !surgeStatus.ready ? 'is-cooling' : ''
                 }`}
                 disabled={phase !== 'play' || !surgeStatus.ready}
+                aria-label={
+                  surgeStatus.ready
+                    ? '音浪爆发：清弹幕并获得短暂无敌'
+                    : surgeStatus.charged
+                      ? `音浪冷却中，剩余 ${surgeStatus.seconds} 秒`
+                      : `音浪爆发充能 ${view.charge}%`
+                }
                 onClick={() => {
                   surge.current = true
                 }}
@@ -1119,10 +1121,10 @@ export default function MusicFarm() {
                 <i style={{ width: `${view.charge}%` }} />
                 <span>
                   {surgeStatus.ready
-                    ? '✦ 音浪爆发！'
+                    ? '爆发'
                     : surgeStatus.charged
-                      ? `音浪冷却 ${surgeStatus.seconds}s`
-                      : `音浪爆发 ${view.charge}%`}
+                      ? `冷却 ${surgeStatus.seconds}s`
+                      : `${view.charge}%`}
                 </span>
               </button>
             </div>
@@ -1149,17 +1151,14 @@ export default function MusicFarm() {
               <div className="farm-stars">{'★'.repeat(round?.stars ?? 0)}</div>
               <strong className="farm-final-score">{number(view.score)}</strong>
               <small className="farm-personal-best">
-                今日最佳 {number(best)} 分 · 生涯最高 {number(career.bestScore)} 分
-                {careerRecords.score ? ' · 新纪录 ✦' : ''} · 生涯最长{' '}
-                {formatFarmTime(career.bestSeconds * FPS)}
-                {careerRecords.seconds ? ' · 新纪录 ✦' : ''}
-                {careerRecords.combo ? ' · 连击新纪录 ✦' : ''}
+                今日最佳 {number(best)} · 生涯 {number(career.bestScore)}
+                {careerRecords.score || careerRecords.seconds || careerRecords.combo
+                  ? ' ✦ 新纪录'
+                  : ''}
               </small>
               <p>
                 生存 {(view.tick / FPS).toFixed(1)} 秒 · {view.harvested} 击败 · {view.maxCombo}{' '}
-                连击{view.elites ? ` · ${view.elites} 精英` : ''}
-                {view.blocks ? ` · 挡下 ${view.blocks} 次攻击` : ''}
-                {view.maxShields ? ` · 最高 ${view.maxShields} 层音盾` : ''}
+                连击
               </p>
               {forms.length > 0 && (
                 <p className="farm-final-build">
@@ -1170,7 +1169,7 @@ export default function MusicFarm() {
                 </p>
               )}
               <button className="farm-primary" onClick={restart}>
-                再来一局，换种奏法 ↗
+                再来一局
               </button>
               <button
                 className="farm-text-button"
@@ -1195,14 +1194,18 @@ export default function MusicFarm() {
                 {rewardError || goalError ? (
                   <>
                     <span role="alert">{rewardError || goalError}</span>
-                    <button className="farm-text-button" onClick={claimReward}>
-                      重试领取奖励
+                    <button
+                      className="farm-text-button"
+                      onClick={claimReward}
+                      aria-label="重试领取奖励"
+                    >
+                      重试领取
                     </button>
                   </>
                 ) : (
                   <>
-                    本局获得 ✦ {number(round?.coins ?? 0)} 金币
-                    <small>钱包共 {number(profile.coins)} 金币 · 解锁角色与永久强化</small>
+                    本局 ✦ {number(round?.coins ?? 0)}
+                    <small>钱包 {number(profile.coins)}</small>
                   </>
                 )}
                 <button
@@ -1212,7 +1215,7 @@ export default function MusicFarm() {
                     openPanel('shop')
                   }}
                 >
-                  去角色商店 ↗
+                  角色商店
                 </button>
                 <button
                   className="farm-result-shop"
@@ -1221,7 +1224,7 @@ export default function MusicFarm() {
                     openPanel('growth')
                   }}
                 >
-                  去永久强化 ↗
+                  永久强化
                 </button>
               </div>
               {submitBlocked && (
@@ -1299,17 +1302,18 @@ export default function MusicFarm() {
                     <h2>乐队等你回来 ♡</h2>
                     <p>战斗和计时已暂停，乐队和构筑都还在。</p>
                     <button className="farm-primary" onClick={closePanel}>
-                      继续战斗 ↗
+                      继续战斗
                     </button>
                     <button
                       className="farm-text-button"
+                      aria-label={settings.effects ? '关闭特效，改为省电' : '开启特效'}
                       onClick={() => {
                         const next = saveFarmSettings({ effects: !settings.effects })
                         settingsRef.current = next
                         setSettings(next)
                       }}
                     >
-                      特效：{settings.effects ? '开' : '关（省电）'}
+                      {settings.effects ? '特效 开' : '特效 省电'}
                     </button>
                     <BuildSummary gear={view.gear} state={view} />
                     <p className="farm-pause-goals">

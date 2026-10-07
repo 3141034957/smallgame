@@ -79,7 +79,7 @@ describe('farm screens render', () => {
     ) as Record<string, number>
     const build = renderToStaticMarkup(<BuildSummary gear={gear as never} />)
     expect(build).toContain('雷霆鼓组')
-    expect(build).toContain('成员')
+    expect(build).toContain('Lv.5 ＋ Lv.5')
     expect(
       renderToStaticMarkup(
         <RunTimeline
@@ -116,7 +116,7 @@ describe('farm screens render', () => {
     )
     expect(build).toContain('farm-school-ladder')
     expect(build).toContain('鼓组流')
-    expect(build).toContain('已进化 · 第 5 层 / 共 5 层')
+    expect(build).toContain('终极')
     expect(build).toContain('本局组合技')
     expect(build).toContain('共振风暴')
     // The wording comes from the data layer, never recomputed here.
@@ -133,7 +133,9 @@ describe('farm screens render', () => {
       <BuildSummary gear={gear as never} state={{ gear: gear as never }} />,
     )
     expect(build).not.toContain('本局组合技')
-    expect(build).toContain('下一步：共振风暴')
+    expect(build).toContain('下一步')
+    expect(build).not.toContain('下一步：')
+    expect(build).toContain('共振风暴')
     expect(build).toContain('还差')
   })
   it('lists every school and combo on the help screen', () => {
@@ -180,7 +182,7 @@ describe('farm screens render', () => {
     installAccountSave('account_ssr_test', { data: {}, revision: 1, dirty: false })
     const html = renderToStaticMarkup(<FarmBoard round={round as never} />)
     expect(html).toContain('上榜')
-    expect(html).toContain('取个昵称，把这一局送上总榜')
+    expect(html).toContain('<label for="farm-player-name">昵称</label>')
     // A player who already saved a nickname goes straight onto the board: no input.
     installAccountSave('account_ssr_test', {
       data: { 'clockwork-player-nickname-v1': '老乐手' },

@@ -565,6 +565,12 @@
 .farm-help-keyboard {
   font-size: 10px !important;
 }
+/* Keys a phone does not have: the help dialog drops them there. */
+@media (max-width: 680px), (hover: none) and (pointer: coarse) {
+  .farm-help-keyboard {
+    display: none;
+  }
+}
 .farm-dialog > .farm-primary {
   width: 100%;
   margin-top: 18px;
@@ -1182,11 +1188,6 @@
   font-size: 19px;
   min-height: 51px;
 }
-.farm-start-card > small {
-  font-size: 10px;
-  margin-top: 15px;
-  color: #99a083;
-}
 .farm-drag-hint {
   bottom: 64px;
   font-size: 11px;
@@ -1356,9 +1357,6 @@
     top: calc(max(8px, env(safe-area-inset-top)) + 160px);
     width: min(200px, calc(100% - 24px));
   }
-  .farm-health small {
-    display: none;
-  }
   .farm-start-card {
     padding: 13px 18px;
     width: 310px;
@@ -1377,9 +1375,6 @@
   .farm-start-card > .farm-primary {
     min-height: 42px;
     padding: 10px;
-  }
-  .farm-start-card > small {
-    margin-top: 10px;
   }
 }
 @media (max-height: 500px) and (min-width: 681px) {
@@ -1500,9 +1495,6 @@
   border-radius: 12px;
   padding: 4px 9px;
   box-shadow: 0 2px 9px #65814b16;
-}
-.music-farm .farm-health small {
-  display: none;
 }
 .farm-health > span {
   color: #dc779b;

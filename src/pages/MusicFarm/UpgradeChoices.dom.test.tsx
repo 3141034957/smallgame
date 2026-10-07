@@ -22,7 +22,7 @@ it('renders the recovery card alongside gear and selects its independent replay 
   const card = screen.getByRole('button', { name: /恢复满血/ })
   expect(card.textContent).toContain('生命 12 → 150')
   expect(card.textContent).not.toContain('Lv.')
-  expect(card.textContent).not.toContain('满级进化')
+  expect(card.textContent).not.toContain('进化：')
   expect(screen.getAllByRole('button')).toHaveLength(3)
   fireEvent.click(card)
   expect(select).toHaveBeenCalledExactlyOnceWith('heal')
@@ -40,7 +40,9 @@ it('keeps a full-health recovery choice usable when the loadout has nothing left
     />,
   )
   const card = screen.getByRole('button', { name: /恢复满血/ })
-  expect(card.textContent).toContain('已满血，也可选择继续升级')
+  // Full health still shows the heal: the card promises 100 → 100 and stays
+  // clickable instead of repeating "已回满" in prose.
+  expect(card.textContent).toContain('生命 100 → 100')
   expect((card as HTMLButtonElement).disabled).toBe(false)
   fireEvent.click(card)
   expect(select).toHaveBeenCalledExactlyOnceWith('heal')
@@ -51,9 +53,9 @@ it('names the school and how far along its ladder the pick lands', () => {
   render(<UpgradeChoices gear={gear} offered={['drum']} state={{ gear }} onSelect={() => {}} />)
   const card = screen.getByRole('button')
   expect(card.textContent).toContain('鼓组流')
-  expect(card.textContent).toContain('第 2 层 / 共 5 层')
+  expect(card.textContent).toContain('Lv.2/5')
   expect(card.textContent).toContain('进化：雷霆鼓组')
-  expect(card.textContent).toContain('Lv.3/5')
+  expect(card.textContent).toContain('3/5 ＋ 3/5')
 })
 
 it('flashes a cross-school combo the pick would unlock', () => {
@@ -61,7 +63,7 @@ it('flashes a cross-school combo the pick would unlock', () => {
   const gear = gearWith({ drum: 5, range: 5, synth: 5, arp: 4 })
   render(<UpgradeChoices gear={gear} offered={['arp']} state={{ gear }} onSelect={() => {}} />)
   const card = screen.getByRole('button')
-  expect(card.textContent).toContain('已进化')
+  expect(card.textContent).toContain('终极')
   expect(card.textContent).toContain('✦ 这次解锁 棱镜合成器')
   expect(card.textContent).toContain('✦ 触发组合技：共振风暴')
 })

@@ -84,7 +84,7 @@ const start = async (strict = false) => {
     </MemoryRouter>
   )
   render(strict ? <StrictMode>{tree}</StrictMode> : tree)
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: /开始玩/ })))
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '开始无限模式' })))
   act(() => frame(1000))
   act(() => frame(1063))
 }
@@ -155,7 +155,7 @@ it('gives focus back to the button that opened a panel after the run ends', asyn
   await start()
   act(() => frame(1126))
   expect(screen.getByText('演出落幕，再战一场！')).toBeTruthy()
-  const opener = screen.getByRole('button', { name: '去永久强化 ↗' })
+  const opener = screen.getByRole('button', { name: '永久强化' })
   opener.focus()
   fireEvent.click(opener)
   await act(async () => fireEvent.click(screen.getByRole('button', { name: '返回游戏' })))

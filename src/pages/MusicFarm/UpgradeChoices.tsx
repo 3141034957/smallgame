@@ -35,10 +35,6 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
     <>
       <small className="farm-eyebrow">LEVEL UP · 时间已暂停</small>
       <h2>组建乐队，选你喜欢的！</h2>
-      <p>
-        成员负责攻击，装备负责强化；一局最多带 {MAX_EQUIPPED} 件乐器和 {MAX_EQUIPPED}{' '}
-        件芯片。恢复满血卡随机出现，不占槽位；角色等级可以持续提升。只有一个选项时自动选择，继续战斗。
-      </p>
       <p className="farm-slot-note">
         槽位 {carried('weapon')}/{MAX_EQUIPPED} 件乐器 · {carried('chip')}/{MAX_EQUIPPED} 件芯片
       </p>
@@ -64,7 +60,6 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
                   </em>
                 </b>
                 <p>{item.description}</p>
-                <strong>{hp >= maxHp ? '已满血，也可选择继续升级' : '选择后立即回满生命'}</strong>
               </button>
             )
           // Raw growth cards appear once the instrument pool runs dry, so they
@@ -83,7 +78,7 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
                 <small>乐队成长 · {item.tag}</small>
                 <b>{item.name}</b>
                 <p>{item.description}</p>
-                <strong>只在本局生效，不占槽位</strong>
+                <strong>本局生效</strong>
               </button>
             )
           const gearId = item.id
@@ -136,9 +131,7 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
               <p>{item.description}</p>
               <div className="farm-recipe-progress">
                 <span className="farm-school-progress">
-                  进化：<b>{recipe.name}</b> · {TALENTS.find((t) => t.id === recipe.weapon)!.name}{' '}
-                  Lv.{nextGear[recipe.weapon]}/{MAX_GEAR_LEVEL} ＋{' '}
-                  {TALENTS.find((t) => t.id === recipe.chip)!.name} Lv.
+                  进化：<b>{recipe.name}</b> · {nextGear[recipe.weapon]}/{MAX_GEAR_LEVEL} ＋{' '}
                   {nextGear[recipe.chip]}/{MAX_GEAR_LEVEL}
                 </span>
                 {hint && (
@@ -153,7 +146,7 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
                   ✦ 触发组合技：{combo.name}
                 </strong>
               ))}
-              {!willEvolve && !fresh.length && <strong>满级进化 → {recipe.name}</strong>}
+              {!willEvolve && !fresh.length && <strong>→ {recipe.name}</strong>}
             </button>
           )
         })}

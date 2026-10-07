@@ -41,7 +41,7 @@ it('uses purchases made on the ready screen at start, then keeps the running sna
   fireEvent.click(screen.getByRole('button', { name: '打开永久强化' }))
   fireEvent.click(screen.getByRole('button', { name: '升级舞台体魄，花费1500金币' }))
   fireEvent.click(screen.getByRole('button', { name: '返回游戏' }))
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: /开始玩/ })))
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '开始无限模式' })))
   expect(screen.getByRole('progressbar', { name: '生命值' }).getAttribute('aria-valuemax')).toBe(
     '105',
   )
@@ -60,7 +60,7 @@ it('uses purchases made on the ready screen at start, then keeps the running sna
   )
   fireEvent.click(screen.getByRole('button', { name: '暂停游戏' }))
   fireEvent.click(screen.getByRole('button', { name: '重新开始' }))
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: /开始玩/ })))
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '开始无限模式' })))
   expect(screen.getByRole('progressbar', { name: '生命值' }).getAttribute('aria-valuemax')).toBe(
     '100',
   )
