@@ -82,7 +82,9 @@ describe('unbounded combat world', () => {
     expect(stepFarm(s, s.position).state.loot).toHaveLength(600)
   })
   it('replays and verifies a completed journey beyond multiple old boundaries', () => {
-    let state = createFarm(day)
+    // A run is always played as a member, and that member decides the opening
+    // instrument: the server rebuilds the same loadout, so submit as one.
+    let state = createFarm(day, {}, 'bear-drums')
     const frames = [],
       choices = [],
       surges = []
@@ -102,19 +104,24 @@ describe('unbounded combat world', () => {
     expect(state.hp).toBe(0)
     expect(state.position[0]).toBeGreaterThan(400)
     expect(state.position[1]).toBeLessThan(-100)
-    const round = replayFarm(day, frames, choices, surges)
+    const round = replayFarm(day, frames, choices, surges, {}, 'bear-drums')
     expect(round).toMatchObject({
       score: state.score,
       hp: state.hp,
       seconds: state.tick / 16,
       outcome: 'defeated',
     })
-    expect(verifyFarm({ ...round, playerId: 'world_test_player', name: '远行乐手' })?.score).toBe(
-      state.score,
-    )
+    expect(
+      verifyFarm({
+        ...round,
+        playerId: 'world_test_player',
+        name: '远行乐手',
+        characterId: 'bear-drums',
+      })?.score,
+    ).toBe(state.score)
     const forged = frames.map((p) => [...p])
     forged[300][0] += 100
-    expect(replayFarm(day, forged, choices, surges)).toBeNull()
+    expect(replayFarm(day, forged, choices, surges, {}, 'bear-drums')).toBeNull()
     expect(state.crops.length).toBeLessThanOrEqual(100 + MAX_BOSSES)
     expect(state.loot.length).toBeLessThanOrEqual(600)
   })

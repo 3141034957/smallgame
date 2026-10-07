@@ -289,7 +289,13 @@ export type FarmRound = {
 export function farmMoveStep(state: FarmState): number
 export function clampPoint(previous: Point, desired: Point, step?: number): Point
 export function synergies(gear: Gear): string[]
-export function createFarm(day: string, permanent?: Partial<PermanentLevels>): FarmState
+// 选角色即选定开局乐器：返回该角色自带的乐器 id，未知的 id 返回 null（回退到旧行为）。
+export function starterTalent(characterId?: string | null): TalentId | null
+export function createFarm(
+  day: string,
+  permanent?: Partial<PermanentLevels>,
+  starter?: string | null,
+): FarmState
 export function orbitPositions(state: FarmState): Point[]
 export function chooseTalent(state: FarmState, id: UpgradeId): FarmState | null
 export function stepFarm(
@@ -303,6 +309,7 @@ export function replayFarm(
   choices: Choice[],
   surges?: number[],
   permanent?: Partial<PermanentLevels>,
+  characterId?: string | null,
 ): FarmRound | null
 export function finishFarm(
   state: FarmState,

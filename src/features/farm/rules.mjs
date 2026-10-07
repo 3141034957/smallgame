@@ -1,4 +1,4 @@
-import { BAND_CHARACTERS } from './characterRoster.mjs'
+import { BAND_CHARACTERS, migrateCharacterId } from './characterRoster.mjs'
 import {
   RECOVERY,
   normalizePermanentLevels,
@@ -267,6 +267,20 @@ export const TALENTS = TALENT_DEFINITIONS.map((talent) => {
     ? { ...talent, characterId: character.id, name: character.name, icon: character.icon }
     : talent
 })
+// Picking a band member picks their instrument: a run opens already holding it,
+// so the opening deal is a normal hand instead of a choice of three starters.
+// Accepts either a character id (legacy ids included) or a raw weapon id, and
+// returns null for anything unknown so callers fall back to the old behaviour.
+export function starterTalent(characterId) {
+  if (typeof characterId !== 'string') return null
+  const character = BAND_CHARACTERS.find(
+    (item) => item.id === (migrateCharacterId(characterId) ?? characterId),
+  )
+  const talent = TALENTS.find(
+    (item) => item.kind === 'weapon' && item.id === (character?.talentId ?? characterId),
+  )
+  return talent ? talent.id : null
+}
 export const FULL_HEAL_CARD = {
   id: 'heal',
   kind: 'recovery',
@@ -469,7 +483,7 @@ function placeAtEdge(state, enemy, respawn = false) {
   enemy.y = state.position[1] + Math.sin(angle) * radius
   enemy.spawnAt = state.tick + 12
 }
-export function createFarm(day, permanent) {
+export function createFarm(day, permanent, starter) {
   const levels = Object.freeze(normalizePermanentLevels(permanent))
   const stats = permanentStats(levels)
   if (!validDay(day)) throw new Error('Invalid farm date')
@@ -523,6 +537,11 @@ export function createFarm(day, permanent) {
     nextSurge: 0,
     growth: { hp: 0, power: 0, stride: 0 },
   }
+  // The member's own instrument is free and level one; chips still have to be
+  // earned. Nothing random is spent here, so a replay that knows the member
+  // rebuilds the exact same opening loadout.
+  const opening = starterTalent(starter)
+  if (opening) state.gear[opening] = 1
   for (let id = 0; id < 24; id++) {
     const enemy = { id, x: 0, y: 0, kind: 0, hp: 1, maxHp: 1, regrow: -1, boss: false }
     placeAtEdge(state, enemy)
@@ -577,8 +596,13 @@ function dealRecovery(state, choices) {
 }
 function offer(state) {
   if (state.xp < farmXpThreshold(state.level + 1) || state.hp <= 0) return
-  if (!state.level) {
-    // Ten instruments would flood the dialog: deal three starters instead.
+  // Ten instruments would flood the dialog: deal three starters instead, but
+  // only when the run holds no weapon at all. A chosen member already carries
+  // its instrument, so its first level-up is dealt like every later one.
+  if (
+    !state.level &&
+    !TALENTS.some((talent) => talent.kind === 'weapon' && state.gear[talent.id] > 0)
+  ) {
     const weapons = TALENTS.filter((talent) => talent.kind === 'weapon').map((talent) => talent.id)
     const starters = []
     while (starters.length < STARTER_CHOICES && weapons.length)
@@ -1558,7 +1582,7 @@ export function stepFarm(previous, point, useSurge = false) {
   offer(state)
   return { state, events }
 }
-export function replayFarm(day, frames, choices, surges = [], permanent = {}) {
+export function replayFarm(day, frames, choices, surges = [], permanent = {}, characterId) {
   if (
     !validDay(day) ||
     !validPermanentLevels(permanent) ||
@@ -1576,7 +1600,7 @@ export function replayFarm(day, frames, choices, surges = [], permanent = {}) {
     )
   )
     return null
-  let state = createFarm(day, permanent),
+  let state = createFarm(day, permanent, characterId),
     cursor = 0
   const surgeSet = new Set(surges)
   for (let tick = 0; tick < frames.length; tick++) {

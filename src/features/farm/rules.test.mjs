@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { BAND_CHARACTERS, LEGACY_CHARACTER_IDS } from './characterRoster.mjs'
 import {
   FARM_MODIFIERS,
   FPS,
@@ -23,6 +24,7 @@ import {
   farmXpThreshold,
   orbitPositions,
   replayFarm,
+  starterTalent,
   stepFarm,
 } from './rules.mjs'
 
@@ -87,8 +89,8 @@ function chase(state) {
   }
   return closest ? [closest.x, closest.y] : [...state.position]
 }
-function run(focus = 'drum', routeDay = day) {
-  let state = createFarm(routeDay),
+function run(focus = 'drum', routeDay = day, characterId) {
+  let state = createFarm(routeDay, {}, characterId),
     firstOffer = null,
     firstUpgrade = null,
     terminalAt = null
@@ -645,5 +647,92 @@ describe('music roguelite farming', () => {
     for (const surges of [[0], [1, 1], [5, 4], [-1], [round.frames.length], [NaN]])
       expect(replay(round.frames, round.choices, surges)).toBeNull()
     expect(replayFarm('2026-02-30', round.frames, round.choices, round.surges)).toBeNull()
+  }, 120000)
+
+  it('starts every member holding its own instrument and falls back safely elsewhere', () => {
+    for (const character of BAND_CHARACTERS) {
+      expect(starterTalent(character.id)).toBe(character.talentId)
+      const state = createFarm(day, {}, character.id)
+      expect(state.gear[character.talentId]).toBe(1)
+      // Only the instrument is free: every chip and every other weapon still
+      // has to be picked during the run.
+      expect(
+        TALENTS.filter((talent) => talent.id !== character.talentId).every(
+          (talent) => state.gear[talent.id] === 0,
+        ),
+      ).toBe(true)
+    }
+    expect(new Set(BAND_CHARACTERS.map((character) => starterTalent(character.id))).size).toBe(
+      BAND_CHARACTERS.length,
+    )
+    // Legacy member ids migrate, a raw instrument id is accepted, and anything
+    // else (including a chip) leaves the old random opener untouched.
+    expect(starterTalent(LEGACY_CHARACTER_IDS.default)).toBe(starterTalent('cat-guitar'))
+    expect(starterTalent('synth')).toBe('synth')
+    for (const bogus of [undefined, null, '', 'nope', 'range', 7, {}]) {
+      expect(starterTalent(bogus)).toBeNull()
+      expect(createFarm(day, {}, bogus)).toEqual(createFarm(day, {}))
+    }
+  })
+
+  it('deals a normal first hand to a run that already holds an instrument', () => {
+    const opening = (characterId) => {
+      let state = createFarm(day, {}, characterId)
+      for (let tick = 0; !state.offered.length && tick < FPS * 5; tick++)
+        state = stepFarm(
+          state,
+          clampPoint(state.position, [
+            50 + 30 * Math.sin(tick / 50),
+            50 + 25 * Math.cos(tick / 75),
+          ]),
+        ).state
+      return state
+    }
+    const member = opening('cat-guitar')
+    expect(member.level).toBe(0)
+    expect(member.gear.orbit).toBe(1)
+    expect(member.offered).toHaveLength(STARTER_CHOICES)
+    // The member's instrument leads the hand, so the first pick deepens the
+    // build instead of asking which weapon to start with.
+    expect(member.offered[0]).toBe('orbit')
+    expect(chooseTalent(member, 'orbit').gear.orbit).toBe(2)
+    // Without a member the run still opens on the old trio of starter weapons.
+    const plain = opening()
+    expect(plain.gear.orbit).toBe(0)
+    expect(
+      plain.offered.every(
+        (id) => id === 'heal' || TALENTS.find((talent) => talent.id === id).kind === 'weapon',
+      ),
+    ).toBe(true)
+  })
+
+  it('replays a member run to the same score, and only when the member is given', () => {
+    for (const [characterId, weapon] of [
+      ['bear-drums', 'drum'],
+      ['bird-vocals', 'echo'],
+    ]) {
+      const round = run(weapon, '2026-10-01', characterId)
+      expect(round.state.gear[weapon]).toBe(MAX_GEAR_LEVEL)
+      expect(round.choices).toHaveLength(round.state.level)
+      const replay = replayFarm(
+        '2026-10-01',
+        round.frames,
+        round.choices,
+        round.surges,
+        {},
+        characterId,
+      )
+      expect(replay).toMatchObject({
+        score: round.state.score,
+        harvested: round.state.harvested,
+        coins: round.state.coins,
+        xp: round.state.xp,
+        gear: round.state.gear,
+      })
+      // The replay has to know the member: the same inputs produce a different
+      // run (or no run at all) when it is missing.
+      const orphan = replayFarm('2026-10-01', round.frames, round.choices, round.surges, {})
+      expect(orphan?.score).not.toBe(round.state.score)
+    }
   }, 120000)
 })
