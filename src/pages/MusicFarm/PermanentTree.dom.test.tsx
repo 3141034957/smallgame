@@ -32,6 +32,27 @@ it('shows all eight nodes immediately and prevents unaffordable purchases', () =
   expect(meter.querySelectorAll('i')).toHaveLength(12)
   expect(meter.querySelectorAll('i.is-on')).toHaveLength(0)
 })
+it('reads each school as a tier ladder I → IV with every tier open', () => {
+  render(<Tree />)
+  const ladders: Record<string, string[]> = {
+    生存保障: ['I', 'II', 'III', 'IV'],
+    攻击成长: ['I', 'II'],
+    操作手感: ['I', 'II'],
+  }
+  for (const [branch, tiers] of Object.entries(ladders)) {
+    const school = screen.getByRole('region', { name: branch })
+    const chips = Array.from(school.querySelectorAll('.farm-growth-tier')).map(
+      (chip) => chip.textContent,
+    )
+    expect(chips).toEqual(tiers)
+  }
+  const survival = screen.getByRole('region', { name: '生存保障' })
+  // Deepest tier is buyable on its own: no rank is locked behind an earlier one.
+  for (const name of ['舞台体魄', '舞台护甲', '生命回响', '守护音盾'])
+    expect(within(survival).getByRole('article', { name })).toBeTruthy()
+  expect(survival.querySelector('.farm-growth-tier.is-trained')).toBeNull()
+  expect(screen.getAllByRole('listitem')).toHaveLength(8)
+})
 it('labels a maxed node as finished instead of offering a null price', () => {
   const levels = Object.fromEntries(
     PERMANENT_UPGRADES.map((item) => [item.id, item.max]),
@@ -50,6 +71,8 @@ it('labels a maxed node as finished instead of offering a null price', () => {
     expect(node.className).toContain('is-maxed')
     const meter = within(node).getByRole('progressbar')
     expect(meter.querySelectorAll('i.is-on')).toHaveLength(item.max)
+    expect(node.querySelector('.farm-growth-seal')!.textContent).toBe('✓')
+    expect(node.parentElement!.querySelector('.farm-growth-tier.is-maxed')).toBeTruthy()
   }
   expect(document.body.textContent).not.toContain('null')
 })
@@ -61,6 +84,7 @@ it('lights one level pip per purchase and ignores a click that repeats before it
   fireEvent.click(buy)
   const node = screen.getByRole('article', { name: '舞台体魄' })
   expect(node.className).toContain('is-trained')
+  expect(node.parentElement!.querySelector('.farm-growth-tier.is-trained')).toBeTruthy()
   const meter = within(node).getByRole('progressbar')
   expect(meter.getAttribute('aria-valuenow')).toBe('1')
   expect(meter.querySelectorAll('i.is-on')).toHaveLength(1)

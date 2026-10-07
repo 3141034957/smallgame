@@ -12,10 +12,12 @@ export const PERMANENT_BRANCHES = [
   { id: 'movement', name: '操作手感', icon: '✦' },
 ]
 
+// Talent-book order inside a branch: tier 1 is the entry, tier 4 the deepest.
 export const PERMANENT_UPGRADES = [
   {
     id: 'vitality',
     branch: 'survival',
+    tier: 1,
     name: '舞台体魄',
     icon: '♡',
     max: 12,
@@ -25,6 +27,7 @@ export const PERMANENT_UPGRADES = [
   {
     id: 'armor',
     branch: 'survival',
+    tier: 2,
     name: '舞台护甲',
     icon: '◇',
     max: 6,
@@ -34,6 +37,7 @@ export const PERMANENT_UPGRADES = [
   {
     id: 'regen',
     branch: 'survival',
+    tier: 3,
     name: '生命回响',
     icon: '✚',
     max: 5,
@@ -43,6 +47,7 @@ export const PERMANENT_UPGRADES = [
   {
     id: 'shield',
     branch: 'survival',
+    tier: 4,
     name: '守护音盾',
     icon: '⬡',
     max: 3,
@@ -52,6 +57,7 @@ export const PERMANENT_UPGRADES = [
   {
     id: 'power',
     branch: 'power',
+    tier: 1,
     name: '乐感力量',
     icon: '♫',
     max: 15,
@@ -61,6 +67,7 @@ export const PERMANENT_UPGRADES = [
   {
     id: 'wisdom',
     branch: 'power',
+    tier: 2,
     name: '演奏领悟',
     icon: '♬',
     max: 10,
@@ -70,6 +77,7 @@ export const PERMANENT_UPGRADES = [
   {
     id: 'stride',
     branch: 'movement',
+    tier: 1,
     name: '轻快步伐',
     icon: '➜',
     max: 10,
@@ -79,6 +87,7 @@ export const PERMANENT_UPGRADES = [
   {
     id: 'magnet',
     branch: 'movement',
+    tier: 2,
     name: '音符吸引',
     icon: '✦',
     max: 10,
@@ -86,6 +95,15 @@ export const PERMANENT_UPGRADES = [
     description: '每级增加 4% 掉落吸引半径，与拾音器共同生效。',
   },
 ]
+
+export const PERMANENT_TIER_LABELS = ['I', 'II', 'III', 'IV']
+export function permanentTierLabel(tier) {
+  return PERMANENT_TIER_LABELS[tier - 1] ?? String(tier)
+}
+// One branch read top to bottom: its talents ordered by tier. Pure visual order, no gating.
+export function permanentTiers(branch) {
+  return PERMANENT_UPGRADES.filter((item) => item.branch === branch).sort((a, b) => a.tier - b.tier)
+}
 
 export const PERMANENT_TOTAL_LEVELS = PERMANENT_UPGRADES.reduce((sum, item) => sum + item.max, 0)
 export function normalizePermanentLevels(value) {

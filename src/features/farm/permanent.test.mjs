@@ -12,7 +12,10 @@ import {
   normalizePermanentLevels,
   permanentPrice,
   permanentStats,
+  permanentTierLabel,
+  permanentTiers,
   validPermanentLevels,
+  PERMANENT_TIER_LABELS,
   PERMANENT_UPGRADES,
   RECOVERY,
 } from './permanent.mjs'
@@ -74,6 +77,30 @@ describe('permanent growth rules', () => {
       0,
     )
     expect(cost).toBe(1824600)
+  })
+
+  it('reads every school as one contiguous tier ladder, ordered I to IV', () => {
+    expect(PERMANENT_TIER_LABELS).toEqual(['I', 'II', 'III', 'IV'])
+    expect(permanentTierLabel(1)).toBe('I')
+    expect(permanentTierLabel(4)).toBe('IV')
+    const ladders = {
+      survival: ['舞台体魄', '舞台护甲', '生命回响', '守护音盾'],
+      power: ['乐感力量', '演奏领悟'],
+      movement: ['轻快步伐', '音符吸引'],
+    }
+    for (const [branch, names] of Object.entries(ladders)) {
+      const items = permanentTiers(branch)
+      expect(items.map((item) => item.name)).toEqual(names)
+      expect(items.map((item) => item.tier)).toEqual(names.map((_, index) => index + 1))
+      expect(items.every((item) => item.branch === branch)).toBe(true)
+    }
+    // Tier is display order only: every talent stays purchasable on its own.
+    expect(PERMANENT_UPGRADES.every((item) => Number.isInteger(item.tier) && item.tier >= 1)).toBe(
+      true,
+    )
+    expect(permanentTiers('survival').every((item) => permanentPrice(item.id, 0) !== null)).toBe(
+      true,
+    )
   })
 
   it('freezes starting attributes and makes even one speed rank effective', () => {

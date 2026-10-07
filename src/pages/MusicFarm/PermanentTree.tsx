@@ -5,9 +5,10 @@ import {
   permanentEffect,
   permanentLevelCount,
   permanentPrice,
+  permanentTierLabel,
+  permanentTiers,
   PERMANENT_BRANCHES,
   PERMANENT_TOTAL_LEVELS,
-  PERMANENT_UPGRADES,
 } from '@/features/farm/permanent.mjs'
 import './PermanentTree.css'
 
@@ -71,7 +72,7 @@ export function PermanentTree({
       )}
       <div className="farm-growth-tree">
         {PERMANENT_BRANCHES.map((branch) => {
-          const items = PERMANENT_UPGRADES.filter((item) => item.branch === branch.id)
+          const items = permanentTiers(branch.id)
           const trained = items.reduce((sum, item) => sum + levels[item.id], 0)
           const capacity = items.reduce((sum, item) => sum + item.max, 0)
           return (
@@ -81,103 +82,122 @@ export function PermanentTree({
               aria-label={branch.name}
               style={{ '--branch-fill': `${(trained / capacity) * 100}%` } as CSSProperties}
             >
-              <header>
+              <header className="farm-growth-brand">
                 <span aria-hidden="true">{branch.icon}</span>
                 <h3>{branch.name}</h3>
                 <small>
                   {trained} / {capacity} 级
                 </small>
               </header>
-              <div className="farm-growth-nodes">
+              <ol className="farm-growth-nodes">
                 {items.map((item) => {
                   const level = levels[item.id]
+                  const tier = permanentTierLabel(item.tier)
                   const price = permanentPrice(item.id, level)
                   const maxed = price === null
                   const affordable = price !== null && profile.coins >= price
                   const busy = pending === item.id
                   return (
-                    <article
-                      className={`farm-growth-node${level ? ' is-trained' : ''}${maxed ? ' is-maxed' : ''}`}
+                    <li
+                      className={`farm-growth-step${level ? ' is-trained' : ''}${maxed ? ' is-maxed' : ''}`}
                       key={item.id}
-                      aria-label={item.name}
                     >
-                      <span className="farm-growth-badge" aria-hidden="true">
-                        {item.icon}
+                      <span
+                        className={`farm-growth-tier${level ? ' is-trained' : ''}${maxed ? ' is-maxed' : ''}`}
+                        aria-hidden="true"
+                      >
+                        {tier}
                       </span>
-                      <small className="farm-growth-tag">{branch.name} · 永久强化</small>
-                      <h4>
-                        {item.name}
-                        <em>
-                          Lv.{level} / {item.max}
-                        </em>
-                      </h4>
-                      <div
-                        className="farm-growth-pips"
-                        role="progressbar"
-                        aria-label={`${item.name}强化进度`}
-                        aria-valuenow={level}
-                        aria-valuemin={0}
-                        aria-valuemax={item.max}
+                      <article
+                        className={`farm-growth-node${level ? ' is-trained' : ''}${maxed ? ' is-maxed' : ''}`}
+                        aria-label={item.name}
                       >
-                        {Array.from({ length: item.max }, (_, index) => (
-                          <i
-                            key={index}
-                            className={index < level ? 'is-on' : undefined}
-                            aria-hidden="true"
-                          />
-                        ))}
-                      </div>
-                      <p>{item.description}</p>
-                      <dl>
-                        <div>
-                          <dt>当前</dt>
-                          <dd>{permanentEffect(item.id, level)}</dd>
-                        </div>
-                        {!maxed && (
-                          <div className="is-next">
-                            <dt>下级</dt>
-                            <dd>{permanentEffect(item.id, level + 1)}</dd>
-                          </div>
+                        {maxed && (
+                          <span className="farm-growth-seal" aria-hidden="true">
+                            ✓
+                          </span>
                         )}
-                      </dl>
-                      <button
-                        type="button"
-                        className={`farm-growth-buy${maxed ? ' is-maxed' : ''}${affordable ? ' is-affordable' : ''}`}
-                        disabled={!affordable || busy}
-                        aria-busy={busy || undefined}
-                        aria-label={
-                          maxed ? `${item.name}已满级` : `升级${item.name}，花费${price}金币`
-                        }
-                        onClick={() => {
-                          if (!settled.current) return
-                          settled.current = false
-                          setPending(item.id)
-                          try {
-                            const result = buyFarmUpgrade(item.id, level)
-                            onChange(result.profile)
-                            setFailed(!!result.error)
-                            setMessage(
-                              result.error ?? `${item.name}升至 Lv.${level + 1}，下一局生效。`,
-                            )
-                          } finally {
-                            queueMicrotask(settle)
+                        <span className="farm-growth-badge" aria-hidden="true">
+                          {item.icon}
+                        </span>
+                        <small className="farm-growth-tag">第 {tier} 层 · 永久强化</small>
+                        <h4>
+                          {item.name}
+                          <em>
+                            Lv.{level} / {item.max}
+                          </em>
+                        </h4>
+                        <div
+                          className="farm-growth-pips"
+                          role="progressbar"
+                          aria-label={`${item.name}强化进度`}
+                          aria-valuenow={level}
+                          aria-valuemin={0}
+                          aria-valuemax={item.max}
+                        >
+                          {Array.from({ length: item.max }, (_, index) => (
+                            <i
+                              key={index}
+                              className={index < level ? 'is-on' : undefined}
+                              aria-hidden="true"
+                            />
+                          ))}
+                        </div>
+                        <p>{item.description}</p>
+                        <dl>
+                          <div>
+                            <dt>当前</dt>
+                            <dd>{permanentEffect(item.id, level)}</dd>
+                          </div>
+                          {!maxed && (
+                            <div className="is-next">
+                              <dt>下级</dt>
+                              <dd>{permanentEffect(item.id, level + 1)}</dd>
+                            </div>
+                          )}
+                        </dl>
+                        <button
+                          type="button"
+                          className={`farm-growth-buy${maxed ? ' is-maxed' : ''}${affordable ? ' is-affordable' : ''}`}
+                          disabled={!affordable || busy}
+                          aria-busy={busy || undefined}
+                          aria-label={
+                            maxed ? `${item.name}已满级` : `升级${item.name}，花费${price}金币`
                           }
-                        }}
-                      >
-                        {maxed ? '已满级 ✓' : `升级 · ✦ ${price.toLocaleString()}`}
-                      </button>
-                      {!maxed && !affordable && (
-                        <small className="farm-growth-shortfall">
-                          还差 {(price - profile.coins).toLocaleString()} 金币
-                        </small>
-                      )}
-                    </article>
+                          onClick={() => {
+                            if (!settled.current) return
+                            settled.current = false
+                            setPending(item.id)
+                            try {
+                              const result = buyFarmUpgrade(item.id, level)
+                              onChange(result.profile)
+                              setFailed(!!result.error)
+                              setMessage(
+                                result.error ?? `${item.name}升至 Lv.${level + 1}，下一局生效。`,
+                              )
+                            } finally {
+                              queueMicrotask(settle)
+                            }
+                          }}
+                        >
+                          {maxed ? '已满级 ✓' : `升级 · ✦ ${price.toLocaleString()}`}
+                        </button>
+                        {!maxed && !affordable && (
+                          <small className="farm-growth-shortfall">
+                            还差 {(price - profile.coins).toLocaleString()} 金币
+                          </small>
+                        )}
+                      </article>
+                    </li>
                   )
                 })}
-              </div>
+              </ol>
             </section>
           )
         })}
+      </div>
+      <div className="farm-growth-legend">
+        <span>三个系并排通读 · 每个系自上而下分 I → IV 层 · 层号只表示深度，不代表解锁顺序</span>
       </div>
       <footer className="farm-growth-reset">
         {confirmReset ? (

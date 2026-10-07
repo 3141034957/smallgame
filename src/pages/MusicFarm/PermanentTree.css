@@ -100,7 +100,7 @@
   font-size: 11px;
 }
 
-/* Three branches, always side by side. */
+/* Three schools, always side by side. */
 .farm-growth-tree {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -119,25 +119,36 @@
 .farm-growth-branch.is-movement {
   --branch-color: #5079a0;
 }
-.farm-growth-branch > header {
+/* School banner: the colored ribbon naming the school. */
+.farm-growth-brand {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 18px;
+  padding: 9px 12px;
+  border-radius: 14px;
+  border: 2px solid var(--branch-color);
+  border-left-width: 7px;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--branch-color) 22%, #fffef5),
+    #fffef5
+  );
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--branch-color) 18%, #fffaf0);
   color: var(--branch-color);
 }
-.farm-growth-branch > header > span {
+.farm-growth-brand > span {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 38px;
-  height: 38px;
-  border-radius: 14px;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
   border: 2px solid var(--branch-color);
   background: color-mix(in srgb, var(--branch-color) 14%, white);
-  font-size: 21px;
+  font-size: 19px;
 }
-.farm-growth-branch > header > small {
+.farm-growth-brand > small {
   margin-left: auto;
   font-size: 10px;
   color: color-mix(in srgb, var(--branch-color) 60%, #8f957f);
@@ -148,18 +159,20 @@
   margin: 0;
 }
 
-/* Growth path: a branch-colored trunk behind the node cards. */
+/* Talent ladder: tier chips ride the rail, one step per tier, top to bottom. */
 .farm-growth-nodes {
   position: relative;
   display: grid;
-  gap: 20px;
-  padding-left: 32px;
+  gap: 26px;
+  margin: 0;
+  padding: 0 0 0 46px;
+  list-style: none;
 }
 .farm-growth-nodes::before,
 .farm-growth-nodes::after {
   content: '';
   position: absolute;
-  left: 10px;
+  left: 12px;
   width: 8px;
   border-radius: 8px;
 }
@@ -178,6 +191,64 @@
   );
   box-shadow: 0 0 12px color-mix(in srgb, var(--branch-color) 45%, transparent);
   transition: height 0.35s ease;
+}
+.farm-growth-step {
+  position: relative;
+}
+/* Twig from the rail to the card. */
+.farm-growth-step::before {
+  content: '';
+  position: absolute;
+  left: -13px;
+  top: 30px;
+  width: 13px;
+  height: 4px;
+  border-radius: 4px;
+  background: #d3dfd5;
+}
+.farm-growth-step.is-trained::before {
+  background: var(--branch-color);
+}
+/* Arrow saying "the next tier is one step further down". */
+.farm-growth-step + .farm-growth-step::after {
+  content: '';
+  position: absolute;
+  left: -35px;
+  top: -10px;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 8px solid color-mix(in srgb, var(--branch-color) 45%, #cfd8cd);
+}
+.farm-growth-tier {
+  position: absolute;
+  z-index: 2;
+  left: -47px;
+  top: 14px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid #d3dfd5;
+  background: #fffef5;
+  color: #9aa08d;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  box-shadow: 0 3px 0 #e5ecdf;
+}
+.farm-growth-tier.is-trained {
+  border-color: var(--branch-color);
+  background: color-mix(in srgb, var(--branch-color) 16%, #fffef5);
+  color: var(--branch-color);
+}
+.farm-growth-tier.is-maxed {
+  border-color: var(--branch-color);
+  background: var(--branch-color);
+  color: #fffef5;
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--branch-color) 60%, #1d3327);
 }
 
 /* Same card language as the in-run upgrade cards. */
@@ -204,19 +275,21 @@
 .farm-growth-node.is-maxed {
   background: color-mix(in srgb, var(--talent-color) 8%, #fffef5);
 }
-/* Twig linking the card to the trunk. */
-.farm-growth-node::before {
-  content: '';
+/* Mastery seal on the corner of a finished talent. */
+.farm-growth-seal {
   position: absolute;
-  left: -24px;
-  top: 32px;
-  width: 24px;
-  height: 4px;
-  border-radius: 4px;
-  background: #d3dfd5;
-}
-.farm-growth-node.is-trained::before {
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
   background: var(--talent-color);
+  color: #fffef5;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--talent-color) 60%, #1d3327);
 }
 .farm-growth-badge {
   display: grid;
@@ -239,6 +312,7 @@
   margin: 6px 0 0;
   font-size: 17px;
   line-height: 1.3;
+  padding-right: 22px;
 }
 .farm-growth-node h4 em {
   display: block;
@@ -351,8 +425,15 @@
   border-color: #f0d3bd;
   color: #974b26;
 }
+.farm-growth-legend {
+  margin-top: 26px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #8f957f;
+}
 .farm-growth-reset {
-  margin-top: 30px;
+  margin-top: 14px;
   padding: 20px;
   border: 2px dashed #bbcebf;
   border-radius: 18px;
@@ -384,19 +465,48 @@
   .farm-growth-tree {
     gap: 14px;
   }
+  .farm-growth-brand {
+    padding: 7px 9px;
+    gap: 7px;
+    margin-bottom: 14px;
+    border-left-width: 5px;
+  }
+  .farm-growth-brand > span {
+    width: 28px;
+    height: 28px;
+    border-radius: 10px;
+    font-size: 16px;
+  }
+  .farm-growth-branch h3 {
+    font-size: 15px;
+  }
   .farm-growth-nodes {
-    padding-left: 22px;
-    gap: 16px;
+    padding-left: 34px;
+    gap: 20px;
   }
   .farm-growth-nodes::before,
   .farm-growth-nodes::after {
-    left: 5px;
+    left: 6px;
     width: 6px;
   }
-  .farm-growth-node::before {
-    left: -16px;
-    width: 16px;
-    top: 26px;
+  .farm-growth-step::before {
+    left: -11px;
+    width: 11px;
+    top: 24px;
+  }
+  .farm-growth-step + .farm-growth-step::after {
+    left: -30px;
+    top: -9px;
+    border-left-width: 4px;
+    border-right-width: 4px;
+    border-top-width: 7px;
+  }
+  .farm-growth-tier {
+    left: -39px;
+    top: 10px;
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
   }
   .farm-growth-node {
     padding: 12px 10px;
@@ -428,44 +538,74 @@
   .farm-growth-tree {
     gap: 8px;
   }
-  .farm-growth-branch > header {
+  .farm-growth-brand {
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
+    padding: 8px 6px;
     margin-bottom: 12px;
+    border-left-width: 4px;
     text-align: center;
   }
-  .farm-growth-branch > header > span {
-    width: 30px;
-    height: 30px;
-    border-radius: 11px;
-    font-size: 17px;
+  .farm-growth-brand > span {
+    width: 26px;
+    height: 26px;
+    border-radius: 9px;
+    font-size: 15px;
   }
-  .farm-growth-branch > header > small {
+  .farm-growth-brand > small {
     margin-left: 0;
     font-size: 9px;
   }
   .farm-growth-branch h3 {
-    font-size: 14px;
+    font-size: 13px;
   }
-  /* Too narrow for a side rail: the trunk runs behind the cards. */
+  /* Too narrow for a side rail: the rail runs behind the cards. */
   .farm-growth-nodes {
     padding-left: 0;
-    gap: 14px;
+    gap: 18px;
   }
   .farm-growth-nodes::before,
   .farm-growth-nodes::after {
-    left: 18px;
+    left: 16px;
     width: 6px;
   }
-  .farm-growth-node::before {
+  .farm-growth-step::before {
     display: none;
   }
+  .farm-growth-step + .farm-growth-step::after {
+    left: 14px;
+    top: -8px;
+  }
+  /* The tier chip rides the card corner instead of the rail. */
+  .farm-growth-tier {
+    z-index: 3;
+    left: -5px;
+    top: -8px;
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+    box-shadow: 0 2px 0 #e5ecdf;
+  }
   .farm-growth-node {
-    padding: 10px 8px;
+    padding: 22px 8px 10px;
     overflow-wrap: anywhere;
+  }
+  .farm-growth-seal {
+    top: 6px;
+    right: 6px;
+    width: 18px;
+    height: 18px;
+    font-size: 10px;
+  }
+  .farm-growth-badge {
+    width: 32px;
+    height: 32px;
+    font-size: 19px;
+    margin-bottom: 7px;
   }
   .farm-growth-node h4 {
     font-size: 13px;
+    padding-right: 18px;
   }
   .farm-growth-node p,
   .farm-growth-node dl,

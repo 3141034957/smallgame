@@ -12,6 +12,7 @@ export const PERMANENT_BRANCHES: { id: string; name: string; icon: string }[]
 export const PERMANENT_UPGRADES: {
   id: PermanentId
   branch: string
+  tier: number
   name: string
   icon: string
   max: number
@@ -20,6 +21,9 @@ export const PERMANENT_UPGRADES: {
   description: string
 }[]
 export const PERMANENT_TOTAL_LEVELS: number
+export const PERMANENT_TIER_LABELS: string[]
+export function permanentTierLabel(tier: number): string
+export function permanentTiers(branch: string): typeof PERMANENT_UPGRADES
 export function normalizePermanentLevels(value?: unknown): PermanentLevels
 export function validPermanentLevels(value: unknown): boolean
 export function permanentLevelCount(value?: unknown): number
