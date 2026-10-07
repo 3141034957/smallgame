@@ -138,6 +138,18 @@ it('announces the card the player picked, not a card the run picked on its own',
   expect(vi.mocked(finishFarm).mock.calls[0][2]).toHaveLength(3)
 })
 
+it('broadcasts a cross-school combo the moment a pick completes it', async () => {
+  const state = loadout()
+  // 鼓组流 is already evolved, so topping off the synth school lights 共振风暴.
+  state.gear.synth = MAX_GEAR_LEVEL - 1
+  state.gear.arp = MAX_GEAR_LEVEL
+  state.offered = ['synth', 'heal']
+  simulate(state)
+  await start()
+  pick(/辅助合成器/)
+  expect(screen.getByText(/✦ 触发组合技：共振风暴/)).toBeTruthy()
+})
+
 it('gives focus back to the button that opened a panel after the run ends', async () => {
   simulate({ ...loadout(), offered: [], score: 4321 })
   await start()

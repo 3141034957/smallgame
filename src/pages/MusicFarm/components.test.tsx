@@ -15,6 +15,7 @@ import { loadFarmAchievements } from '@/features/farm/achievements'
 import { loadFarmCareer } from '@/features/farm/stats'
 import { farmQuests, loadFarmQuests } from '@/features/farm/quests'
 import { createFarm, MAX_GEAR_LEVEL, TALENTS, UPGRADE_CARDS } from '@/features/farm/rules.mjs'
+import { SCHOOL_COMBOS, SCHOOL_LIST } from '@/features/farm/help'
 
 // SSR catches missing copy without running effects; the *.dom.test.tsx suites
 // also mount the real screens and exercise lifecycle and player interactions.
@@ -98,6 +99,49 @@ describe('farm screens render', () => {
     )
     expect(long).toContain('本局复盘')
     expect(long).toContain('90')
+  })
+  it('shows the run schools with their ladder and the combos they unlocked', () => {
+    const gear = Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])) as Record<
+      string,
+      number
+    >
+    gear.drum = MAX_GEAR_LEVEL
+    gear.range = MAX_GEAR_LEVEL
+    gear.synth = MAX_GEAR_LEVEL
+    gear.arp = MAX_GEAR_LEVEL
+    const build = renderToStaticMarkup(
+      <BuildSummary gear={gear as never} state={{ gear: gear as never }} />,
+    )
+    expect(build).toContain('farm-school-ladder')
+    expect(build).toContain('鼓组流')
+    expect(build).toContain('已进化 · 第 5 层 / 共 5 层')
+    expect(build).toContain('本局组合技')
+    expect(build).toContain('共振风暴')
+  })
+  it('points at the next combo when the run stopped one school short', () => {
+    const gear = Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])) as Record<
+      string,
+      number
+    >
+    gear.drum = MAX_GEAR_LEVEL
+    gear.synth = MAX_GEAR_LEVEL
+    const build = renderToStaticMarkup(
+      <BuildSummary gear={gear as never} state={{ gear: gear as never }} />,
+    )
+    expect(build).not.toContain('本局组合技')
+    expect(build).toContain('下一步：共振风暴')
+    expect(build).toContain('还差')
+  })
+  it('lists every school and combo on the help screen', () => {
+    const help = renderToStaticMarkup(<FarmHelp onClose={() => {}} />)
+    expect(help).toContain('流派与组合技')
+    expect(help).toContain('farm-school-list')
+    for (const school of SCHOOL_LIST) {
+      expect(help).toContain(school.name)
+      expect(help).toContain(school.form)
+    }
+    for (const combo of SCHOOL_COMBOS) expect(help).toContain(combo.name)
+    expect(help).toContain('任意 3 个流派进化')
   })
   it('renders the leaderboard submit form for a finished round and the stats overlay', () => {
     const round = {

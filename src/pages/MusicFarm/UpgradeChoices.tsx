@@ -8,17 +8,27 @@ import {
   UPGRADE_CARDS,
 } from '@/features/farm/rules.mjs'
 import type { Gear, UpgradeId } from '@/features/farm/rules.mjs'
+import {
+  activeSchoolCombos,
+  schoolComboHints,
+  schoolOfTalent,
+  schoolViews,
+  type ComboState,
+} from '@/features/farm/help'
 
 type Props = {
   gear: Gear
   offered: UpgradeId[]
   hp?: number
   maxHp?: number
+  // The live run, when the caller has it: combos can look at more than gear.
+  state?: ComboState
   onSelect: (id: UpgradeId) => void
 }
 
-export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, onSelect }: Props) {
+export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, onSelect }: Props) {
   const forms = evolved(gear)
+  const base = (state ?? { gear }) as ComboState
   const carried = (kind: 'weapon' | 'chip') =>
     TALENTS.filter((item) => item.kind === kind && gear[item.id] > 0).length
   return (
@@ -81,6 +91,16 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, onSelect 
           const nextGear = { ...gear, [gearId]: gear[gearId] + 1 }
           const willEvolve =
             evolved(nextGear).includes(recipe.weapon) && !forms.includes(recipe.weapon)
+          const school = schoolOfTalent(gearId)
+          const view = school
+            ? schoolViews(nextGear).find((entry) => entry.school.id === school.id)
+            : undefined
+          const nextState = { ...base, gear: nextGear } as ComboState
+          const live = activeSchoolCombos(base)
+          const fresh = activeSchoolCombos(nextState).filter(
+            (combo) => !live.some((entry) => entry.id === combo.id),
+          )
+          const hint = schoolComboHints(nextState)[0]
           return (
             <button
               key={id}
@@ -101,23 +121,39 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, onSelect 
                   Lv.{gear[gearId]} → {gear[gearId] + 1}
                 </em>
               </b>
+              {view && (
+                <span
+                  className={`farm-school-tag${view.evolved ? ' is-evolved' : ''}`}
+                  style={{ '--school-color': view.school.color } as CSSProperties}
+                >
+                  <span className="farm-school-icon" aria-hidden="true">
+                    {view.school.formIcon}
+                  </span>
+                  <span className="farm-school-name">{view.school.name}</span>
+                  <span className="farm-school-layer">{view.layerLabel}</span>
+                </span>
+              )}
               <p>{item.description}</p>
               <div className="farm-recipe-progress">
-                <span>
-                  {TALENTS.find((talent) => talent.id === recipe.weapon)!.characterId
-                    ? '成员'
-                    : '辅助乐器'}{' '}
-                  {TALENTS.find((talent) => talent.id === recipe.weapon)!.name}{' '}
-                  {nextGear[recipe.weapon]}/{MAX_GEAR_LEVEL}
-                </span>
-                <span>
-                  装备 {TALENTS.find((talent) => talent.id === recipe.chip)!.name}{' '}
+                <span className="farm-school-progress">
+                  进化：<b>{recipe.name}</b> · {TALENTS.find((t) => t.id === recipe.weapon)!.name}{' '}
+                  Lv.{nextGear[recipe.weapon]}/{MAX_GEAR_LEVEL} ＋{' '}
+                  {TALENTS.find((t) => t.id === recipe.chip)!.name} Lv.
                   {nextGear[recipe.chip]}/{MAX_GEAR_LEVEL}
                 </span>
+                {hint && (
+                  <span>
+                    再补 {hint.missing} → {hint.combo.name}
+                  </span>
+                )}
               </div>
-              <strong>
-                {willEvolve ? `✦ 这次解锁 ${recipe.name}` : `满级进化 → ${recipe.name}`}
-              </strong>
+              {willEvolve && <strong>✦ 这次解锁 {recipe.name}</strong>}
+              {fresh.map((combo) => (
+                <strong key={combo.id} className="is-combo">
+                  ✦ 触发组合技：{combo.name}
+                </strong>
+              ))}
+              {!willEvolve && !fresh.length && <strong>满级进化 → {recipe.name}</strong>}
             </button>
           )
         })}

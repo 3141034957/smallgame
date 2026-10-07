@@ -63,7 +63,7 @@ import {
   FARM_SAMPLE_LIMIT,
   type FarmSample,
 } from '@/features/farm/timeline'
-import { FARM_HELP_SEEN_KEY } from '@/features/farm/help'
+import { activeSchoolCombos, FARM_HELP_SEEN_KEY } from '@/features/farm/help'
 import { loadFarmSettings, saveFarmSettings, type FarmSettings } from '@/features/farm/settings'
 import { FARM_TOO_LONG_MESSAGE, farmShareText, farmTooLongToSubmit } from '@/features/farm/share'
 import { RunTimeline } from './RunTimeline'
@@ -381,6 +381,16 @@ export default function MusicFarm() {
     } else if (card.kind === 'weapon' && next.gear[card.id] === 1) {
       setNotice(`${card.icon} ${card.name} ${card.characterId ? '加入乐队！' : '就位！'}`)
       noticeUntil.current = performance.now() + 2600
+    }
+    // Cross-school combos are the rarest news in a run, so they win the HUD
+    // slot over the "member joined" line above.
+    const liveCombos = activeSchoolCombos(before)
+    const freshCombos = activeSchoolCombos(next).filter(
+      (combo) => !liveCombos.some((entry) => entry.id === combo.id),
+    )
+    if (freshCombos.length) {
+      setNotice(`✦ 触发组合技：${freshCombos.map((combo) => combo.name).join('、')}`)
+      noticeUntil.current = performance.now() + 2800
     }
     const newForm = evolved(next.gear).find((weapon) => !evolved(before.gear).includes(weapon))
     if (newForm) {
@@ -1178,7 +1188,7 @@ export default function MusicFarm() {
               >
                 {copied ? '已复制 ✓' : '复制战绩'}
               </button>
-              <BuildSummary gear={view.gear} />
+              <BuildSummary gear={view.gear} state={view} />
               <RunTimeline samples={timeline} marks={evolutionTicks} seconds={view.tick / FPS} />
               <QuestList quests={todayQuests} log={quests} fresh={freshQuests} />
               <div className="farm-wallet-reward">
@@ -1265,6 +1275,7 @@ export default function MusicFarm() {
                 offered={view.offered}
                 hp={view.hp}
                 maxHp={view.maxHp}
+                state={view}
                 onSelect={select}
               />
             ) : (
@@ -1300,7 +1311,7 @@ export default function MusicFarm() {
                     >
                       特效：{settings.effects ? '开' : '关（省电）'}
                     </button>
-                    <BuildSummary gear={view.gear} />
+                    <BuildSummary gear={view.gear} state={view} />
                     <p className="farm-pause-goals">
                       <small>
                         今日词缀 {modifier.icon} {modifier.name}

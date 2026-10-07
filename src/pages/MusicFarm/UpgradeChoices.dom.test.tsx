@@ -2,7 +2,9 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { UpgradeChoices } from './UpgradeChoices'
-import { createFarm } from '@/features/farm/rules.mjs'
+import { createFarm, type Gear } from '@/features/farm/rules.mjs'
+
+const gearWith = (extra: Partial<Gear>): Gear => ({ ...createFarm('2026-10-04').gear, ...extra })
 
 afterEach(cleanup)
 
@@ -42,4 +44,24 @@ it('keeps a full-health recovery choice usable when the loadout has nothing left
   expect((card as HTMLButtonElement).disabled).toBe(false)
   fireEvent.click(card)
   expect(select).toHaveBeenCalledExactlyOnceWith('heal')
+})
+
+it('names the school and how far along its ladder the pick lands', () => {
+  const gear = gearWith({ drum: 2, range: 3 })
+  render(<UpgradeChoices gear={gear} offered={['drum']} state={{ gear }} onSelect={() => {}} />)
+  const card = screen.getByRole('button')
+  expect(card.textContent).toContain('鼓组流')
+  expect(card.textContent).toContain('第 2 层 / 共 5 层')
+  expect(card.textContent).toContain('进化：雷霆鼓组')
+  expect(card.textContent).toContain('Lv.3/5')
+})
+
+it('flashes a cross-school combo the pick would unlock', () => {
+  // 鼓组流 already evolved; topping off the synth's chip completes 共振风暴.
+  const gear = gearWith({ drum: 5, range: 5, synth: 5, arp: 4 })
+  render(<UpgradeChoices gear={gear} offered={['arp']} state={{ gear }} onSelect={() => {}} />)
+  const card = screen.getByRole('button')
+  expect(card.textContent).toContain('已进化')
+  expect(card.textContent).toContain('✦ 这次解锁 棱镜合成器')
+  expect(card.textContent).toContain('✦ 触发组合技：共振风暴')
 })
