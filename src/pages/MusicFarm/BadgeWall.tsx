@@ -93,7 +93,7 @@ export function BadgeWall({ log, career }: { log: FarmAchievementLog; career: Fa
             )
           })}
       </ul>
-      <small className="farm-badge-note">成就保存在当前浏览器，每局死亡结算后解锁。</small>
+      <small className="farm-badge-note">每局结算后解锁</small>
     </div>
   )
 }

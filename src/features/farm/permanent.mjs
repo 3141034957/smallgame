@@ -22,7 +22,7 @@ export const PERMANENT_UPGRADES = [
     icon: '♡',
     max: 12,
     base: 1500,
-    description: '每级增加 5 点初始生命与生命上限。',
+    description: '每级生命 +5',
   },
   {
     id: 'armor',
@@ -32,7 +32,7 @@ export const PERMANENT_UPGRADES = [
     icon: '◇',
     max: 6,
     base: 3500,
-    description: '每级减少 2% 生命伤害，所有敌人攻击均生效。',
+    description: '每级减伤 2%',
   },
   {
     id: 'regen',
@@ -42,7 +42,7 @@ export const PERMANENT_UPGRADES = [
     icon: '✚',
     max: 5,
     prices: [3500, 14000, 35000, 80000, 160000],
-    description: `受击后安全等待 ${RECOVERY.safeSeconds} 秒，再每 ${RECOVERY.regenSeconds} 秒恢复少量生命；第一口在第 ${RECOVERY.safeSeconds + RECOVERY.regenSeconds} 秒。`,
+    description: '受击 8 秒后回血',
   },
   {
     id: 'shield',
@@ -52,7 +52,7 @@ export const PERMANENT_UPGRADES = [
     icon: '⬡',
     max: 3,
     prices: [18000, 70000, 200000],
-    description: '空盾时计时；任何有效受击或拾取护盾都会从零重计，自动只补 1 层。',
+    description: '空盾自动补 1 层',
   },
   {
     id: 'power',
@@ -62,7 +62,7 @@ export const PERMANENT_UPGRADES = [
     icon: '♫',
     max: 15,
     base: 2000,
-    description: '每级增加 2% 所有乐器与音浪爆发的伤害。',
+    description: '每级伤害 +2%',
   },
   {
     id: 'wisdom',
@@ -72,7 +72,7 @@ export const PERMANENT_UPGRADES = [
     icon: '♬',
     max: 10,
     base: 2500,
-    description: '每级增加 2% 获得经验，不改变金币收益。',
+    description: '每级经验 +2%',
   },
   {
     id: 'stride',
@@ -82,7 +82,7 @@ export const PERMANENT_UPGRADES = [
     icon: '➜',
     max: 10,
     base: 1800,
-    description: '每级增加 1% 移动速度，适用于键盘、鼠标与触控。',
+    description: '每级移速 +1%',
   },
   {
     id: 'magnet',
@@ -92,7 +92,7 @@ export const PERMANENT_UPGRADES = [
     icon: '✦',
     max: 10,
     base: 1500,
-    description: '每级增加 4% 掉落吸引半径，与拾音器共同生效。',
+    description: '每级拾取 +4%',
   },
 ]
 

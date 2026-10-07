@@ -50,9 +50,7 @@ export function PermanentTree({
       </header>
       <div className="farm-growth-intro">
         <div>
-          <span>全角色通用 · 永久保存 · 下局生效</span>
-          <h3>把每次演出，变成下一次的底气。</h3>
-          <p>八项强化全部开放，各项独立购买，无关卡解锁要求。</p>
+          <span>下局生效</span>
         </div>
         <div className="farm-growth-total">
           <strong>
@@ -120,7 +118,7 @@ export function PermanentTree({
                         <span className="farm-growth-badge" aria-hidden="true">
                           {item.icon}
                         </span>
-                        <small className="farm-growth-tag">第 {tier} 层 · 永久强化</small>
+                        <small className="farm-growth-tag">第 {tier} 层</small>
                         <h4>
                           {item.name}
                           <em>
@@ -143,7 +141,6 @@ export function PermanentTree({
                             />
                           ))}
                         </div>
-                        <p>{item.description}</p>
                         <dl>
                           <div>
                             <dt>当前</dt>
@@ -172,9 +169,7 @@ export function PermanentTree({
                               const result = buyFarmUpgrade(item.id, level)
                               onChange(result.profile)
                               setFailed(!!result.error)
-                              setMessage(
-                                result.error ?? `${item.name}升至 Lv.${level + 1}，下一局生效。`,
-                              )
+                              setMessage(result.error ?? `${item.name} → Lv.${level + 1}`)
                             } finally {
                               queueMicrotask(settle)
                             }
@@ -184,7 +179,7 @@ export function PermanentTree({
                         </button>
                         {!maxed && !affordable && (
                           <small className="farm-growth-shortfall">
-                            还差 {(price - profile.coins).toLocaleString()} 金币
+                            还差 ✦{(price - profile.coins).toLocaleString()}
                           </small>
                         )}
                       </article>
@@ -197,15 +192,12 @@ export function PermanentTree({
         })}
       </div>
       <div className="farm-growth-legend">
-        <span>三个系并排通读 · 每个系自上而下分 I → IV 层 · 层号只表示深度，不代表解锁顺序</span>
+        <span>层号只表深度，不是解锁顺序</span>
       </div>
       <footer className="farm-growth-reset">
         {confirmReset ? (
           <div role="group" aria-label="确认重置强化">
-            <p>
-              重置全部强化，返还实际支出的 {(profile.growth?.spent ?? 0).toLocaleString()}{' '}
-              金币。下一局使用重置后的属性。
-            </p>
+            <p>返还 ✦ {(profile.growth?.spent ?? 0).toLocaleString()}</p>
             <button type="button" onClick={() => setConfirmReset(false)}>
               取消
             </button>
@@ -228,7 +220,6 @@ export function PermanentTree({
           </div>
         ) : (
           <>
-            <p>尝试不同成长路线，重置可返还实际支出的金币。</p>
             <button type="button" disabled={!count} onClick={() => setConfirmReset(true)}>
               免费重置强化
             </button>

@@ -3,7 +3,6 @@ export type BandCharacter = {
   talentId: string
   icon: string
   name: string
-  desc: string
   coinPrice: number
   image: string
   color: string

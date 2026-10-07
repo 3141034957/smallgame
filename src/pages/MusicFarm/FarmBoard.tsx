@@ -67,7 +67,7 @@ export function FarmBoard({
         if (!controller.signal.aborted) setBoard(value)
       })
       .catch(() => {
-        if (!controller.signal.aborted) setError('生存榜暂时连不上，点刷新再试一次。')
+        if (!controller.signal.aborted) setError('连不上，点 ↻ 重试')
       })
     return () => controller.abort()
   }, [playerId, revision])
@@ -78,7 +78,7 @@ export function FarmBoard({
       if (!authenticated || !target || submitRef.current) return
       const next = normalizeNickname(nickname)
       if (!next) {
-        setError('给你的乐手取个昵称吧。')
+        setError('先填昵称')
         return
       }
       saveNickname(next)
@@ -110,7 +110,7 @@ export function FarmBoard({
         })
         .catch((reason) => {
           if (!controller.signal.aborted)
-            setError(reason instanceof Error ? reason.message : '暂时连不上，再试一次。')
+            setError(reason instanceof Error ? reason.message : '连不上，重试')
         })
         .finally(() => {
           if (submitRef.current === controller) {
@@ -151,13 +151,16 @@ export function FarmBoard({
           ↻
         </button>
       </div>
-      {!compact && <p className="farm-board-caption">历史总排名 · 每位乐手只保留最高分</p>}
       {!compact && round && !authenticated && (
         <div className="farm-board-guest">
-          <p>这一局的金币和成长已保存在本机。注册账号，把进度保存到云端。</p>
-          <button onClick={() => account?.openAccount('register')}>注册并保存本局进度</button>
-          <button onClick={() => account?.openAccount('login')}>已有账号，登录恢复</button>
-          <small>不注册也可以继续玩；上榜需要登录。</small>
+          <p>进度已存本机</p>
+          <button aria-label="注册并保存本局进度" onClick={() => account?.openAccount('register')}>
+            注册
+          </button>
+          <button aria-label="已有账号，登录恢复" onClick={() => account?.openAccount('login')}>
+            登录
+          </button>
+          <small>上榜需登录</small>
         </div>
       )}
       {!compact &&
@@ -166,7 +169,7 @@ export function FarmBoard({
         authenticated &&
         (submitted ? (
           <p role="status" className="farm-board-success">
-            上榜啦！{board?.own && `总榜第 ${board.own.rank} 名`}，下次冲得更高 ♡
+            {board?.own ? `总榜第 ${board.own.rank} 名` : '已上榜'}
           </p>
         ) : (
           !name && (
@@ -176,7 +179,7 @@ export function FarmBoard({
                 submit(draft || name, round)
               }}
             >
-              <label htmlFor="farm-player-name">取个昵称，把这一局送上总榜</label>
+              <label htmlFor="farm-player-name">昵称</label>
               <div>
                 <input
                   id="farm-player-name"
@@ -211,7 +214,7 @@ export function FarmBoard({
       )}
       {!board && !error && (
         <p role="status" className="farm-board-empty">
-          乐手们的成绩正在赶来…
+          载入中…
         </p>
       )}
       {board && (
@@ -240,7 +243,7 @@ export function FarmBoard({
                 )
               })
             ) : (
-              <li className="farm-board-empty">总榜首位幸存者，等你来挑战 ♫</li>
+              <li className="farm-board-empty">等你上榜</li>
             )}
           </ol>
           {board.own && !compact && (

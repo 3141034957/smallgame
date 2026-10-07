@@ -45,12 +45,6 @@
   font-size: 20px;
   cursor: pointer;
 }
-.farm-board .farm-board-caption {
-  margin: 12px 0 14px;
-  color: #9a8ca6;
-  font-size: 11px;
-  line-height: 1.7;
-}
 .farm-board-columns {
   display: grid;
   grid-template-columns: 34px 44px minmax(0, 1fr) auto;

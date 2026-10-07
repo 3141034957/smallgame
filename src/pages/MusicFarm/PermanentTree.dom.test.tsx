@@ -18,13 +18,16 @@ function Tree() {
 }
 it('shows all eight nodes immediately and prevents unaffordable purchases', () => {
   render(<Tree />)
-  expect(screen.getByText('八项强化全部开放，各项独立购买，无关卡解锁要求。')).toBeTruthy()
+  // The intro keeps one fact — upgrades land next run — and no slogan.
+  expect(screen.getByText('下局生效')).toBeTruthy()
   expect(screen.getAllByRole('article')).toHaveLength(8)
+  // Every node states its level through the 当前 → 下级 rows: no description repeat.
+  expect(document.body.textContent).not.toContain('每级')
   expect(
     (screen.getByRole('button', { name: '升级守护音盾，花费18000金币' }) as HTMLButtonElement)
       .disabled,
   ).toBe(true)
-  expect(screen.getByText('还差 18,000 金币')).toBeTruthy()
+  expect(screen.getByText('还差 ✦18,000')).toBeTruthy()
   const meter = within(screen.getByRole('article', { name: '舞台体魄' })).getByRole('progressbar', {
     name: '舞台体魄强化进度',
   })
@@ -52,6 +55,7 @@ it('reads each school as a tier ladder I → IV with every tier open', () => {
     expect(within(survival).getByRole('article', { name })).toBeTruthy()
   expect(survival.querySelector('.farm-growth-tier.is-trained')).toBeNull()
   expect(screen.getAllByRole('listitem')).toHaveLength(8)
+  expect(screen.getByText('层号只表深度，不是解锁顺序')).toBeTruthy()
 })
 it('labels a maxed node as finished instead of offering a null price', () => {
   const levels = Object.fromEntries(
@@ -88,6 +92,7 @@ it('lights one level pip per purchase and ignores a click that repeats before it
   const meter = within(node).getByRole('progressbar')
   expect(meter.getAttribute('aria-valuenow')).toBe('1')
   expect(meter.querySelectorAll('i.is-on')).toHaveLength(1)
+  expect(screen.getByRole('status').textContent).toBe('舞台体魄 → Lv.1')
   expect(loadFarmProfile().coins).toBe(8500)
 })
 
@@ -104,6 +109,7 @@ it('buys from any branch, updates levels and price, persists across remounts, an
     screen.getByRole('progressbar', { name: '守护音盾强化进度' }).getAttribute('aria-valuenow'),
   ).toBe('1')
   fireEvent.click(screen.getByRole('button', { name: '免费重置强化' }))
+  expect(screen.getByText('返还 ✦ 18,000')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: '取消' }))
   expect(loadFarmProfile().coins).toBe(2000)
   fireEvent.click(screen.getByRole('button', { name: '免费重置强化' }))

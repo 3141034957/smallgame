@@ -21,7 +21,6 @@ export function RunTimeline({
     <figure className="farm-recap">
       <figcaption>
         <small>本局复盘</small>
-        <span>每 2 秒采样 · 曲线为分数与生命</span>
       </figcaption>
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}

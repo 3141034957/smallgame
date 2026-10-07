@@ -47,7 +47,7 @@ it('completes automatic submission under the StrictMode used by the app', async 
       <FarmBoard round={round} />
     </StrictMode>,
   )
-  await waitFor(() => expect(screen.getByText(/上榜啦/)).toBeTruthy())
+  await waitFor(() => expect(screen.getByText(/已上榜/)).toBeTruthy())
   expect((screen.getByRole('button', { name: '刷新生存榜' }) as HTMLButtonElement).disabled).toBe(
     false,
   )
@@ -59,7 +59,7 @@ it('posts the score once when the effect is replayed after a cleanup', async () 
       <FarmBoard round={round} />
     </StrictMode>,
   )
-  await waitFor(() => expect(screen.getByText(/上榜啦/)).toBeTruthy())
+  await waitFor(() => expect(screen.getByText(/已上榜/)).toBeTruthy())
   // A replayed mount must not resend: the server already stored this run.
   expect(vi.mocked(farmRequest).mock.calls.filter(([path]) => path === 'score')).toHaveLength(1)
 })
@@ -74,7 +74,7 @@ it('lets the player retry a failed submission without submitting on every render
   expect(vi.mocked(farmRequest).mock.calls.filter(([path]) => path === 'score')).toHaveLength(1)
   vi.mocked(farmRequest).mockResolvedValue(board)
   fireEvent.click(screen.getByRole('button', { name: /重新上榜/ }))
-  await screen.findByText(/上榜啦/)
+  await screen.findByText(/已上榜/)
   expect(vi.mocked(farmRequest).mock.calls.filter(([path]) => path === 'score')).toHaveLength(2)
 })
 
@@ -83,7 +83,7 @@ it('submits a newly entered nickname only once', async () => {
   render(<FarmBoard round={round} />)
   fireEvent.change(screen.getByRole('textbox'), { target: { value: '新乐手' } })
   fireEvent.click(screen.getByRole('button', { name: '上榜 ↗' }))
-  await screen.findByText(/上榜啦/)
+  await screen.findByText(/已上榜/)
   expect(vi.mocked(farmRequest).mock.calls.filter(([path]) => path === 'score')).toHaveLength(1)
 })
 
@@ -95,7 +95,9 @@ it('lets guests register after a finished run without submitting an anonymous sc
       <FarmBoard round={round} />
     </AccountContext>,
   )
-  fireEvent.click(screen.getByRole('button', { name: '注册并保存本局进度' }))
+  const register = screen.getByRole('button', { name: '注册并保存本局进度' })
+  expect(register.textContent).toBe('注册')
+  fireEvent.click(register)
   expect(openAccount).toHaveBeenCalledWith('register')
   await waitFor(() => expect(farmRequest).toHaveBeenCalled())
   expect(vi.mocked(farmRequest).mock.calls.some(([path]) => path === 'score')).toBe(false)

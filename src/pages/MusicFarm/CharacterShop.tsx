@@ -79,9 +79,7 @@ export function CharacterShop({
           <div>
             <small>NO. {String(FARM_CHARACTERS.indexOf(character) + 1).padStart(2, '0')}</small>
             <h3>{character.name}</h3>
-            <p>
-              {owned ? character.desc : `还差 ${missing.toLocaleString()} 金币，打完这局就能带走`}
-            </p>
+            {!owned && <p>还差 ✦{missing.toLocaleString()}</p>}
           </div>
           <button
             type="button"
@@ -94,10 +92,7 @@ export function CharacterShop({
               try {
                 const result = selectFarmCharacter(character.id)
                 onChange(result.profile)
-                setMessage(
-                  result.error ??
-                    `${owned ? '已切换为' : '解锁成功！'} ${character.name}，上场吧！`,
-                )
+                setMessage(result.error ?? `${owned ? '已切换' : '已解锁'} ${character.name}`)
               } finally {
                 pending.current = false
                 setBusy(false)
@@ -117,7 +112,6 @@ export function CharacterShop({
           <div>
             <small>CHARACTER COLLECTION</small>
             <strong>选择角色</strong>
-            <p>角色决定上场外观，本局乐队通过升级组建。</p>
           </div>
           <span>
             <b>{profile.owned.length}</b> / {FARM_CHARACTERS.length}

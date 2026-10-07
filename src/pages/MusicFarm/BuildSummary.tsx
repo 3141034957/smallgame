@@ -32,9 +32,7 @@ export function BuildSummary({ gear, state }: { gear: Gear; state?: ComboState }
               <div>
                 <strong>{item.evolved ? item.form : item.weaponName}</strong>
                 <small>
-                  {item.weaponIsMember ? '成员' : '辅助乐器'} {item.weaponName} Lv.
-                  {item.weaponLevel} ＋ 装备 {item.chipName} Lv.
-                  {item.chipLevel}
+                  Lv.{item.weaponLevel} ＋ Lv.{item.chipLevel}
                 </small>
                 {view && (
                   <span
@@ -78,9 +76,7 @@ export function BuildSummary({ gear, state }: { gear: Gear; state?: ComboState }
       </ul>
       {(combos.length > 0 || hints.length > 0) && (
         <div className="farm-combos">
-          <small className="farm-combos-title">
-            {combos.length ? 'CROSS-SCHOOL COMBOS · 本局组合技' : 'CROSS-SCHOOL COMBOS · 下一步'}
-          </small>
+          <small className="farm-combos-title">{combos.length ? '本局组合技' : '下一步'}</small>
           <ul>
             {combos.map((combo) => (
               <li key={combo.id}>
@@ -95,7 +91,7 @@ export function BuildSummary({ gear, state }: { gear: Gear; state?: ComboState }
               <li key={hint.combo.id} className="is-hint">
                 <span aria-hidden="true">{hint.combo.icon}</span>
                 <div>
-                  <strong>下一步：{hint.combo.name}</strong>
+                  <strong>{hint.combo.name}</strong>
                   <small>
                     {hint.missing} · {hint.combo.effect}
                   </small>
