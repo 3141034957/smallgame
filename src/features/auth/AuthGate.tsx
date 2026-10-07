@@ -82,17 +82,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
         await loadAccountProgress(next.id, controller.signal)
         if (!mounted.current || revision !== sequence.current) return
       }
-      if (principal.current && !next) setNotice('登录已结束，你可以继续游客游玩，账号存档仍保留。')
+      if (principal.current && !next) setNotice('已退出登录')
       accept(next)
       setError('')
     } catch (cause) {
       if (!mounted.current || revision !== sequence.current || controller.signal.aborted) return
       if (cause instanceof AccountError && cause.status === 401) {
         accept(null)
-        setNotice('登录已失效或账号在别处登录，账号进度已保留，可继续游客游玩。')
+        setNotice('登录已失效，可继续玩')
       } else {
         setChecking(false)
-        setError('暂时无法连接账号服务，你仍可以玩；进度先保存在本机。')
+        setError('连不上账号服务，先存本机')
       }
     } finally {
       if (pending.current === controller) pending.current = null
@@ -117,7 +117,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     const expired = () => {
       cancelPending()
       accept(null)
-      setNotice('登录已失效或账号已切换，账号进度已保留，可继续游客游玩。')
+      setNotice('登录已失效，可继续玩')
       void check()
     }
     window.addEventListener('focus', focus)
@@ -185,15 +185,15 @@ export function AuthGate({ children }: { children: ReactNode }) {
     event.preventDefault()
     if (mutating.current) return
     if (!normalizeAccount(account)) {
-      setError(ACCOUNT_HINT)
+      setError('账号格式不对')
       return
     }
     if (!validPassword(password)) {
-      setError(PASSWORD_HINT)
+      setError('密码至少 8 位')
       return
     }
     if (mode === 'register' && confirmation !== password) {
-      setError('两次输入的密码不一致。')
+      setError('两次密码不一致')
       return
     }
     mutating.current = true
@@ -216,7 +216,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         try {
           resetGuestProgress(progress)
         } catch {
-          setNotice('账号已保存，本机游客备份暂时无法更新。')
+          setNotice('已保存，备份未更新')
         }
       } else {
         await loadAccountProgress(next.id, controller.signal)
@@ -226,11 +226,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       setConfirmation('')
       setFormOpen(false)
       accept(next, mode === 'register')
-      setNotice(
-        mode === 'register'
-          ? '注册成功，游客进度已保存到账号，继续玩吧！'
-          : '已恢复账号进度；原游客存档仍保留在本机。',
-      )
+      setNotice(mode === 'register' ? '注册成功，进度已存' : '已恢复账号进度')
       announceAccountChange()
     } catch (cause) {
       if (mounted.current && !controller.signal.aborted)
@@ -252,7 +248,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       await accountRequest('logout', {})
       if (!mounted.current) return
       accept(null)
-      setNotice('已退出登录，可继续游客游玩。账号存档和未同步的本机进度仍保留。')
+      setNotice('已退出登录')
       announceAccountChange()
     } catch (cause) {
       if (mounted.current) {
@@ -276,17 +272,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
     try {
       // End the old run before replacing its storage, then remount from the cloud.
       flushSync(() => setGameVisible(false))
-      const { backup } = await loadAccountProgress(owner.id, controller.signal, true)
+      await loadAccountProgress(owner.id, controller.signal, true)
       if (!mounted.current || controller.signal.aborted) return
       setGameKey(`${owner.id}:${Date.now()}`)
       setGameVisible(true)
       setUser({ ...owner })
       setSyncStatus('saved')
-      setNotice(
-        backup
-          ? '已恢复云端进度，未上传的本机副本已保留。'
-          : '已恢复云端进度，本机没有需要保留的进度。',
-      )
+      setNotice('已恢复云端进度')
     } catch (cause) {
       if (mounted.current && !controller.signal.aborted) {
         setGameKey(`${owner.id}:${Date.now()}`)
@@ -307,7 +299,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
           aria-label={user ? '当前登录账号' : '游客模式'}
           inert={formOpen}
         >
-          <span>{user ? `♫ ${user.username}` : '游客模式 · 进度保存在本机'}</span>
+          <span>{user ? `♫ ${user.username}` : '游客模式'}</span>
           <div className="account-actions">
             {user ? (
               <>
@@ -317,15 +309,21 @@ export function AuthGate({ children }: { children: ReactNode }) {
                     : syncStatus === 'pending'
                       ? '正在保存…'
                       : syncStatus === 'conflict'
-                        ? '云端有更新，本机副本已保留'
-                        : '本机已保存，等待同步'}
+                        ? '云端有更新'
+                        : '待同步'}
                 </span>
                 {syncStatus === 'offline' && (
-                  <button onClick={() => void sync.current?.flush()}>重试保存</button>
+                  <button aria-label="重试保存进度" onClick={() => void sync.current?.flush()}>
+                    重试
+                  </button>
                 )}
                 {syncStatus === 'conflict' && (
-                  <button disabled={busy} onClick={() => void restoreCloud()}>
-                    恢复云端进度
+                  <button
+                    aria-label="恢复云端进度"
+                    disabled={busy}
+                    onClick={() => void restoreCloud()}
+                  >
+                    恢复云端
                   </button>
                 )}
                 <button disabled={busy} onClick={() => void logout()}>
@@ -335,7 +333,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
             ) : (
               <>
                 <button onClick={() => openAccount('login')}>登录</button>
-                <button onClick={() => openAccount('register')}>注册保存进度</button>
+                <button aria-label="注册账号保存进度" onClick={() => openAccount('register')}>
+                  注册
+                </button>
               </>
             )}
           </div>
@@ -343,7 +343,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
         {!formOpen && (error || notice) && (
           <p className="account-game-notice" role={error ? 'alert' : 'status'}>
             {error || notice}
-            {error && <button onClick={() => void check()}>重新连接</button>}
+            {error && (
+              <button aria-label="重新连接账号服务" onClick={() => void check()}>
+                重连
+              </button>
+            )}
           </p>
         )}
         <div className="account-play" inert={formOpen}>
@@ -396,13 +400,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
                 <img key={character.id} src={character.image} alt="" />
               ))}
             </div>
-            <span className="account-eyebrow">怪潮乐队历险记 · 乐手档案</span>
             <h2>{mode === 'register' ? '保存你的乐队进度' : '欢迎回到乐队'}</h2>
-            <p className="account-intro">
-              {mode === 'register'
-                ? '注册后自动保存本机游客进度，换设备登录也能继续。'
-                : '登录恢复账号云端进度，当前游客存档不会覆盖它。'}
-            </p>
             <div className="account-tabs" aria-label="账号操作">
               {(['login', 'register'] as const).map((item) => (
                 <button
@@ -490,14 +488,18 @@ export function AuthGate({ children }: { children: ReactNode }) {
                   {error}
                 </p>
               )}
-              <button className="account-primary" type="submit" disabled={busy}>
-                {busy ? '正在连接…' : mode === 'login' ? '登录并进入乐队' : '注册并保存进度'}
+              <button
+                className="account-primary"
+                type="submit"
+                disabled={busy}
+                aria-label={
+                  busy ? undefined : mode === 'login' ? '登录并进入乐队' : '注册并保存进度'
+                }
+              >
+                {busy ? '正在连接…' : mode === 'login' ? '登录' : '注册'}
               </button>
             </form>
-            <p className="account-footnote">
-              不注册也能玩。同一账号仅保留一次登录，登录后成长进度自动保存到云端。
-            </p>
-            {checking && <p className="account-hint">正在确认已有登录，游客游玩不受影响。</p>}
+            {checking && <p className="account-hint">检查登录中…</p>}
           </section>
         </div>
       )}

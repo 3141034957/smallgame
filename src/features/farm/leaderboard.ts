@@ -34,9 +34,7 @@ export async function farmRequest<T>(
   })
   const result = await response.json().catch(() => null)
   if (response.status === 401) notifyAccountExpired()
-  if (!response.ok)
-    throw new Error(result?.error ?? '排行榜暂时连不上，本机成绩仍然保留，请稍后再试。')
-  if (!result || !Array.isArray(result.data))
-    throw new Error('排行榜暂时连不上，本机成绩仍然保留，请稍后再试。')
+  if (!response.ok) throw new Error(result?.error ?? '排行榜连不上，稍后再试')
+  if (!result || !Array.isArray(result.data)) throw new Error('排行榜连不上，稍后再试')
   return result as T
 }

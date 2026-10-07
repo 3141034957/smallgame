@@ -33,13 +33,13 @@ export async function progressRequest(
   const result = await response.json().catch(() => null)
   if (response.status === 401) notifyAccountExpired()
   if (!response.ok)
-    throw new AccountError(response.status, result?.error ?? '云端保存暂时不可用，本机进度仍保留。')
+    throw new AccountError(response.status, result?.error ?? '云端保存失败，进度在本机')
   if (
     !validProgress(result?.data) ||
     !Number.isSafeInteger(result?.revision) ||
     result.revision < 0
   )
-    throw new Error('云端进度返回异常，本机存档仍保留。')
+    throw new Error('云端进度异常')
   return result
 }
 export async function loadAccountProgress(id: string, signal: AbortSignal, forceCloud = false) {

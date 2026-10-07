@@ -95,7 +95,10 @@ it('lets guests play first, then registers with every guest save and preserves t
   const password = ' Aa1!"<> &+/% '
   await fill(password)
   fireEvent.change(screen.getByLabelText('确认密码'), { target: { value: 'different' } })
-  fireEvent.click(screen.getByRole('button', { name: '注册并保存进度' }))
+  const submit = screen.getByRole('button', { name: '注册并保存进度' })
+  // The button stays a button: "注册" on screen, full wording only for screen readers.
+  expect(submit.textContent).toBe('注册')
+  fireEvent.click(submit)
   expect(screen.getByRole('alert').textContent).toContain('不一致')
   fireEvent.change(screen.getByLabelText('确认密码'), { target: { value: password } })
   fireEvent.click(screen.getByRole('button', { name: '注册并保存进度' }))
@@ -115,6 +118,19 @@ it('lets guests play first, then registers with every guest save and preserves t
   activateAccount(null)
   expect(loadFarmProfile().coins).toBe(0)
   activateAccount(user.id)
+})
+it('shows the field rules once and reports them with short errors', async () => {
+  mount()
+  fireEvent.click(screen.getByRole('button', { name: '登录' }))
+  expect(screen.getByText('3–32 位字母、数字或 _')).toBeTruthy()
+  expect(screen.getByText('8–128 位，区分大小写')).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('账号'), { target: { value: 'ab' } })
+  fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'abc' } })
+  fireEvent.click(screen.getByRole('button', { name: '登录并进入乐队' }))
+  expect(screen.getByRole('alert').textContent).toBe('账号格式不对')
+  fireEvent.change(screen.getByLabelText('账号'), { target: { value: 'PLAYER_ONE' } })
+  fireEvent.click(screen.getByRole('button', { name: '登录并进入乐队' }))
+  expect(screen.getByRole('alert').textContent).toBe('密码至少 8 位')
 })
 it('preserves guest progress after failed registration and prevents duplicate submissions', async () => {
   let finish: (response: Response) => void = () => {}
@@ -157,6 +173,7 @@ it('restores cloud progress after local storage was cleared and leaves the separ
   }
   fireEvent.click(screen.getByRole('button', { name: '登录' }))
   await fill('Aa1!test')
+  expect(screen.getByRole('button', { name: '登录并进入乐队' }).textContent).toBe('登录')
   fireEvent.click(screen.getByRole('button', { name: '登录并进入乐队' }))
   await screen.findByText(/游戏账号 account_.*金币 9000/)
   activateAccount(null)

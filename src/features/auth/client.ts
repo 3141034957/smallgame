@@ -34,8 +34,7 @@ export async function accountRequest(
       : AbortSignal.timeout(10000),
   })
   const result = await response.json().catch(() => null)
-  if (!response.ok)
-    throw new AccountError(response.status, result?.error ?? '账号服务暂时连不上，请稍后重试。')
+  if (!response.ok) throw new AccountError(response.status, result?.error ?? '服务连不上，稍后重试')
   const user = result?.user
   if (user === null && (path === 'session' || path === 'logout')) return null
   if (
@@ -44,7 +43,7 @@ export async function accountRequest(
     !/^account_[a-f0-9-]{36}$/.test(user.id) ||
     normalizeAccount(user.username) !== user.username
   )
-    throw new Error('账号服务返回异常，请稍后重试。')
+    throw new Error('服务异常，稍后再试')
   return user
 }
 export function announceAccountChange() {

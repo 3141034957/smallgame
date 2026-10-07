@@ -57,7 +57,8 @@ describe('result share text', () => {
     expect(farmTooLongToSubmit(null)).toBe(false)
     expect(farmTooLongToSubmit(long)).toBe(true)
     // The player is told why, instead of "成绩未通过校验".
-    expect(FARM_TOO_LONG_MESSAGE).toContain('超出排行榜上限')
+    expect(FARM_TOO_LONG_MESSAGE).toContain('未上榜')
+    expect(FARM_TOO_LONG_MESSAGE.length).toBeLessThan(20)
   })
   it('omits empty counters and works before the first run', () => {
     const text = farmShareText(round({ elites: 0, blocks: 0 }), '2026-10-04')

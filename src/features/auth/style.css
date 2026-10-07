@@ -96,20 +96,9 @@
   width: 88px;
   height: 88px;
 }
-.account-eyebrow {
-  font-size: 11px;
-  letter-spacing: 1.5px;
-  color: #74876c;
-}
 .account-card h2 {
   font-size: 25px;
-  margin-top: 6px;
-}
-.account-intro {
-  color: #74816e;
-  line-height: 1.65;
-  font-size: 13px;
-  margin: 10px 0 18px;
+  margin: 6px 0 18px;
 }
 .account-tabs {
   display: flex;
@@ -182,12 +171,6 @@
   color: #538260;
   line-height: 1.6;
   margin-top: 12px;
-}
-.account-footnote {
-  margin-top: 18px;
-  color: #738069;
-  font-size: 11px;
-  line-height: 1.8;
 }
 .account-overlay button {
   cursor: pointer;
