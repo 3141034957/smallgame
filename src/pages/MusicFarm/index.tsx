@@ -839,7 +839,10 @@ export default function MusicFarm() {
           <a className="farm-brand" href="#/farm">
             <span>♬</span>
             <div>
-              <h1>怪潮乐队历险记</h1>
+              <h1>
+                <span className="farm-brand-full">怪潮乐队历险记</span>
+                <span className="farm-brand-short">怪潮乐队</span>
+              </h1>
               <small>TINY BAND · BIG BATTLES</small>
             </div>
           </a>

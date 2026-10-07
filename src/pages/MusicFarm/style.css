@@ -435,10 +435,15 @@
   color: #8b917c;
   line-height: 1.85;
 }
+/* Sticky instead of absolute: the dialog is the scroll container, so an
+   absolutely placed button scrolled out of reach on the badge and help
+   dialogs. Negative margins keep it out of the flow, so every dialog keeps
+   the layout it had before. */
 .farm-close {
-  position: absolute;
-  right: 12px;
-  top: 10px;
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  margin: -20px -12px -20px auto;
   background: #edeede;
   border: 0;
   color: #889576;
@@ -580,9 +585,13 @@
   text-align: center;
   color: #adbd87;
 }
+/* Stacking order for every overlay inside `.farm-game`:
+   field 0 / xp 1 / hud·health 2 / header 3 / drag-hint 4 / alerts 5 /
+   notice·evolution 6 / performance 98 / backdrop 100. */
 .farm-notice,
 .farm-evolution {
   position: absolute;
+  z-index: 6;
   left: 12px;
   right: 12px;
   top: 12px;
@@ -617,6 +626,7 @@
 }
 .farm-drag-hint {
   position: absolute;
+  z-index: 4;
   bottom: 12px;
   left: 0;
   right: 0;
@@ -1006,6 +1016,10 @@
   margin: 0;
   line-height: 1.3;
 }
+/* Only the mobile breakpoint swaps in the short name; desktop shows the full one. */
+.farm-brand-short {
+  display: none;
+}
 .farm-brand > span {
   width: 38px;
   height: 38px;
@@ -1029,7 +1043,8 @@
 .farm-game {
   width: 100%;
   height: 100%;
-  min-height: 520px;
+  /* A hard floor pushed the arena past its container on short screens. */
+  min-height: 0;
   border: 0;
   border-radius: 0;
   background: linear-gradient(#f7f8e8, #e5edcf 20%, #e5edcf 82%, #edf2da);
@@ -1086,6 +1101,7 @@
 }
 .farm-field {
   position: absolute;
+  z-index: 0;
   inset: 0;
   width: 100%;
   height: 100%;
@@ -1201,8 +1217,9 @@
   font-size: 19px;
   min-height: 51px;
 }
+/* Clear of `.farm-controls` (12px + 44px tall) so the two never overlap. */
 .farm-drag-hint {
-  bottom: 64px;
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 62px);
   font-size: 11px;
 }
 .farm-notice {
@@ -1241,9 +1258,11 @@
 }
 .farm-performance {
   position: fixed;
-  /* Below `.farm-backdrop` (100) so ?stats=1 never covers a dialog. */
-  z-index: 99;
-  bottom: 3px;
+  /* Below `.farm-backdrop` (100) so ?stats=1 never covers a dialog, and
+     above the surge button so it never sits on top of it. */
+  z-index: 98;
+  pointer-events: none;
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 64px);
   right: 4px;
   padding: 4px 6px;
   background: #fffaf0e8;
@@ -1253,7 +1272,7 @@
 }
 .farm-alerts {
   position: absolute;
-  z-index: 3;
+  z-index: 5;
   bottom: calc(max(7px, env(safe-area-inset-bottom)) + 88px);
   left: 50%;
   transform: translateX(-50%);
@@ -1273,44 +1292,75 @@
   text-align: center;
 }
 @media (max-width: 680px) {
+  /* Six nav buttons used to squeeze the brand down to ~100px: the tagline
+     then wrapped into four lines and spilled out of the header onto the HUD.
+     The brand keeps one line and the tagline goes away. */
+  .farm-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    overflow: hidden;
+  }
   .farm-brand h1 {
     font-size: 18px;
   }
-  .farm-brand small {
-    font-size: 9px;
+  /* The short name fits narrow screens without ellipsis; the full name stays
+     for screen readers and desktop. */
+  .farm-brand-short {
+    display: none;
   }
-  /* Fingers need 40px targets: the buttons keep their size and the title
-     truncates instead, so six of them still fit a 375px screen. */
+  /* Hiding the logo tile frees ~48px, enough for the title on one line. */
+  .farm-brand > span {
+    display: none;
+  }
+  .farm-brand-full {
+    display: none;
+  }
+  .farm-brand-short {
+    display: inline;
+  }
+  .farm-brand small {
+    display: none;
+  }
+  /* Icon-first and tight: six buttons still fit a 375px screen. */
   .farm-header nav button {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     flex: 0 0 auto;
   }
   .farm-header nav {
-    gap: 4px;
+    gap: 3px;
     flex: 0 0 auto;
   }
   .farm-brand {
     min-width: 0;
+    flex: 1 1 auto;
     overflow: hidden;
+  }
+  .farm-brand > span {
+    flex: none;
   }
   .farm-brand > div {
     min-width: 0;
+    flex: 1 1 auto;
   }
   .farm-brand h1 {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  /* Notch-safe staircase: every overlay steps down from the same base
+     instead of hard-coding a top that ignores `env(safe-area-inset-top)`. */
   .farm-hud {
-    top: 64px;
+    top: calc(max(10px, env(safe-area-inset-top)) + 58px);
   }
   .farm-xp {
-    top: 130px;
+    top: calc(max(10px, env(safe-area-inset-top)) + 128px);
     font-size: 9px;
   }
   .farm-field {
-    top: 140px;
+    top: calc(max(10px, env(safe-area-inset-top)) + 140px);
     bottom: 145px;
     width: 100%;
     height: auto;
@@ -1345,7 +1395,7 @@
     padding: 24px 16px;
   }
 }
-@media (max-height: 620px) and (min-width: 681px) {
+@media (max-height: 620px) {
   .farm-header {
     top: 8px;
   }
@@ -1390,7 +1440,7 @@
     padding: 10px;
   }
 }
-@media (max-height: 500px) and (min-width: 681px) {
+@media (max-height: 500px) {
   .farm-game {
     min-height: 0;
   }
@@ -1569,7 +1619,7 @@
     font-size: 22px;
   }
 }
-@media (max-height: 500px) and (min-width: 681px) {
+@media (max-height: 500px) {
   .music-farm .farm-health {
     top: calc(max(8px, env(safe-area-inset-top)) + 202px);
     left: 12px;
@@ -1631,7 +1681,9 @@
 .farm-badge-list {
   list-style: none;
   margin: 16px 0 0;
-  padding: 0;
+  /* Bottom padding keeps the last badge clear of the scroll edge instead of
+     cutting its progress bar in half. */
+  padding: 0 0 14px;
   display: grid;
   gap: 8px;
   max-height: 52vh;
@@ -1982,10 +2034,11 @@
 .farm-choices button {
   position: relative;
 }
+/* Top-right: at the top-left it sat on top of `.farm-choice-icon`. */
 .farm-choice-key {
   position: absolute;
   top: 7px;
-  left: 8px;
+  right: 8px;
   min-width: 15px;
   height: 15px;
   line-height: 15px;
@@ -2077,9 +2130,9 @@
 }
 @media (max-width: 680px) {
   .farm-header nav .farm-growth-open {
-    min-width: 44px;
-    padding: 0 5px;
-    font-size: 10px;
+    min-width: 40px;
+    padding: 0 6px;
+    font-size: 9px;
   }
 }
 .farm-backdrop.is-fullscreen {
@@ -2139,7 +2192,7 @@
 }
 
 /* Landscape phones: the floating header must not cover the start card. */
-@media (max-height: 520px) and (min-width: 681px) {
+@media (max-height: 520px) {
   .farm-ready {
     padding-top: 54px;
   }
@@ -2412,6 +2465,13 @@
   line-height: 1.5;
 }
 @media (max-width: 430px) {
+  /* Every pixel left over goes to the title, not the logo. */
+  .farm-brand > span {
+    display: none;
+  }
+  .farm-header nav {
+    gap: 2px;
+  }
   .farm-school-list > div,
   .farm-help-combos > div {
     flex-wrap: wrap;
