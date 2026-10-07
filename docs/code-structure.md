@@ -9,6 +9,7 @@
 - `src/pages/MusicFarm/FarmBoard.tsx`：生存榜读取、提交与重试。
 - `src/pages/MusicFarm/render.ts`、`background.ts`：绘图和背景；不改变游戏规则。
 - `src/features/farm/`：战斗规则、控制器、本地角色钱包、成就、任务、生涯统计等独立模块。
+- `src/features/farm/schools.mjs`：流派（乐器 + 专属芯片 + 进化形态）与跨流派组合技的数据层，只描述数据与纯函数判定；增益由 `rules.mjs` 在 `stepFarm` 里乘到既有数值上，并通过 `rules.mjs` 一并导出给界面，保证客户端与服务端回放共用同一份结果。
 - `src/features/farm/audio.ts`、`calendar.mjs`、`leaderboard.ts`：当前游戏的合成音频、北京时间及每日种子、排行榜请求，不依赖已删除的游戏模块。
 - `src/features/auth/`、`server/auth.mjs`、`server/auth-store.mjs`：可选注册、密码登录与单账号单会话；`cloud.ts` 串行同步账号成长，`server/progress.mjs` 校验版本并保存到 SQLite；Cookie 只存会话令牌。
 - `src/utils/accountStorage.ts`：游客与账号成长存档分别保存；新账号继承游客快照，账号存档携带云端版本和待同步标记。`playerIdentity.ts` 提供游客身份、账号身份和当前作用域昵称。
