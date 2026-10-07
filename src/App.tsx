@@ -4,7 +4,10 @@ import { AuthGate } from '@/features/auth/AuthGate'
 
 function FarmHome() {
   const [params] = useSearchParams()
-  return <MusicFarm key={params.toString()} />
+  // A remount would drop a running round, so only a different day rebuilds the
+  // game: it restarts itself when `day` changes, and a dialog owns the back
+  // gesture through a placeholder history entry instead of a URL change.
+  return <MusicFarm key={params.get('day') ?? ''} />
 }
 
 export default function App() {

@@ -57,6 +57,25 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, onSelect 
                 <strong>{hp >= maxHp ? '已满血，也可选择继续升级' : '选择后立即回满生命'}</strong>
               </button>
             )
+          // Raw growth cards appear once the instrument pool runs dry, so they
+          // have no recipe and no gear level to show.
+          if (item.kind === 'stat')
+            return (
+              <button
+                key={id}
+                onClick={() => onSelect(id)}
+                style={{ '--talent-color': item.color } as CSSProperties}
+              >
+                <i className="farm-choice-key" aria-hidden="true">
+                  {index + 1}
+                </i>
+                <span className="farm-choice-icon">{item.icon}</span>
+                <small>乐队成长 · {item.tag}</small>
+                <b>{item.name}</b>
+                <p>{item.description}</p>
+                <strong>只在本局生效，不占槽位</strong>
+              </button>
+            )
           const gearId = item.id
           const recipe = RECIPES.find((entry) => entry.weapon === id || entry.chip === id)!
           const nextGear = { ...gear, [gearId]: gear[gearId] + 1 }

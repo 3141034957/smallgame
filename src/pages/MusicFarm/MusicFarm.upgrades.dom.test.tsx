@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { StrictMode } from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import MusicFarm from './index'
@@ -74,6 +74,9 @@ const simulate = (offered: FarmState) => {
     events: [],
   }))
 }
+// A dry pool deals a full hand, so late levels are picked by hand.
+const pick = (name: RegExp) =>
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name }))
 const start = async (strict = false) => {
   const tree = (
     <MemoryRouter initialEntries={['/farm?day=2026-10-04']}>
@@ -94,30 +97,45 @@ const expectRecorded = (ids: string[]) => {
   expect(choices).toEqual(ids.map((id) => ({ tick: 1, id })))
 }
 
-it('automatically heals and continues play without mounting a single-option dialog', async () => {
+it('auto-takes a lone healing card, then waits for a real choice from the dry pool', async () => {
   simulate({ ...loadout(), offered: ['heal'] })
   await start()
-  expect(screen.queryByRole('dialog')).toBeNull()
+  // A sole offer is still consumed without a dialog: the heal lands and the
+  // level advances on its own.
   expect(screen.getByRole('progressbar', { name: '生命值' }).getAttribute('aria-valuenow')).toBe(
     '100',
   )
-  expect(screen.getByText('Lv.54')).toBeTruthy()
+  expect(screen.getByText('Lv.52')).toBeTruthy()
+  // The next hand is a dry pool — heal plus growth cards — so it is a real
+  // choice now and the run stops instead of eating the rest of the levels.
+  const dialog = screen.getByRole('dialog')
+  expect(dialog.textContent).toContain('恢复满血')
+  expect(dialog.textContent).toContain('乐队成长')
+  expect(within(dialog).getAllByRole('button')).toHaveLength(3)
+  // Reaching the last level therefore takes two deliberate picks.
+  pick(/恢复满血/)
+  pick(/恢复满血/)
   expectRecorded(['heal', 'heal', 'heal'])
 })
 
-it('announces the card the player picked, not the last card of an automatic chain', async () => {
+it('announces the card the player picked, not a card the run picked on its own', async () => {
   const state = loadout()
   state.gear.range = MAX_GEAR_LEVEL - 1
   state.offered = ['range', 'heal']
   simulate(state)
   await start()
-  fireEvent.click(screen.getByRole('button', { name: /共鸣音箱/ }))
-  // The automatic heals behind the pick are not the player's choice and must
-  // not announce themselves as one.
+  pick(/共鸣音箱/)
+  // No heal is swallowed automatically behind the pick, so none is announced.
   expect(screen.queryByText(/已恢复满血/)).toBeNull()
+  // What follows is another dry-pool hand, so the player has to finish the
+  // level themselves before the run can move on.
+  expect(screen.getByRole('dialog').textContent).toContain('乐队成长')
+  pick(/恢复满血/)
+  pick(/恢复满血/)
   act(() => frame(1126))
-  // The picked card leads the replay log, whatever follows it.
+  // The picked card still leads the replay log, whatever follows it.
   expect(vi.mocked(finishFarm).mock.calls[0][2][0]).toEqual({ tick: 1, id: 'range' })
+  expect(vi.mocked(finishFarm).mock.calls[0][2]).toHaveLength(3)
 })
 
 it('gives focus back to the button that opened a panel after the run ends', async () => {
@@ -143,7 +161,7 @@ it('stores the daily best score once when a run ends', async () => {
   expect(score).toBeGreaterThan(0)
 })
 
-it('waits for a manual choice when there are multiple options, then skips following sole offers', async () => {
+it('waits for a manual choice, and keeps waiting: a dry pool deals a hand, not a sole offer', async () => {
   const state = loadout()
   state.gear.range = MAX_GEAR_LEVEL - 1
   state.offered = ['range', 'heal']
@@ -152,10 +170,17 @@ it('waits for a manual choice when there are multiple options, then skips follow
   expect(screen.getByRole('dialog')).toBeTruthy()
   act(() => frame(1126))
   expect(vi.mocked(stepFarm)).toHaveBeenCalledTimes(1)
-  fireEvent.click(screen.getByRole('button', { name: /共鸣音箱/ }))
-  expect(screen.queryByRole('dialog')).toBeNull()
+  pick(/共鸣音箱/)
+  // Maxing the last instrument drains the pool, but the next hand is heal plus
+  // growth cards, so there is no sole offer left to skip: the dialog stays.
+  const dialog = screen.getByRole('dialog')
+  expect(dialog.textContent).toContain('乐队成长')
   // The time spent choosing must not turn into extra simulation ticks.
   act(() => frame(1189))
+  expect(vi.mocked(stepFarm)).toHaveBeenCalledTimes(1)
+  pick(/恢复满血/)
+  pick(/恢复满血/)
+  act(() => frame(1252))
   expect(vi.mocked(finishFarm)).toHaveBeenCalledOnce()
   expect(vi.mocked(finishFarm).mock.calls[0][2]).toEqual(
     ['range', 'heal', 'heal'].map((id) => ({ tick: 1, id })),

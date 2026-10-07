@@ -1,10 +1,13 @@
 import { isProgressKey, PROGRESS_KEYS } from '@/features/auth/progress.mjs'
 
+export const GUEST_SAVE_KEY = 'farm-guest-save-v1'
 const PREFIX = 'farm-account-save-v1:'
 const CORRUPT = ':corrupt'
 const CLAIM = 'farm-legacy-claim-v1'
-const GUEST = 'farm-guest-save-v1'
 const DAILY_BEST = /^farm-best-v[\w-]+:(\d{4}-\d{2}-\d{2})$/
+// Daily best scores stay in plain localStorage, so another tab announces them
+// under this prefix instead of through an account save.
+export const isDailyBestKey = (key: string) => DAILY_BEST.test(key)
 const DAILY_BEST_DAYS = 400
 export const ACCOUNT_SAVE_EVENT = 'echo-progress-changed'
 export type ProgressData = Record<string, string>
@@ -53,7 +56,7 @@ function legacySnapshot() {
   )
 }
 export function guestProgress(): ProgressData {
-  const stored = localStorage.getItem(GUEST)
+  const stored = localStorage.getItem(GUEST_SAVE_KEY)
   return stored !== null ? object(stored) : localStorage.getItem(CLAIM) ? {} : legacySnapshot()
 }
 export function exportGuestProgress(): ProgressData {
@@ -116,7 +119,7 @@ export function resetGuestProgress(transferred: ProgressData = {}) {
   localStorage.setItem('farm-guest-backup-v1', JSON.stringify(data))
   // Only drop what actually reached the account; unknown keys stay playable.
   const rest = Object.fromEntries(Object.entries(data).filter(([key]) => !(key in transferred)))
-  localStorage.setItem(GUEST, JSON.stringify(rest))
+  localStorage.setItem(GUEST_SAVE_KEY, JSON.stringify(rest))
 }
 // Daily best scores are dropped after a while so the upload stays within the server limit.
 export function progressForCloud(data: ProgressData): ProgressData {
@@ -158,6 +161,11 @@ export const accountStorage = {
         dirty: true,
       })
       if (typeof window !== 'undefined') window.dispatchEvent(new Event(ACCOUNT_SAVE_EVENT))
-    } else localStorage.setItem(GUEST, JSON.stringify({ ...guestProgress(), [key]: value }))
+    } else {
+      localStorage.setItem(GUEST_SAVE_KEY, JSON.stringify({ ...guestProgress(), [key]: value }))
+      // Guests have no cloud save, so this event is the only thing telling the
+      // open page (and other tabs, through the storage event) to re-read it.
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event(ACCOUNT_SAVE_EVENT))
+    }
   },
 }

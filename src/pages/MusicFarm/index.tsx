@@ -1,4 +1,10 @@
-import { accountStorage, ACCOUNT_SAVE_EVENT, activeAccountId } from '@/utils/accountStorage'
+import {
+  accountStorage,
+  ACCOUNT_SAVE_EVENT,
+  activeAccountId,
+  GUEST_SAVE_KEY,
+  isDailyBestKey,
+} from '@/utils/accountStorage'
 import { farmBestKey } from '@/features/farm/monsters.mjs'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -6,6 +12,7 @@ import {
   advanceFarmPosition,
   farmBossCountdown,
   farmPointerTarget,
+  farmSurgeStatus,
   farmWorldBounds,
   formatFarmTime,
 } from '@/features/farm/presentation'
@@ -58,7 +65,7 @@ import {
 } from '@/features/farm/timeline'
 import { FARM_HELP_SEEN_KEY } from '@/features/farm/help'
 import { loadFarmSettings, saveFarmSettings, type FarmSettings } from '@/features/farm/settings'
-import { farmShareText } from '@/features/farm/share'
+import { FARM_TOO_LONG_MESSAGE, farmShareText, farmTooLongToSubmit } from '@/features/farm/share'
 import { RunTimeline } from './RunTimeline'
 import { BadgeWall } from './BadgeWall'
 import { QuestList } from './QuestList'
@@ -106,6 +113,9 @@ export default function MusicFarm() {
   const modifier = farmModifier(day)
   const bossesAlive = view.crops.filter((crop) => crop.boss).length
   const growthStats = permanentStats(view.permanent)
+  // A spent surge locks the button for a few seconds, so the HUD has to show
+  // the wait instead of staying lit up and swallowing the next tap.
+  const surgeStatus = farmSurgeStatus(view)
   const safeSeconds = Math.max(
     0,
     Math.ceil((FPS * RECOVERY.safeSeconds - (view.tick - view.lastHit)) / FPS),
@@ -160,12 +170,26 @@ export default function MusicFarm() {
   const audioSerial = useRef(0)
   const celebrationUntil = useRef(0)
   const noticeUntil = useRef(0)
+  // A dialog owns the back gesture: without a placeholder history entry the
+  // mobile back button leaves the page and the running round is lost.
+  const dialogHistory = useRef(false)
+  const dropDialogHistory = (consumeEntry: boolean) => {
+    if (!dialogHistory.current) return
+    dialogHistory.current = false
+    if (consumeEntry) window.history.back()
+  }
+  const pushDialogHistory = () => {
+    if (dialogHistory.current) return
+    window.history.pushState({ farmDialog: true }, '')
+    dialogHistory.current = true
+  }
   const openPanel = (next: Panel) => {
     keys.current.clear()
     controls.current?.reset()
     previousFocus.current = document.activeElement as HTMLElement
     panelRef.current = next
     setPanel(next)
+    pushDialogHistory()
     audio.current?.stop()
     audioSerial.current++
   }
@@ -177,11 +201,23 @@ export default function MusicFarm() {
     setAudioError(!ok)
     audio.current.setMuted(nextMuted)
   }
-  const closePanel = () => {
+  const dismissPanel = (fromHistory: boolean) => {
+    dropDialogHistory(!fromHistory)
     panelRef.current = null
     setPanel(null)
     if (phaseRef.current === 'play') void prepare()
   }
+  const closePanel = () => dismissPanel(false)
+  const dismissPanelRef = useRef(dismissPanel)
+  dismissPanelRef.current = dismissPanel
+  useEffect(() => {
+    // The back gesture closes the dialog instead of leaving the page.
+    const onPopState = () => {
+      if (dialogHistory.current) dismissPanelRef.current(true)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
   const initializeBattle = () => {
     const latest = loadFarmProfile()
     setProfile(latest)
@@ -230,6 +266,7 @@ export default function MusicFarm() {
     setNotice('')
     celebrationUntil.current = 0
     noticeUntil.current = 0
+    dropDialogHistory(true)
     panelRef.current = null
     setPanel(null)
     phaseRef.current = 'ready'
@@ -311,6 +348,10 @@ export default function MusicFarm() {
         !event.key ||
         event.key === FARM_PROFILE_KEY ||
         event.key === 'character-unlocks-v1' ||
+        // Guest progress is a separate blob, so another tab's run only shows
+        // up here when its own key is watched.
+        event.key === GUEST_SAVE_KEY ||
+        isDailyBestKey(event.key) ||
         (!!owner && event.key === accountSaveKey(owner))
       )
         sync()
@@ -699,6 +740,7 @@ export default function MusicFarm() {
       if (document.hidden && phaseRef.current === 'play') {
         panelRef.current = 'pause'
         setPanel('pause')
+        pushDialogHistory()
         keys.current.clear()
         input.reset()
         audio.current?.stop()
@@ -737,6 +779,9 @@ export default function MusicFarm() {
     }
   }, [phase])
   const upgrade = phase === 'play' && view.offered.length > 0
+  // Past the replay budget the server would reject the upload anyway, so the
+  // run stays on the device and says so instead of failing with a vague error.
+  const submitBlocked = farmTooLongToSubmit(round)
   const previousThreshold = farmXpThreshold(view.level)
   const requiredXp = farmUpgradeXp(view.level)
   const currentXp = Math.max(0, Math.min(requiredXp, view.xp - previousThreshold))
@@ -1053,14 +1098,22 @@ export default function MusicFarm() {
                 </small>
               </div>
               <button
-                className={`farm-surge ${view.charge >= 100 ? 'is-ready' : ''}`}
-                disabled={phase !== 'play' || view.charge < 100}
+                className={`farm-surge ${surgeStatus.ready ? 'is-ready' : ''} ${
+                  surgeStatus.charged && !surgeStatus.ready ? 'is-cooling' : ''
+                }`}
+                disabled={phase !== 'play' || !surgeStatus.ready}
                 onClick={() => {
                   surge.current = true
                 }}
               >
                 <i style={{ width: `${view.charge}%` }} />
-                <span>{view.charge >= 100 ? '✦ 音浪爆发！' : `音浪爆发 ${view.charge}%`}</span>
+                <span>
+                  {surgeStatus.ready
+                    ? '✦ 音浪爆发！'
+                    : surgeStatus.charged
+                      ? `音浪冷却 ${surgeStatus.seconds}s`
+                      : `音浪爆发 ${view.charge}%`}
+                </span>
               </button>
             </div>
           </section>
@@ -1161,7 +1214,12 @@ export default function MusicFarm() {
                   去永久强化 ↗
                 </button>
               </div>
-              <FarmBoard round={round} characterId={profile.selected} />
+              {submitBlocked && (
+                <p role="alert" className="farm-board-error">
+                  {FARM_TOO_LONG_MESSAGE}
+                </p>
+              )}
+              <FarmBoard round={submitBlocked ? null : round} characterId={profile.selected} />
             </section>
           )}
         </div>

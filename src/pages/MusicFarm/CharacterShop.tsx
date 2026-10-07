@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FARM_CHARACTERS, selectFarmCharacter, type FarmProfile } from '@/features/farm/characters'
 import './CharacterShop.css'
 
@@ -15,6 +15,10 @@ export function CharacterShop({
   // Unlocking a character equips it, so the preview has to follow.
   useEffect(() => setPreviewId(profile.selected), [profile.selected])
   const [message, setMessage] = useState('')
+  // A double tap used to buy twice: the button stays disabled until this
+  // purchase has gone through, and the ref blocks a second synchronous click.
+  const [busy, setBusy] = useState(false)
+  const pending = useRef(false)
   const character = FARM_CHARACTERS.find((item) => item.id === previewId) ?? FARM_CHARACTERS[0]
   const owned = profile.owned.includes(character.id)
   const equipped = profile.selected === character.id
@@ -82,13 +86,22 @@ export function CharacterShop({
           <button
             type="button"
             className={`farm-shop-action${equipped ? ' is-active' : ''}${!owned ? ' is-buy' : ''}`}
-            disabled={equipped || (!owned && !affordable)}
+            disabled={busy || equipped || (!owned && !affordable)}
             onClick={() => {
-              const result = selectFarmCharacter(character.id)
-              onChange(result.profile)
-              setMessage(
-                result.error ?? `${owned ? '已切换为' : '解锁成功！'} ${character.name}，上场吧！`,
-              )
+              if (pending.current) return
+              pending.current = true
+              setBusy(true)
+              try {
+                const result = selectFarmCharacter(character.id)
+                onChange(result.profile)
+                setMessage(
+                  result.error ??
+                    `${owned ? '已切换为' : '解锁成功！'} ${character.name}，上场吧！`,
+                )
+              } finally {
+                pending.current = false
+                setBusy(false)
+              }
             }}
           >
             {equipped

@@ -377,6 +377,18 @@
 .farm-surge.is-ready i {
   background: linear-gradient(110deg, #eccb83, #f7daa0);
 }
+/* Charged but still on cooldown: the button stays dim and counts down, so the
+   wait never looks like a dead tap. */
+.farm-surge.is-cooling {
+  background: #eceadb;
+  border-color: #cfd2bb;
+  color: #8d9179;
+  box-shadow: none;
+  animation: none;
+}
+.farm-surge.is-cooling i {
+  background: #dfe3ce;
+}
 .farm-footer {
   display: flex;
   justify-content: space-between;
@@ -431,8 +443,9 @@
   border: 0;
   color: #889576;
   font-size: 21px;
-  width: 29px;
-  height: 29px;
+  /* The only way out of the help, badge, board and pause dialogs. */
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
 }
 .farm-upgrade-dialog {
@@ -957,13 +970,14 @@
     margin-top: 15px;
   }
 }
-/* The game owns the viewport on both desktop and mobile. */
+/* The game owns the viewport on both desktop and mobile. It fills the space
+   the account shell leaves instead of claiming 100dvh, which always overflowed
+   by the height of the account bar above it. */
 .music-farm {
   padding: 0;
-  min-height: 100vh;
-  min-height: 100dvh;
-  height: 100vh;
-  height: 100dvh;
+  min-height: 0;
+  height: 100%;
+  flex: 1;
   overflow: hidden;
   background: #e5edcf;
 }
@@ -1185,10 +1199,15 @@
   max-width: 430px;
   margin: 0 auto;
 }
+/* The recap is taller than the screen on a phone, so it becomes the scroll
+   container: `min-height: 100dvh` pushed it past its flex parent and the
+   overflow was clipped by `#root` instead. */
 .music-farm.is-result-page {
   height: auto;
-  min-height: 100dvh;
-  overflow: auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 82px 12px 24px;
   background: radial-gradient(at 50% 0, #fff8d9, #edf2e1);
 }
@@ -1243,11 +1262,30 @@
     font-size: 18px;
   }
   .farm-brand small {
-    font-size: 5px;
+    font-size: 9px;
   }
+  /* Fingers need 40px targets: the buttons keep their size and the title
+     truncates instead, so six of them still fit a 375px screen. */
   .farm-header nav button {
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
+  }
+  .farm-header nav {
+    gap: 4px;
+    flex: 0 0 auto;
+  }
+  .farm-brand {
+    min-width: 0;
+    overflow: hidden;
+  }
+  .farm-brand > div {
+    min-width: 0;
+  }
+  .farm-brand h1 {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .farm-hud {
     top: 64px;
@@ -1994,6 +2032,11 @@
 }
 
 /* The start card owns the screen before the run: keep the battle HUD out of it. */
+/* The start card scrolls on short screens, so the arena must not swallow the
+   touch: only the running game needs the joystick gesture. */
+.music-farm[data-phase='ready'] .farm-field {
+  touch-action: auto;
+}
 .music-farm[data-phase='ready'] .farm-hud,
 .music-farm[data-phase='ready'] .farm-xp,
 .music-farm[data-phase='ready'] .farm-health {

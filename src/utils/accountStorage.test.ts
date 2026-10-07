@@ -2,10 +2,13 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { testStorage } from '@/test/storage'
 import {
   accountStorage,
+  ACCOUNT_SAVE_EVENT,
   activateAccount,
   canClaimLegacyProgress,
   claimLegacyProgress,
   exportGuestProgress,
+  GUEST_SAVE_KEY,
+  isDailyBestKey,
   progressForCloud,
   resetGuestProgress,
 } from './accountStorage'
@@ -133,6 +136,25 @@ it('keeps guest keys that registration never uploaded', () => {
   expect(JSON.parse(localStorage.getItem('farm-guest-backup-v1')!)['farm-career-v1']).toBe(
     '{"runs":3}',
   )
+})
+it('announces guest writes so the open page and other tabs refresh', () => {
+  const seen: string[] = []
+  // This suite runs without a DOM, so stand in for the window the app uses.
+  const target = new EventTarget()
+  vi.stubGlobal('window', target)
+  const listener = (event: Event) => seen.push(event.type)
+  target.addEventListener(ACCOUNT_SAVE_EVENT, listener)
+  try {
+    accountStorage.setItem('farm-career-v1', '{"runs":2}')
+  } finally {
+    target.removeEventListener(ACCOUNT_SAVE_EVENT, listener)
+  }
+  // Guests have no cloud save: without this event a second tab never sees the
+  // run that was just played.
+  expect(seen).toEqual([ACCOUNT_SAVE_EVENT])
+  expect(JSON.parse(localStorage.getItem(GUEST_SAVE_KEY)!)['farm-career-v1']).toBe('{"runs":2}')
+  expect(isDailyBestKey(GUEST_SAVE_KEY)).toBe(false)
+  expect(isDailyBestKey('farm-best-v8-recovery:2026-10-06')).toBe(true)
 })
 it('drops daily best scores older than the retention window before uploading', () => {
   const today = new Date().toISOString().slice(0, 10)
