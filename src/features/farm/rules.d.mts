@@ -104,6 +104,21 @@ export const RECIPES: {
   description: string
 }[]
 export function evolved(gear: Gear): TalentId[]
+// 流派与跨流派组合技的类型以 schools.d.mts 为准，rules.mjs 只是把它们一并转出，
+// 所以这里复用同一份声明，避免界面从两个入口拿到不同的形状。
+import type { Combo, ComboProgress, ComboSource, School, SchoolProgress } from './schools.mjs'
+export type { Combo, ComboProgress, ComboSource, School, SchoolProgress }
+export function schools(): School[]
+export function schoolProgress(state: FarmState | Gear): SchoolProgress[]
+// 跨流派组合技：达成即自动生效，不占槽位。
+export const COMBOS: Combo[]
+export function activeCombos(state: FarmState | Gear): Combo[]
+export function comboModifiers(state: FarmState | Gear): Record<string, number>
+export function comboProgress(state: FarmState | Gear): {
+  active: ComboProgress[]
+  close: ComboProgress[]
+  evolvedSchools: number
+}
 export type Gear = Record<TalentId, number>
 export type Crop = {
   id: number

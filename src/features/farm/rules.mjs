@@ -7,7 +7,10 @@ import {
 } from './permanent.mjs'
 import { FARM_RULESET, MONSTERS, regularMonsterKind } from './monsters.mjs'
 import { routeSeed, todayRoute, validDay } from './calendar.mjs'
+import { comboModifiers } from './schools.mjs'
 export { todayRoute, validDay }
+// 流派与跨流派组合技是数据层，但玩法上属于同一套规则，从这里一并导出给界面。
+export * from './schools.mjs'
 export const FPS = 16
 export const MOVE_STEP = 3
 // Every band member and piece of gear climbs to this level; reaching it on a
@@ -700,6 +703,8 @@ export function stepFarm(previous, point, useSurge = false) {
   const durationBonus = gear.sustain + gear.delay
   const residueBonus = gear.delay
   const pulseDamage = 1 + Math.floor(gear.tempo / 3) + frenzy
+  // 跨流派组合技不占槽位：达成即自动生效，增益与上面的芯片加成同乘一处。
+  const combo = comboModifiers(gear)
   const harvest = (crop, chain = false) => {
     if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) return
     crop.hp = 0
@@ -782,13 +787,16 @@ export function stepFarm(previous, point, useSurge = false) {
     })
     if (gear.drum) {
       const radius =
-        (7 + gear.drum * 2 + (boomFlow ? 3 : 0) + (forms.includes('drum') ? 12 : 0)) * areaBonus
+        (7 + gear.drum * 2 + (boomFlow ? 3 : 0) + (forms.includes('drum') ? 12 : 0)) *
+        areaBonus *
+        combo.blastArea
       events.push({ id: state.nextId++, kind: 'blast', x: crop.x, y: crop.y, radius, lane: 0 })
       for (const other of state.crops)
         if (other.hp > 0 && distance(other.x, other.y, crop.x, crop.y) <= radius)
           damage(
             other,
-            (gear.drum + (boomFlow ? 1 : 0)) * (forms.includes('drum') ? 2 : 1) + powerBonus,
+            ((gear.drum + (boomFlow ? 1 : 0)) * (forms.includes('drum') ? 2 : 1) + powerBonus) *
+              combo.blast,
             true,
           )
     }
@@ -801,7 +809,7 @@ export function stepFarm(previous, point, useSurge = false) {
   // Every hit this run lands harder once overload cards are picked; the
   // permanent power level stays the baseline they stack on. This also covers
   // the surge, which fires through the same damage path.
-  const runDamage = stats.damage * (1 + state.growth.power * STAT_CARD_DAMAGE)
+  const runDamage = stats.damage * (1 + state.growth.power * STAT_CARD_DAMAGE) * combo.damage
   const damage = (crop, amount, chain = false) => {
     if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) return
     const critical = gear.lucky > 0 && (crop.id + state.tick) % Math.max(3, 8 - gear.lucky) === 0
@@ -992,7 +1000,7 @@ export function stepFarm(previous, point, useSurge = false) {
         fromY: point[1],
         lane: 3,
       })
-      damage(crop, gear.echo * (forms.includes('echo') ? 2 : 1) + powerBonus)
+      damage(crop, (gear.echo * (forms.includes('echo') ? 2 : 1) + powerBonus) * combo.rain)
     }
     // A fast sound wave can schedule the next rain on the same tick. Keep it
     // without cancelling the rain that was already due.
@@ -1032,7 +1040,7 @@ export function stepFarm(previous, point, useSurge = false) {
         id: state.nextId++,
         x: point[0],
         y: point[1],
-        damage: gear.whistle + (forms.includes('whistle') ? 2 : 0) + powerBonus,
+        damage: (gear.whistle + (forms.includes('whistle') ? 2 : 0) + powerBonus) * combo.residue,
         expires: state.tick + FPS * (3 + durationBonus),
       })
       if (state.trails.length > 30) state.trails.shift()
@@ -1062,7 +1070,7 @@ export function stepFarm(previous, point, useSurge = false) {
         if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
         const dist = distance(crop.x, crop.y, point[0], point[1])
         if (dist > radius) continue
-        damage(crop, gear.bell + (forms.includes('bell') ? 2 : 0) + powerBonus)
+        damage(crop, (gear.bell + (forms.includes('bell') ? 2 : 0) + powerBonus) * combo.shock)
         const factor = 6 / Math.max(1, dist)
         crop.x += (crop.x - point[0] || 1) * factor
         crop.y += (crop.y - point[1] || 1) * factor
@@ -1111,7 +1119,7 @@ export function stepFarm(previous, point, useSurge = false) {
         const along = vx * heading[0] + vy * heading[1]
         const side = Math.abs(vx * -heading[1] + vy * heading[0])
         if (along < -4 || along > length || side > half + along * 0.9) continue
-        damage(crop, 2 + gear.sax * 2 + (forms.includes('sax') ? 4 : 0) + powerBonus)
+        damage(crop, (2 + gear.sax * 2 + (forms.includes('sax') ? 4 : 0) + powerBonus) * combo.horn)
         crop.slowUntil = state.tick + FPS * (forms.includes('sax') ? 3 : 2)
         crop.x += heading[0] * (forms.includes('sax') ? 9 : 6)
         crop.y += heading[1] * (forms.includes('sax') ? 9 : 6)
@@ -1133,7 +1141,7 @@ export function stepFarm(previous, point, useSurge = false) {
         x: point[0],
         y: point[1],
         due: state.tick + FPS,
-        damage: gear.sampler + 1 + (forms.includes('sampler') ? 2 : 0) + powerBonus,
+        damage: (gear.sampler + 1 + (forms.includes('sampler') ? 2 : 0) + powerBonus) * combo.mine,
         radius:
           (18 + gear.trigger * 4 + residueBonus * 2 + (forms.includes('sampler') ? 10 : 0)) *
           areaBonus,
@@ -1168,7 +1176,7 @@ export function stepFarm(previous, point, useSurge = false) {
       for (const crop of state.crops) {
         if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
         if (distance(crop.x, crop.y, bx, by) > 9) continue
-        damage(crop, gear.deck + (forms.includes('deck') ? 3 : 1) + powerBonus)
+        damage(crop, (gear.deck + (forms.includes('deck') ? 3 : 1) + powerBonus) * combo.blade)
         if (!forms.includes('deck')) continue
         const other = state.crops.find(
           (target) =>
@@ -1187,7 +1195,7 @@ export function stepFarm(previous, point, useSurge = false) {
           fromY: other.y,
           lane: 3,
         })
-        damage(other, 2 + gear.needle + powerBonus)
+        damage(other, (2 + gear.needle + powerBonus) * combo.ricochet)
       }
     }
   }
@@ -1197,7 +1205,8 @@ export function stepFarm(previous, point, useSurge = false) {
     if (state.tick % every === 0) {
       const dir = aimAt()
       const base = Math.atan2(dir[1], dir[0] * 0.84)
-      const reach = (36 + gear.arp * 6 + (forms.includes('synth') ? 14 : 0)) * areaBonus
+      const reach =
+        (36 + gear.arp * 6 + (forms.includes('synth') ? 14 : 0)) * areaBonus * combo.fanArea
       const spread = 0.45 + gear.arp * 0.1 + (forms.includes('synth') ? 0.3 : 0)
       for (const offset of forms.includes('synth') ? [-0.32, 0, 0.32] : [0]) {
         const angle = base + offset
@@ -1217,7 +1226,10 @@ export function stepFarm(previous, point, useSurge = false) {
           const towards = Math.atan2(crop.y - point[1], (crop.x - point[0]) * 0.84)
           const off = Math.abs(((towards - angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI)
           if (off > spread) continue
-          damage(crop, gear.synth + 1 + (forms.includes('synth') ? 2 : 0) + powerBonus)
+          damage(
+            crop,
+            (gear.synth + 1 + (forms.includes('synth') ? 2 : 0) + powerBonus) * combo.fan,
+          )
         }
       }
     }
@@ -1228,9 +1240,10 @@ export function stepFarm(previous, point, useSurge = false) {
         if (crop.hp > 0 && distance(crop.x, crop.y, orb[0], orb[1]) <= 6)
           damage(
             crop,
-            (gear.orbit + (boomFlow ? 1 : 0)) * (forms.includes('orbit') ? 2 : 1) + powerBonus,
+            ((gear.orbit + (boomFlow ? 1 : 0)) * (forms.includes('orbit') ? 2 : 1) + powerBonus) *
+              combo.orbit,
           )
-  const attraction = (15 + gear.magnet * 15) * stats.attraction
+  const attraction = (15 + gear.magnet * 15) * stats.attraction * combo.attraction
   for (const drop of state.loot) {
     const dist = distance(drop.x, drop.y, point[0], point[1])
     if (dist <= attraction || state.tick < state.surgeUntil) {

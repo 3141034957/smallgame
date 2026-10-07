@@ -13,6 +13,7 @@ import {
   SURGE_COOLDOWN,
   TALENTS,
   THRESHOLDS,
+  activeCombos,
   chooseTalent,
   clampPoint,
   createFarm,
@@ -599,6 +600,26 @@ describe('music roguelite farming', () => {
       expect(round.state.hp).toBe(0)
       expect(round.state.loot.length).toBeLessThanOrEqual(600)
     }
+  }, 120000)
+
+  it('replays a run that leans on cross-school combos to the same score', () => {
+    // Regression guard: combos fire off nothing but the gear table, so a run
+    // that reaches several evolutions has to stay frame-for-frame reproducible.
+    const round = run('echo', '2026-10-01')
+    const combos = activeCombos(round.state.gear)
+    expect(combos.length).toBeGreaterThan(1)
+    expect(evolved(round.state.gear).length).toBeGreaterThanOrEqual(3)
+    const replay = replayFarm('2026-10-01', round.frames, round.choices, round.surges)
+    expect(replay).toMatchObject({
+      score: round.state.score,
+      harvested: round.state.harvested,
+      bosses: round.state.bosses,
+      coins: round.state.coins,
+      xp: round.state.xp,
+      gear: round.state.gear,
+    })
+    expect(activeCombos(replay.gear)).toEqual(combos)
+    expect(replayFarm('2026-10-01', round.frames, round.choices, round.surges)).toEqual(replay)
   }, 120000)
 
   it('rejects partial or forged replay inputs and unmatched or illegal choices and boosts', () => {
