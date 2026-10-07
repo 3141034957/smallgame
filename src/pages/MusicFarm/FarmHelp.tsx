@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import { MONSTERS } from '@/features/farm/monsters.mjs'
 import { MAX_GEAR_LEVEL, RECIPES, TALENTS } from '@/features/farm/rules.mjs'
-import { comboRequirement, SCHOOL_COMBOS, SCHOOL_LIST } from '@/features/farm/help'
+import { SCHOOL_COMBOS, SCHOOL_LIST } from '@/features/farm/help'
 
 const talent = (id: string) => TALENTS.find((item) => item.id === id)!
 
@@ -39,7 +39,7 @@ export function FarmHelp({ onClose }: { onClose: () => void }) {
             <div>
               <b>{combo.name}</b>
               <small>
-                {comboRequirement(combo)} · {combo.tagline}
+                {combo.requirement} → {combo.effect}
               </small>
             </div>
           </div>

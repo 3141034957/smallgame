@@ -143,7 +143,7 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
                 </span>
                 {hint && (
                   <span>
-                    再补 {hint.missing} → {hint.combo.name}
+                    {hint.missing} → {hint.combo.name}
                   </span>
                 )}
               </div>

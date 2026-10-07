@@ -4,7 +4,6 @@ import { MAX_GEAR_LEVEL } from '@/features/farm/rules.mjs'
 import type { Gear } from '@/features/farm/rules.mjs'
 import {
   activeSchoolCombos,
-  comboBonusText,
   schoolComboHints,
   SCHOOL_ROMAN,
   startedSchoolViews,
@@ -88,7 +87,7 @@ export function BuildSummary({ gear, state }: { gear: Gear; state?: ComboState }
                 <span aria-hidden="true">{combo.icon}</span>
                 <div>
                   <strong>{combo.name}</strong>
-                  <small>{comboBonusText(combo)}</small>
+                  <small>{combo.effect}</small>
                 </div>
               </li>
             ))}
@@ -98,7 +97,7 @@ export function BuildSummary({ gear, state }: { gear: Gear; state?: ComboState }
                 <div>
                   <strong>下一步：{hint.combo.name}</strong>
                   <small>
-                    还差 {hint.missing} · {hint.combo.tagline}
+                    {hint.missing} · {hint.combo.effect}
                   </small>
                 </div>
               </li>
