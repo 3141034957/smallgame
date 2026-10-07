@@ -33,12 +33,9 @@ export type Combo = {
   requires: string[]
   any?: number
   tagline: string
+  requirement: string
+  effect: string
   bonus: Record<string, number>
-}
-
-export type ComboProgress = Combo & {
-  schools: string[]
-  missing: string[]
 }
 
 // Combo and school lookups accept the live run or a bare gear map.
@@ -60,13 +57,17 @@ export const FULL_ENCORE_ATTRACTION: number
 export const FULL_ENCORE_SCHOOLS: number
 export const COMBO_BONUS_KEYS: string[]
 export const COMBOS: Combo[]
+export const SCHOOLS: School[]
 export function schools(): School[]
 export function schoolById(id: string): School | undefined
 export function activeCombos(source: ComboSource): Combo[]
+export function nearCombos(
+  source: ComboSource,
+): { id: string; name: string; icon: string; missing: string }[]
 export function comboModifiers(source: ComboSource): Record<string, number>
 export function schoolProgress(source: ComboSource): SchoolProgress[]
 export function comboProgress(source: ComboSource): {
-  active: ComboProgress[]
-  close: ComboProgress[]
+  active: Combo[]
+  near: { id: string; name: string; icon: string; missing: string }[]
   evolvedSchools: number
 }

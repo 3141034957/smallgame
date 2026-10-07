@@ -5,7 +5,7 @@ import { MAX_GEAR_LEVEL, RECIPES, TALENTS, evolved } from './rules.mjs'
 // 这一层只描述数据与数值，判定与生效都在下面的纯函数里完成，
 // 因此同样的 gear 永远得到同样的结果（重放可复现）。
 
-// 乐器、芯片、进化名与配色全部复用 rules.mjs 的既有常量，这里只补流派名与定位。
+// 这里只补流派名与定位，乐器、芯片、进化名与配色全部复用 rules.mjs 的既有常量。
 const SCHOOL_DEFINITIONS = [
   {
     id: 'drum',
@@ -91,13 +91,16 @@ export const COMBO_BONUS_KEYS = [
   'mine',
 ]
 
+const percent = (value) => `${Math.round(value * 100)}%`
+
 export const COMBOS = [
   {
     id: 'resonance',
     name: '共振风暴',
     icon: '🌀',
     requires: ['drum', 'synth'],
-    tagline: '爆破与扇形互相增幅：连锁爆破与棱镜音浪都更痛、更宽',
+    requirement: '鼓组流 + 合成器流都进化',
+    effect: `连锁爆破与扇形音浪伤害 +${percent(RESONANCE_STORM_DAMAGE)}、范围 +${percent(RESONANCE_STORM_AREA)}`,
     bonus: {
       blast: RESONANCE_STORM_DAMAGE,
       blastArea: RESONANCE_STORM_AREA,
@@ -110,7 +113,8 @@ export const COMBOS = [
     name: '低音陷阱',
     icon: '🕳️',
     requires: ['power', 'whistle'],
-    tagline: '黑洞把怪群拖进音阵，残留伤害更高、掉落吸得更远',
+    requirement: '贝斯流 + 长笛流都进化',
+    effect: `长笛残留音阵伤害 +${percent(BASS_TRAP_RESIDUE)}、拾取范围 +${percent(BASS_TRAP_ATTRACTION)}`,
     bonus: { residue: BASS_TRAP_RESIDUE, attraction: BASS_TRAP_ATTRACTION },
   },
   {
@@ -118,7 +122,8 @@ export const COMBOS = [
     name: '金属回响',
     icon: '🎸',
     requires: ['orbit', 'deck'],
-    tagline: '音刃与回响弹互相触发连锁：音刃更痛，回响弹大幅加强',
+    requirement: '吉他流 + 唱盘流都进化',
+    effect: `吉他与唱盘音刃伤害各 +${percent(METAL_ECHO_BLADE)}、回响弹伤害 +${percent(METAL_ECHO_RICOCHET)}`,
     bonus: {
       orbit: METAL_ECHO_ORBIT,
       blade: METAL_ECHO_BLADE,
@@ -130,7 +135,8 @@ export const COMBOS = [
     name: '星海合唱',
     icon: '🌟',
     requires: ['echo', 'bell'],
-    tagline: '星浪附带追踪音雨：环形冲击与音雨同时变强',
+    requirement: '主唱流 + 键盘流都进化',
+    effect: `键盘星浪伤害 +${percent(STAR_CHOIR_SHOCK)}、追踪音雨伤害 +${percent(STAR_CHOIR_RAIN)}`,
     bonus: { shock: STAR_CHOIR_SHOCK, rain: STAR_CHOIR_RAIN },
   },
   {
@@ -138,7 +144,8 @@ export const COMBOS = [
     name: '铜管狂潮',
     icon: '🎷',
     requires: ['sax', 'sampler'],
-    tagline: '冲刺波引爆沿途音爆：号角与音爆伤害一起提升',
+    requirement: '萨克斯流 + 采样台流都进化',
+    effect: `号角冲刺波伤害 +${percent(BRASS_FRENZY_HORN)}、音爆采样伤害 +${percent(BRASS_FRENZY_MINE)}`,
     bonus: { horn: BRASS_FRENZY_HORN, mine: BRASS_FRENZY_MINE },
   },
   {
@@ -147,40 +154,77 @@ export const COMBOS = [
     icon: '🎆',
     requires: [],
     any: FULL_ENCORE_SCHOOLS,
-    tagline: `任意 ${FULL_ENCORE_SCHOOLS} 个流派进化：全局伤害与拾取范围小幅提升`,
+    requirement: `任意 ${FULL_ENCORE_SCHOOLS} 个流派完成进化`,
+    effect: `全部伤害 +${percent(FULL_ENCORE_DAMAGE)}、拾取范围 +${percent(FULL_ENCORE_ATTRACTION)}`,
     bonus: { damage: FULL_ENCORE_DAMAGE, attraction: FULL_ENCORE_ATTRACTION },
   },
 ]
 
-let schoolCache = null
-// 延迟到第一次调用才从 rules.mjs 取值：两个模块互相引用，
-// 顶层直接展开 RECIPES 会撞上尚未初始化的绑定。
-export function schools() {
-  schoolCache ??= SCHOOL_DEFINITIONS.map((school) => {
-    const recipe = RECIPES.find((item) => item.weapon === school.id)
+let derivedCache = null
+// 乐器名、芯片名、进化形态与配色都在 rules.mjs 里，而 rules.mjs 又要用到本模块的
+// 组合技增益：两个模块互相引用，顶层直接展开 RECIPES 会撞上尚未初始化的绑定。
+// 所以这些字段做成取值时才计算的派生属性，第一次读到之后缓存下来。
+function derivedFor(id) {
+  if (!derivedCache) derivedCache = {}
+  if (!derivedCache[id]) {
+    const recipe = RECIPES.find((item) => item.weapon === id)
     const weapon = TALENTS.find((talent) => talent.id === recipe.weapon)
     const chip = TALENTS.find((talent) => talent.id === recipe.chip)
-    return {
-      id: school.id,
-      name: school.name,
-      style: school.style,
-      tagline: school.tagline,
-      weapon: recipe.weapon,
+    derivedCache[id] = {
       chip: recipe.chip,
       weaponName: weapon.name,
-      chipName: chip.name,
       weaponIcon: weapon.icon,
+      chipName: chip.name,
       chipIcon: chip.icon,
       color: weapon.color,
       form: recipe.name,
       formIcon: recipe.icon,
       formDescription: recipe.description,
     }
-  })
-  return schoolCache
+  }
+  return derivedCache[id]
 }
 
-export const schoolById = (id) => schools().find((school) => school.id === id)
+// 界面直接用的一张表：id、流派名、核心乐器、专属芯片、进化形态、一句话定位、配色。
+export const SCHOOLS = SCHOOL_DEFINITIONS.map((school) => ({
+  id: school.id,
+  name: school.name,
+  weapon: school.id,
+  style: school.style,
+  tagline: school.tagline,
+  blurb: `${school.style}：${school.tagline}`,
+  get chip() {
+    return derivedFor(school.id).chip
+  },
+  get chipName() {
+    return derivedFor(school.id).chipName
+  },
+  get chipIcon() {
+    return derivedFor(school.id).chipIcon
+  },
+  get weaponName() {
+    return derivedFor(school.id).weaponName
+  },
+  get weaponIcon() {
+    return derivedFor(school.id).weaponIcon
+  },
+  get color() {
+    return derivedFor(school.id).color
+  },
+  get form() {
+    return derivedFor(school.id).form
+  },
+  get formIcon() {
+    return derivedFor(school.id).formIcon
+  },
+  get formDescription() {
+    return derivedFor(school.id).formDescription
+  },
+}))
+
+export const schools = () => SCHOOLS
+
+export const schoolById = (id) => SCHOOLS.find((school) => school.id === id)
 
 const gearOf = (source) => source?.gear ?? source
 
@@ -190,7 +234,8 @@ function comboMet(combo, gear, forms) {
   return combo.requires.every((id) => forms.includes(id))
 }
 
-// 差一点就达成：显式流派每个都有一半满级，只差另一半；全场安可只差一个进化。
+// 差一点就达成：显式流派每个已进化的算到位，剩下的要有一件满级；
+// 全场安可只差一个进化。
 function comboAlmost(combo, gear, forms) {
   if (combo.any) return forms.length === combo.any - 1
   return combo.requires.every((id) => {
@@ -200,20 +245,49 @@ function comboAlmost(combo, gear, forms) {
   })
 }
 
-// 当前生效的组合技。只依赖 gear，所以重放逐帧可复现。
-export function activeCombos(source) {
-  const gear = gearOf(source)
+// 当前生效的组合技。入参是完整的 farm state（也可以直接传 gear），
+// 刚开局装备全 0 时安全返回空数组。只依赖 gear，所以重放逐帧可复现。
+export function activeCombos(state) {
+  const gear = gearOf(state)
   const forms = evolved(gear)
   return COMBOS.filter((combo) => comboMet(combo, gear, forms))
 }
 
 // 把生效组合技的数值增益折成一组乘数，未涉及的键恒为 1。
 // 同一个键上的多个组合叠加方式与既有加成一致：加算到同一个 1 + 上。
-export function comboModifiers(source) {
+export function comboModifiers(state) {
   const multipliers = Object.fromEntries(COMBO_BONUS_KEYS.map((key) => [key, 1]))
-  for (const combo of activeCombos(source))
+  for (const combo of activeCombos(state))
     for (const [key, value] of Object.entries(combo.bonus)) multipliers[key] += value
   return multipliers
+}
+
+// 差一点的那些组合技，附一句中文提示告诉玩家还差什么。
+export function nearCombos(state) {
+  const gear = gearOf(state)
+  const forms = evolved(gear)
+  return COMBOS.filter(
+    (combo) => !comboMet(combo, gear, forms) && comboAlmost(combo, gear, forms),
+  ).map((combo) => ({
+    id: combo.id,
+    name: combo.name,
+    icon: combo.icon,
+    missing: missingOf(combo, gear, forms),
+  }))
+}
+
+function missingOf(combo, gear, forms) {
+  if (combo.any) return `还差 ${combo.any - forms.length} 个流派进化`
+  const parts = combo.requires
+    .filter((id) => !forms.includes(id))
+    .map((id) => {
+      const school = schoolById(id)
+      const remaining =
+        Math.max(0, MAX_GEAR_LEVEL - (gear[school.weapon] ?? 0)) +
+        Math.max(0, MAX_GEAR_LEVEL - (gear[school.chip] ?? 0))
+      return `「${school.name}」还差 ${remaining} 级进化`
+    })
+  return parts.join('、')
 }
 
 // 流派层数：0 未接触、1 已有核心乐器、2 乐器与芯片齐备、
@@ -228,10 +302,10 @@ function schoolTier(gear, school, isEvolved) {
 }
 
 // 给升级页与帮助页用：每个流派当前走到第几层、还差多少级。
-export function schoolProgress(source) {
-  const gear = gearOf(source)
+export function schoolProgress(state) {
+  const gear = gearOf(state)
   const forms = evolved(gear)
-  return schools().map((school) => {
+  return SCHOOLS.map((school) => {
     const weaponLevel = gear[school.weapon] ?? 0
     const chipLevel = gear[school.chip] ?? 0
     const isEvolved = forms.includes(school.id)
@@ -247,24 +321,11 @@ export function schoolProgress(source) {
   })
 }
 
-// 已达成与差一点的都列出来，帮助页可以提示玩家下一步拼什么。
-export function comboProgress(source) {
-  const gear = gearOf(source)
-  const forms = evolved(gear)
-  const decorate = (combo) => ({
-    ...combo,
-    schools: combo.any
-      ? forms.map((id) => schoolById(id).name)
-      : combo.requires.map((id) => schoolById(id).name),
-    missing: combo.any
-      ? []
-      : combo.requires.filter((id) => !forms.includes(id)).map((id) => schoolById(id).name),
-  })
+// 已经达成的组合技、差一点的提示，以及本局进化了几个流派。
+export function comboProgress(state) {
   return {
-    active: COMBOS.filter((combo) => comboMet(combo, gear, forms)).map(decorate),
-    close: COMBOS.filter(
-      (combo) => !comboMet(combo, gear, forms) && comboAlmost(combo, gear, forms),
-    ).map(decorate),
-    evolvedSchools: forms.length,
+    active: activeCombos(state),
+    near: nearCombos(state),
+    evolvedSchools: evolved(gearOf(state)).length,
   }
 }

@@ -8,12 +8,14 @@ import {
   MAX_GEAR_LEVEL,
   RECIPES,
   RESONANCE_STORM_DAMAGE,
+  SCHOOLS,
   TALENTS,
   activeCombos,
   comboModifiers,
   comboProgress,
   createFarm,
   evolved,
+  nearCombos,
   schoolProgress,
   schools,
   stepFarm,
@@ -217,14 +219,67 @@ describe('music roguelite schools', () => {
     const combos = comboProgress(state)
     // 鼓组已进化、合成器差一件：共振风暴还差一点，还没有组合技生效。
     expect(combos.active).toEqual([])
-    expect(ids(combos.close)).toEqual(['resonance'])
+    expect(combos.near.map((item) => item.id)).toEqual(['resonance'])
     expect(combos.evolvedSchools).toBe(evolved(state.gear).length)
     // 补上琶音器就立刻生效。
     const complete = { ...state.gear, arp: MAX_GEAR_LEVEL }
     expect(ids(comboProgress({ gear: complete }).active)).toEqual(['resonance'])
     // 两个流派进化后，全场安可也进入差一点。
-    expect(ids(comboProgress({ gear: complete }).close)).toEqual(['encore'])
-    // 全场安可差一个进化时也算差一点。
-    expect(ids(comboProgress({ gear: gearWith('drum', 'whistle') }).close)).toEqual(['encore'])
+    expect(comboProgress({ gear: complete }).near.map((item) => item.id)).toEqual(['encore'])
+  })
+
+  it('exports the shape the upgrade and help pages ask for', () => {
+    // SCHOOLS：id、流派名、核心乐器、专属芯片、进化形态、一句话定位、配色。
+    expect(SCHOOLS).toHaveLength(RECIPES.length)
+    for (const school of SCHOOLS) {
+      expect(typeof school.id).toBe('string')
+      expect(typeof school.name).toBe('string')
+      expect(school.weapon).toBe(school.id)
+      expect(typeof school.chip).toBe('string')
+      expect(school.form).toBe(RECIPES.find((item) => item.weapon === school.id).name)
+      expect(school.color).toBe(TALENTS.find((talent) => talent.id === school.id).color)
+      expect(school.blurb).toContain('：')
+    }
+    // COMBOS：id、名称、图标、前提、效果，效果里带上具体数值。
+    for (const combo of COMBOS) {
+      expect(typeof combo.requirement).toBe('string')
+      expect(combo.requirement.length).toBeGreaterThan(0)
+      expect(combo.effect).toMatch(/\d+%/)
+      expect(combo.icon.length).toBeGreaterThan(0)
+    }
+    // 刚开局的空 state 上调用是安全的。
+    const fresh = createFarm(day)
+    expect(activeCombos(fresh)).toEqual([])
+    expect(nearCombos(fresh)).toEqual([])
+    expect(comboProgress(fresh)).toEqual({ active: [], near: [], evolvedSchools: 0 })
+  })
+
+  it('names what each near combo is missing', () => {
+    const state = createFarm(day)
+    Object.assign(state.gear, {
+      drum: MAX_GEAR_LEVEL,
+      range: MAX_GEAR_LEVEL,
+      synth: MAX_GEAR_LEVEL,
+      arp: MAX_GEAR_LEVEL - 1,
+    })
+    const near = nearCombos(state)
+    expect(near).toEqual([
+      {
+        id: 'resonance',
+        name: '共振风暴',
+        icon: '🌀',
+        missing: '「合成器流」还差 1 级进化',
+      },
+    ])
+    // 只差一个流派进化时，全场安可给出的是个数而不是流派名。
+    const encore = nearCombos({ gear: gearWith('drum', 'whistle') })
+    expect(encore.map((item) => item.id)).toEqual(['encore'])
+    expect(encore[0].missing).toBe('还差 1 个流派进化')
+    // 已经达成的组合技不会再出现在差一点里。
+    const done = nearCombos({ gear: gearWith('drum', 'synth') })
+    expect(done.map((item) => item.id)).toEqual(['encore'])
+    expect(activeCombos({ gear: gearWith('drum', 'synth') }).map((item) => item.id)).toEqual([
+      'resonance',
+    ])
   })
 })
