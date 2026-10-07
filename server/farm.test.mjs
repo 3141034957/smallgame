@@ -453,6 +453,42 @@ describe('replay-verified all-time farm leaderboard', () => {
     }
   })
 
+  it('refuses non-POST score uploads with 405 and an Allow header', async () => {
+    const store = createFarmStore(':memory:')
+    const request = createRequest(store)
+    try {
+      for (const method of ['GET', 'PUT', 'DELETE']) {
+        const rejected = await request(method, '/api/farm/score')
+        expect(rejected.status).toBe(405)
+        expect(rejected.headers.Allow).toBe('POST')
+      }
+      // The neighbouring leaderboard route keeps its own contract.
+      expect((await request('POST', '/api/farm/leaderboard', '{}')).status).toBe(404)
+    } finally {
+      store.close()
+    }
+  })
+
+  it('explains that a run longer than the replayable limit cannot be ranked', async () => {
+    const store = createFarmStore(':memory:')
+    const request = createRequest(store)
+    try {
+      const long = await request(
+        'POST',
+        '/api/farm/score',
+        JSON.stringify({
+          ...input,
+          frames: Array.from({ length: MAX_FARM_FRAMES + 1 }, () => input.frames[0]),
+        }),
+      )
+      expect(long.status).toBe(400)
+      expect(long.data.error).toContain('上限')
+      expect(store.boardAcrossDays(FARM_PREFIX, 'farm').total).toBe(0)
+    } finally {
+      store.close()
+    }
+  })
+
   it('returns useful HTTP errors for malformed, oversized, invalid and unknown requests', async () => {
     const store = createFarmStore(':memory:')
     const request = createRequest(store)

@@ -98,6 +98,14 @@ export async function handleFarmRequest(
         send(401, { error: '登录已失效或在别处登录，请重新登录。' })
         return
       }
+      // A run longer than the replayable window is rejected here as well, so
+      // say why: "成绩未通过校验" alone leaves the player guessing.
+      if (Array.isArray(input?.frames) && input.frames.length > MAX_FARM_FRAMES) {
+        send(400, {
+          error: `本局时长超出排行榜可校验的上限（约 ${MAX_FARM_FRAMES / FPS / 60} 分钟），请缩短对局或只提交较短的一局；成绩仍保留在本机。`,
+        })
+        return
+      }
       const record = verifyFarm({ ...input, playerId: current.id })
       if (!record) {
         send(400, { error: '成绩未通过校验，完成一局生存挑战后再上榜吧。' })
@@ -108,7 +116,9 @@ export async function handleFarmRequest(
         ...store.boardAcrossDays(FARM_PREFIX, 'farm', record.playerId),
         acceptedScore: record.score,
       })
-    } else send(404, { error: '无限榜接口不存在。' })
+    } else if (url.pathname === '/api/farm/score')
+      send(405, { error: '成绩提交只支持 POST 方法。' }, { Allow: 'POST' })
+    else send(404, { error: '无限榜接口不存在。' })
   } catch (error) {
     if (error instanceof AuthError)
       send(

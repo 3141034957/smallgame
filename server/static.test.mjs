@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { brotliDecompressSync, gunzipSync } from 'node:zlib'
-import { createStaticHandler, negotiateEncoding } from './static.mjs'
+import { createStaticHandler, negotiateEncoding, warnOnMissingBuild } from './static.mjs'
 
 let root, send, html, script
 beforeEach(() => {
@@ -117,6 +117,16 @@ describe('static response correctness', () => {
     expect(leaked.status).toBe(403)
     expect(String(leaked.body)).not.toContain('outside-secret')
     expect(response('/assets/linked.txt').body.toString()).toBe('hello')
+  })
+  it('warns about a missing build only when the SPA entry cannot be read', () => {
+    const logs = []
+    const log = (message) => logs.push(message)
+    expect(warnOnMissingBuild(join(root, 'client'), log)).toBe(false)
+    expect(logs).toEqual([])
+    expect(warnOnMissingBuild(join(root, 'client-private'), log)).toBe(true)
+    expect(warnOnMissingBuild(join(root, 'no-such-build'), log)).toBe(true)
+    expect(logs).toHaveLength(2)
+    for (const message of logs) expect(message).toContain('npm run build')
   })
   it('returns 404 when even the SPA entry is absent', () => {
     rmSync(join(root, 'client/index.html'))

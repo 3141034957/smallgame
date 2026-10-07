@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { request } from 'node:http'
+import { createServer, request } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -295,3 +295,46 @@ it.each([
   })
   expect(posted).toBe(404)
 })
+
+function startChild(port, dataDir) {
+  return spawnSync(process.execPath, [fileURLToPath(new URL('./index.mjs', import.meta.url))], {
+    env: { ...process.env, PORT: String(port), DATA_DIR: dataDir },
+    encoding: 'utf8',
+    timeout: 20000,
+  })
+}
+
+it('explains a port conflict instead of crashing with a stack trace', async () => {
+  const blocker = createServer()
+  blocker.listen(0)
+  await once(blocker, 'listening')
+  const dataDir = mkdtempSync(join(tmpdir(), 'smallgame-port-'))
+  try {
+    const run = startChild(blocker.address().port, dataDir)
+    expect(run.status).not.toBe(0)
+    expect(run.stderr).toContain('已被其他进程占用')
+  } finally {
+    blocker.close()
+    rmSync(dataDir, { recursive: true, force: true })
+  }
+}, 30000)
+
+it('asks for a higher port when binding 80 is refused', async () => {
+  // Some sandboxes let an unprivileged process take port 80; there the child
+  // would simply start, so only assert where the bind is really refused.
+  const refused = await new Promise((resolve) => {
+    const probe = createServer()
+    probe.once('error', () => resolve(true))
+    probe.listen(80, () => probe.close(() => resolve(false)))
+  })
+  if (!refused) return
+  const dataDir = mkdtempSync(join(tmpdir(), 'smallgame-root-'))
+  try {
+    const run = startChild(80, dataDir)
+    expect(run.status).not.toBe(0)
+    expect(run.stderr).toContain('root 权限')
+    expect(run.stderr).toContain('PORT=3001')
+  } finally {
+    rmSync(dataDir, { recursive: true, force: true })
+  }
+}, 30000)

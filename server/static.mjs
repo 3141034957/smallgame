@@ -1,5 +1,5 @@
 import { readFileSync, realpathSync, statSync } from 'node:fs'
-import { extname, relative, resolve, sep } from 'node:path'
+import { extname, join, relative, resolve, sep } from 'node:path'
 import { brotliCompressSync, constants, gzipSync } from 'node:zlib'
 
 const MIME_TYPES = {
@@ -45,6 +45,22 @@ export function negotiateEncoding(header, available = ['br', 'gzip']) {
   const identity = weights.get('identity') ?? (weights.get('*') === 0 ? 0 : 1)
   if (weights.has('identity') && identity > best) return 'identity'
   return chosen ?? (identity > 0 ? 'identity' : null)
+}
+
+// Without a build every page route answers 404, which looks like broken APIs
+// rather than a forgotten `npm run build`. Say so at startup, but keep serving:
+// the API still works and `npm run dev` never reaches this server.
+export function warnOnMissingBuild(clientDirectory, log = console.warn) {
+  const entry = join(resolve(clientDirectory), 'index.html')
+  try {
+    if (statSync(entry).isFile()) return false
+  } catch {
+    /* Fall through to the warning: the file is missing or unreadable. */
+  }
+  log(
+    `⚠️ 未找到前端构建产物 ${entry}，所有页面都会返回 404。请先执行 npm run build 再启动服务（开发调试请直接用 npm run dev）。`,
+  )
+  return true
 }
 
 export function createStaticHandler(clientDirectory) {

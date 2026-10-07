@@ -3,7 +3,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createFarmStore } from './farm-store.mjs'
 import { handleFarmRequest } from './farm.mjs'
-import { createStaticHandler } from './static.mjs'
+import { createStaticHandler, warnOnMissingBuild } from './static.mjs'
 import { createAuthStore } from './auth-store.mjs'
 import { createAuthHandler, allowAccountWrite } from './auth.mjs'
 import { handleProgressRequest } from './progress.mjs'
@@ -22,7 +22,9 @@ const databasePath = join(process.env.DATA_DIR || join(directory, 'data'), 'game
 const store = createFarmStore(databasePath)
 const accounts = createAuthStore(databasePath)
 const auth = createAuthHandler(accounts)
-const sendStatic = createStaticHandler(join(directory, '..', 'dist', 'client'))
+const clientDirectory = join(directory, '..', 'dist', 'client')
+const sendStatic = createStaticHandler(clientDirectory)
+warnOnMissingBuild(clientDirectory)
 
 const server = createServer((req, res) => {
   let url
@@ -69,7 +71,23 @@ const server = createServer((req, res) => {
   sendStatic(req, res, url.pathname)
 })
 
-server.listen(process.env.PORT || 3001, () => {
+const port = process.env.PORT || 3001
+// Operators reach this server by IP with no proxy, so a failed bind must say
+// what to change instead of dumping a stack trace at them.
+server.on('error', (error) => {
+  if (error.code === 'EACCES') {
+    console.error(
+      `❌ 端口 ${port} 绑定失败：1024 以下的端口需要 root 权限。请改用高位端口，例如 PORT=3001 npm start。`,
+    )
+    process.exit(1)
+  }
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ 端口 ${port} 已被其他进程占用，请更换 PORT 或先停止占用该端口的服务。`)
+    process.exit(1)
+  }
+  throw error
+})
+server.listen(port, () => {
   console.log(`🌐 Server running at http://localhost:${server.address().port}`)
   console.log(`🗄️ Database stored at ${databasePath}`)
 })
