@@ -320,14 +320,16 @@ it('explains a port conflict instead of crashing with a stack trace', async () =
 }, 30000)
 
 it('asks for a higher port when binding 80 is refused', async () => {
-  // Some sandboxes let an unprivileged process take port 80; there the child
-  // would simply start, so only assert where the bind is really refused.
-  const refused = await new Promise((resolve) => {
+  // Some sandboxes let an unprivileged process take port 80, and a busy port 80
+  // fails with EADDRINUSE instead, so only run the child where the bind is
+  // really refused for missing privileges. The wording itself is covered by the
+  // deterministic case below, which no sandbox can skip.
+  const code = await new Promise((resolve) => {
     const probe = createServer()
-    probe.once('error', () => resolve(true))
-    probe.listen(80, () => probe.close(() => resolve(false)))
+    probe.once('error', (error) => resolve(error.code))
+    probe.listen(80, () => probe.close(() => resolve(null)))
   })
-  if (!refused) return
+  if (code !== 'EACCES') return
   const dataDir = mkdtempSync(join(tmpdir(), 'smallgame-root-'))
   try {
     const run = startChild(80, dataDir)
