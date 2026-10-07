@@ -124,8 +124,21 @@ describe('permanent growth rules', () => {
         let state = quiet({ power })
         state.gear[weapon] = 5
         state.gear[chip] = 5
+        // Nothing attacks on the player's behalf any more, so the probe has to
+        // stand where the instrument reaches: the two ring weapons orbit far
+        // out, everything else covers the player's own tile.
+        const reach = { orbit: (13 + 10) / 0.84, deck: (24 + 15) / 0.84 }[weapon] ?? 3
         state.crops = [
-          { id: 1, x: 53, y: 76, hp: 1000000, maxHp: 1000000, kind: 0, regrow: -1, boss: false },
+          {
+            id: 1,
+            x: state.position[0] + reach,
+            y: state.position[1],
+            hp: 1000000,
+            maxHp: 1000000,
+            kind: 0,
+            regrow: -1,
+            boss: false,
+          },
         ]
         for (let tick = 0; tick < 96; tick++) state = stepFarm(state, state.position).state
         return 1000000 - state.crops[0].hp

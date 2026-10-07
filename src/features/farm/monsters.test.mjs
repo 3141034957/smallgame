@@ -24,7 +24,6 @@ const arena = (tick, crops = []) => ({
   nextWave: Infinity,
   nextBoss: Infinity,
   nextBass: Infinity,
-  lastPulse: tick,
   hurtUntil: 0,
 })
 const step = (state) => stepFarm(state, state.position)
@@ -87,7 +86,6 @@ describe('new monster roster and encounters', () => {
       for (let seconds = 120; seconds <= 720; seconds += 120) {
         // Keep the scheduled timers from the previous appearance, while isolating combat.
         state.tick = seconds * FPS - 1
-        state.lastPulse = state.tick
         state.crops = []
         const before = step(state).state
         expect(before.crops.some((crop) => crop.boss)).toBe(false)
@@ -131,7 +129,7 @@ describe('new monster roster and encounters', () => {
     expect(dashed.crops[0].x).toBeGreaterThan(20)
     expect(dashed.crops[0].y).toBe(50)
     expect(dashed.crops[0].dashUntil).toBe(176)
-    const recovering = step({ ...dashed, tick: 176, lastPulse: 176 }).state
+    const recovering = step({ ...dashed, tick: 176 }).state
     expect(recovering.crops[0].x).toBe(dashed.crops[0].x)
     expect(recovering.crops[0].y).toBe(dashed.crops[0].y)
     expect(warned.crops[0].x).toBe(20) // Inputs stay immutable.
@@ -141,10 +139,10 @@ describe('new monster roster and encounters', () => {
     const warned = step(state).state
     expect(warned.dangers[0]).toMatchObject({ sourceId: 0, damage: 18, radius: 11, due: 112 })
     expect(warned.hp).toBe(100)
-    const struck = step({ ...warned, tick: 112, lastPulse: 112 }).state
+    const struck = step({ ...warned, tick: 112 }).state
     expect(struck.hp).toBe(82)
-    expect(step({ ...warned, tick: 112, lastPulse: 112, position: [65, 50] }).state.hp).toBe(100)
-    const interrupted = step({ ...warned, tick: 112, crops: [], lastPulse: 112 }).state
+    expect(step({ ...warned, tick: 112, position: [65, 50] }).state.hp).toBe(100)
+    const interrupted = step({ ...warned, tick: 112, crops: [] }).state
     expect(interrupted.hp).toBe(100)
     expect(interrupted.dangers).toEqual([])
   })

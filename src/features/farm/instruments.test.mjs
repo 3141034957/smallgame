@@ -27,7 +27,6 @@ function arena(gear, crops, tick = 0) {
     crops,
     tick,
     aim: [1, 0],
-    lastPulse: tick,
     nextBoss: Infinity,
     nextWave: Infinity,
   })

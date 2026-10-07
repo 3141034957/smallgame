@@ -126,7 +126,7 @@ const TALENT_DEFINITIONS = [
     name: '节拍器',
     icon: '⚡',
     color: '#d9bb74',
-    description: '所有攻击节奏更快，普攻伤害微增，配吉他手进化',
+    description: '所有攻击节奏更快（音刃转速、箭雨、光柱、号角、音阵等），配吉他手进化',
     tag: '攻击速度',
   },
   {
@@ -512,8 +512,6 @@ export function createFarm(day, permanent, starter) {
     lastHarvest: -1000,
     charge: 0,
     nextId: 100,
-    lastPulse: -8,
-    echoDue: -1,
     bellRings: 0,
     modifier: modifier.id,
     nextBoss: MONSTERS.find((monster) => monster.id === 'drum-boss').starts * FPS,
@@ -562,8 +560,11 @@ export function orbitPositions(state) {
     : state.gear.orbit
       ? 1 + state.gear.orbit
       : 0
+  // The metronome spins the blades faster: haste is the only chip the
+  // guitarist's own attack can feel.
+  const speed = 0.18 + state.gear.tempo * 0.02
   return Array.from({ length: count }, (_, index) => {
-    const angle = state.tick * 0.18 + (index * Math.PI * 2) / count
+    const angle = state.tick * speed + (index * Math.PI * 2) / count
     return [
       state.position[0] + (Math.cos(angle) * (13 + state.gear.orbit * 2)) / 0.84,
       state.position[1] + Math.sin(angle) * (13 + state.gear.orbit * 2),
@@ -716,17 +717,17 @@ export function stepFarm(previous, point, useSurge = false) {
   const modifier = FARM_MODIFIERS.find((item) => item.id === state.modifier)
   const forms = evolved(gear)
   const boomFlow = gear.orbit && gear.drum
-  // A long combo pushes the whole band: louder waves, and a wider reach at
-  // the top tier. It rewards staying inside the horde instead of kiting.
+  // A long combo pushes the whole band. The band no longer carries a built-in
+  // sound wave, so the tier rides on every instrument instead and still
+  // rewards staying inside the horde instead of kiting.
   const frenzy = state.combo >= 60 ? 2 : state.combo >= 30 ? 1 : 0
   // Chips are universal stats first: area, haste, power, duration and residue
   // reach every attack. The matching pair only adds the evolution on top.
   const areaBonus = 1 + (gear.range + gear.mute + gear.arp) * 0.05
   const hasteBonus = gear.tempo + gear.trigger
-  const powerBonus = gear.needle
+  const powerBonus = gear.needle + frenzy
   const durationBonus = gear.sustain + gear.delay
   const residueBonus = gear.delay
-  const pulseDamage = 1 + Math.floor(gear.tempo / 3) + frenzy
   // 跨流派组合技不占槽位：达成即自动生效，增益与上面的芯片加成同乘一处。
   const combo = comboModifiers(gear)
   const harvest = (crop, chain = false) => {
@@ -809,21 +810,7 @@ export function stepFarm(previous, point, useSurge = false) {
       midi: PITCHES[crop.id % PITCHES.length],
       chain,
     })
-    if (gear.drum) {
-      const radius =
-        (7 + gear.drum * 2 + (boomFlow ? 3 : 0) + (forms.includes('drum') ? 12 : 0)) *
-        areaBonus *
-        combo.blastArea
-      events.push({ id: state.nextId++, kind: 'blast', x: crop.x, y: crop.y, radius, lane: 0 })
-      for (const other of state.crops)
-        if (other.hp > 0 && distance(other.x, other.y, crop.x, crop.y) <= radius)
-          damage(
-            other,
-            ((gear.drum + (boomFlow ? 1 : 0)) * (forms.includes('drum') ? 2 : 1) + powerBonus) *
-              combo.blast,
-            true,
-          )
-    }
+    if (gear.drum) drumBlast(crop.x, crop.y, true)
     if (crop.boss)
       for (const drop of state.loot) {
         drop.x = state.position[0]
@@ -848,6 +835,22 @@ export function stepFarm(previous, point, useSurge = false) {
     for (const crop of state.crops)
       if (crop.hp > 0 && distance(crop.x, crop.y, point[0], point[1]) <= radius)
         damage(crop, amount)
+  }
+  // One drum beat, used both by a harvest and by the kit's own rhythm below.
+  const drumBlast = (x, y, chain) => {
+    const radius =
+      (7 + gear.drum * 2 + (boomFlow ? 3 : 0) + (forms.includes('drum') ? 12 : 0)) *
+      areaBonus *
+      combo.blastArea
+    events.push({ id: state.nextId++, kind: 'blast', x, y, radius, lane: 0 })
+    for (const other of state.crops)
+      if (other.hp > 0 && distance(other.x, other.y, x, y) <= radius)
+        damage(
+          other,
+          ((gear.drum + (boomFlow ? 1 : 0)) * (forms.includes('drum') ? 2 : 1) + powerBonus) *
+            combo.blast,
+          chain,
+        )
   }
   for (const crop of state.crops)
     if (!crop.boss && crop.hp <= 0 && state.tick >= crop.regrow) {
@@ -995,14 +998,29 @@ export function stepFarm(previous, point, useSurge = false) {
     state.dangers = []
     pulse((38 + gear.range * 2) * areaBonus, 8 + gear.power + powerBonus, 'surge')
   }
-  const rainDue = state.echoDue
-  const interval = Math.max(3, 8 - gear.tempo - (state.tick < state.surgeUntil ? 2 : 0))
-  if (state.tick - state.lastPulse >= interval) {
-    pulse((15 + gear.range * 4) * areaBonus * (frenzy === 2 ? 1.3 : 1), pulseDamage + powerBonus)
-    state.lastPulse = state.tick
-    if (gear.echo) state.echoDue = state.tick + Math.max(1, 4 - gear.echo)
+  // The kit beats on its own instead of waiting for a first kill: the beat
+  // lands on the nearest monster and blows up around it, so the drummer can
+  // open a run without the basic wave that used to start every harvest.
+  if (gear.drum && state.tick % Math.max(6, 20 - gear.drum * 3 - hasteBonus) === 0) {
+    let target = null,
+      nearest = Infinity
+    for (const crop of state.crops) {
+      if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
+      const gap = distance(crop.x, crop.y, point[0], point[1])
+      if (gap < nearest) {
+        nearest = gap
+        target = crop
+      }
+    }
+    if (target && nearest <= (30 + gear.range * 6) * areaBonus) drumBlast(target.x, target.y, false)
   }
-  if (state.tick === rainDue) {
+  // Seeking rain keeps its own rhythm now that nothing else can trigger it:
+  // the same cadence the basic wave had, so haste chips and a surge still
+  // speed the voice up.
+  if (
+    gear.echo &&
+    state.tick % Math.max(3, 8 - gear.tempo - (state.tick < state.surgeUntil ? 2 : 0)) === 0
+  ) {
     const targets = state.crops
       .filter(
         (crop) =>
@@ -1026,11 +1044,9 @@ export function stepFarm(previous, point, useSurge = false) {
       })
       damage(crop, (gear.echo * (forms.includes('echo') ? 2 : 1) + powerBonus) * combo.rain)
     }
-    // A fast sound wave can schedule the next rain on the same tick. Keep it
-    // without cancelling the rain that was already due.
-    if (state.echoDue === rainDue) state.echoDue = -1
   }
-  if (gear.power && state.tick % 12 === 0) {
+  // Bass column: haste chips shorten the wait between two columns.
+  if (gear.power && state.tick % Math.max(4, 10 - hasteBonus) === 0) {
     if (forms.includes('power')) {
       pulse(32, 4 + gear.power, 'blackhole')
       for (const drop of state.loot) {
@@ -1199,7 +1215,7 @@ export function stepFarm(previous, point, useSurge = false) {
         by = point[1] + Math.sin(angle) * radius
       for (const crop of state.crops) {
         if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
-        if (distance(crop.x, crop.y, bx, by) > 9) continue
+        if (distance(crop.x, crop.y, bx, by) > 12) continue
         damage(crop, (gear.deck + (forms.includes('deck') ? 3 : 1) + powerBonus) * combo.blade)
         if (!forms.includes('deck')) continue
         const other = state.crops.find(
@@ -1261,7 +1277,7 @@ export function stepFarm(previous, point, useSurge = false) {
   if (state.tick % 2 === 0)
     for (const orb of orbitPositions(state))
       for (const crop of state.crops)
-        if (crop.hp > 0 && distance(crop.x, crop.y, orb[0], orb[1]) <= 6)
+        if (crop.hp > 0 && distance(crop.x, crop.y, orb[0], orb[1]) <= 9)
           damage(
             crop,
             ((gear.orbit + (boomFlow ? 1 : 0)) * (forms.includes('orbit') ? 2 : 1) + powerBonus) *

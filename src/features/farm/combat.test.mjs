@@ -26,7 +26,6 @@ const arena = (enemies, tick = 100) => ({
   tick,
   nextBoss: Infinity,
   nextWave: Infinity,
-  lastPulse: tick,
   hurtUntil: 0,
 })
 const step = (s, surge = false) => stepFarm(s, s.position, surge)
@@ -106,7 +105,9 @@ describe('survivor combat', () => {
       const s = arena([], tick)
       s.hp = hp
       s.harvested = harvested
-      s.lastPulse = tick - 20
+      // The band no longer carries a basic wave, so a kill needs an
+      // instrument: the harp's rain reaches the crop next to the player.
+      s.gear.echo = 1
       s.loot = loot
       s.crops = [enemy(1, 0, 62, 50, boss)]
       return step({ ...s, crops: [{ ...s.crops[0], hp: 1, maxHp: 1 }] }).state
@@ -121,7 +122,6 @@ describe('survivor combat', () => {
       step({
         ...state,
         tick,
-        lastPulse: tick - 20,
         harvested: 31,
         loot: [],
         crops: [{ ...enemy(2, 0, 62, 50), hp: 1, maxHp: 1 }],
@@ -131,7 +131,6 @@ describe('survivor combat', () => {
     const occupied = step({
       ...wounded,
       tick: 200 + HEAL_COOLDOWN,
-      lastPulse: 200 + HEAL_COOLDOWN - 20,
       harvested: 31,
       loot: [{ id: 900, x: 120, y: 50, xp: 0, coins: 0, heal: 18, expires: 9999 }],
       crops: [{ ...enemy(2, 0, 62, 50), hp: 1, maxHp: 1 }],
@@ -166,7 +165,7 @@ describe('survivor combat', () => {
     const killed = (boss) => {
       const s = arena([], 128)
       s.hp = 40
-      s.lastPulse = 108
+      s.gear.echo = 1
       s.crops = [{ ...boss, x: 38, y: 50, hp: 1, maxHp: 1 }]
       return step(s)
     }
@@ -186,7 +185,6 @@ describe('survivor combat', () => {
       s.nextWave = Infinity
       s.nextBoss = Infinity
       s.nextBass = Infinity
-      s.lastPulse = tick
       return step(s)
     }
     const idle = ring({ bell: 0 }, 120)
@@ -199,16 +197,14 @@ describe('survivor combat', () => {
     const first = ring({ bell: MAX_GEAR_LEVEL, sustain: MAX_GEAR_LEVEL }, 120)
     expect(first.events.filter((event) => event.kind === 'shock')).toHaveLength(1)
     expect(first.state.bellRings).toBe(2)
-    const second = step({ ...first.state, tick: 124, lastPulse: 124 })
-    const third = step({ ...second.state, tick: 128, lastPulse: 128 })
+    const second = step({ ...first.state, tick: 124 })
+    const third = step({ ...second.state, tick: 128 })
     expect(second.events.filter((event) => event.kind === 'shock')).toHaveLength(1)
     expect(third.events.filter((event) => event.kind === 'shock')).toHaveLength(1)
     expect(third.state.bellRings).toBe(0)
     // The ring cadence shortens with the top-level chip, so the quiet tick moves too.
     expect(
-      step({ ...third.state, tick: 132, lastPulse: 132 }).events.filter(
-        (event) => event.kind === 'shock',
-      ),
+      step({ ...third.state, tick: 132 }).events.filter((event) => event.kind === 'shock'),
     ).toHaveLength(0)
   })
   it('sends gold-record elites after 45 seconds: tougher, dashing and worth more', () => {
@@ -244,7 +240,7 @@ describe('survivor combat', () => {
     const earned = (crop) => {
       const s = arena([], 128)
       s.hp = 40
-      s.lastPulse = 108
+      s.gear.echo = 1
       s.crops = [{ ...crop, x: 38, y: 50, hp: 1, maxHp: 1 }]
       return step(s).state
     }
@@ -256,7 +252,6 @@ describe('survivor combat', () => {
     const pick = (loot) => {
       const s = arena([], 128)
       s.hp = 60
-      s.lastPulse = 108
       s.loot = loot
       return step(s).state
     }
@@ -292,7 +287,7 @@ describe('survivor combat', () => {
     const spawned = arena([], 128)
     spawned.harvested = 39
     spawned.nextShield = 0
-    spawned.lastPulse = 108
+    spawned.gear.echo = 1
     spawned.crops = [{ id: 1, kind: 0, x: 62, y: 50, hp: 1, maxHp: 1, regrow: -1, boss: false }]
     const wave = step(spawned).state
     expect(wave.loot.some((drop) => drop.shield)).toBe(true)
@@ -304,7 +299,7 @@ describe('survivor combat', () => {
       const state = arena([], tick)
       state.harvested = 39
       state.nextShield = nextShield
-      state.lastPulse = tick - 20
+      state.gear.echo = 1
       state.crops = [{ id: 1, kind: 0, x: 62, y: 50, hp: 1, maxHp: 1, regrow: -1, boss: false }]
       return step(state).state
     }
@@ -318,19 +313,21 @@ describe('survivor combat', () => {
     ).toHaveLength(1)
   })
 
-  it('turns a long combo into stronger and wider sound waves', () => {
+  it('turns a long combo into stronger instrument hits instead of a basic wave', () => {
+    // The band no longer carries its own sound wave, so the combo tier rides
+    // on every instrument: the same harp rain hits harder tier by tier.
     const wave = (combo) => {
       const s = arena(
         [{ id: 1, kind: 0, x: 50, y: 62, hp: 60, maxHp: 60, regrow: -1, boss: false }],
         128,
       )
       s.combo = combo
-      s.lastPulse = 108
       s.lastHarvest = 128
+      s.gear.echo = 1
       const result = step(s)
       return {
         hp: result.state.crops[0].hp,
-        radius: result.events.find((event) => event.kind === 'pulse').radius,
+        waves: result.events.filter((event) => event.kind === 'pulse').length,
       }
     }
     const calm = wave(0),
@@ -338,8 +335,8 @@ describe('survivor combat', () => {
       hot = wave(60)
     expect(warm.hp).toBeLessThan(calm.hp)
     expect(hot.hp).toBeLessThan(warm.hp)
-    expect(hot.radius).toBeGreaterThan(warm.radius)
-    expect(warm.radius).toBe(calm.radius)
+    // Nothing fires a wave of its own: only the surge and the black hole do.
+    expect([calm.waves, warm.waves, hot.waves]).toEqual([0, 0, 0])
   })
   it('leaves echo-whistle notes behind that keep hurting, then expire and stay capped', () => {
     const note = (id, x, y, expires = 9999) => ({ id, x, y, damage: 2, expires })
@@ -353,7 +350,6 @@ describe('survivor combat', () => {
       s.nextWave = Infinity
       s.nextBoss = Infinity
       s.nextBass = Infinity
-      s.lastPulse = tick
       return step(s).state
     }
     const clean = walk({ whistle: 0 })

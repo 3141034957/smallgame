@@ -244,8 +244,6 @@ export type FarmState = {
   nextSurge: number
   growth: { hp: number; power: number; stride: number }
   nextId: number
-  lastPulse: number
-  echoDue: number
   bellRings: number
   nextBoss: number
   nextBass: number

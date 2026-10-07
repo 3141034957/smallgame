@@ -117,7 +117,9 @@ describe('unlimited player levels and recovery cards', () => {
   })
 
   it('replays real randomly dealt healing choices and rejects substituted or extra choices', () => {
-    let state = createFarm('2026-10-04')
+    // Only a member's instrument can open a run now, so the run and its
+    // replay are both played as the drummer.
+    let state = createFarm('2026-10-04', {}, 'bear-drums')
     const frames = [],
       choices = []
     for (let tick = 0; tick < 16 * 600 && state.hp > 0; tick++) {
@@ -133,7 +135,7 @@ describe('unlimited player levels and recovery cards', () => {
     }
     expect(state.hp).toBe(0)
     expect(choices.some((choice) => choice.id === 'heal')).toBe(true)
-    const round = replayFarm(state.day, frames, choices)
+    const round = replayFarm(state.day, frames, choices, [], {}, 'bear-drums')
     expect(round).toMatchObject({ hp: 0, score: state.score, xp: state.xp, gear: state.gear })
     const wrong = choices.map((choice) => ({ ...choice }))
     wrong[0].id = 'missing'

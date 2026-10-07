@@ -53,13 +53,26 @@ function punchingBag() {
     attackUntil: Infinity,
   }
 }
-function damageDealt(gear, ticks = 128) {
+// 站在玩家另一侧、更近的一只怪：它会替假想怪挨下所有追着最近目标打的攻击。
+function decoy() {
+  return {
+    id: 2,
+    x: 35.4,
+    y: 34.2,
+    kind: 0,
+    hp: 1e5,
+    maxHp: 1e5,
+    regrow: Infinity,
+    boss: false,
+    attackUntil: Infinity,
+  }
+}
+function damageDealt(gear, ticks = 128, extra = []) {
   const state = createFarm(day)
   Object.assign(state, {
     position: [50, 50],
-    crops: [punchingBag()],
+    crops: [punchingBag(), ...extra],
     tick: 0,
-    lastPulse: 0,
     nextBoss: Infinity,
     nextBass: Infinity,
     nextWave: Infinity,
@@ -139,6 +152,8 @@ describe('music roguelite schools', () => {
 
   it('raises every hit once the third school evolves into the full encore', () => {
     // 只切换鼓组的芯片：共鸣音箱不产生任何伤害，多出的鼓组进化只带来全场安可。
+    // 鼓点打在最近的怪身上，所以再放一只更近的诱饵怪把鼓点引开：
+    // 这样连满级鼓组的爆炸也够不到假想怪。
     const base = {
       whistle: MAX_GEAR_LEVEL,
       delay: MAX_GEAR_LEVEL,
@@ -151,7 +166,10 @@ describe('music roguelite schools', () => {
     const three = { ...base, range: MAX_GEAR_LEVEL }
     expect(activeCombos(two)).toEqual([])
     expect(ids(activeCombos(three))).toEqual(['encore'])
-    expect(damageDealt(three) / damageDealt(two)).toBeCloseTo(1 + FULL_ENCORE_DAMAGE, 4)
+    expect(damageDealt(three, 128, [decoy()]) / damageDealt(two, 128, [decoy()])).toBeCloseTo(
+      1 + FULL_ENCORE_DAMAGE,
+      4,
+    )
   })
 
   it('stacks the bonuses of every combo that is active at once', () => {

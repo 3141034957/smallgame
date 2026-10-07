@@ -21,13 +21,14 @@ export function simulateFarm(
   focus = 'echo',
   dodge = true,
   seconds = 300,
-  startHolding = false,
+  startHolding = true,
   permanent = {},
   movement = dodge ? 'dodge' : 'wander',
 ) {
   let state = createFarm(day, permanent)
-  // The opening deal is random, so a check that wants one exact build can start
-  // the run already holding that instrument.
+  // A run is always played as a band member and opens holding that member's
+  // instrument, so a check starts the run already holding the one it wants
+  // instead of dealing a random opening hand.
   if (startHolding) {
     state.gear[focus] = 1
     state.level = 1
@@ -154,12 +155,12 @@ export function checkRecoveryBalance() {
     Object.entries(profiles).flatMap(([profile, levels]) =>
       modifierDays().map((day) => ({
         profile,
-        ...simulateFarm(day, 'echo', movement === 'dodge', 600, false, levels, movement),
+        ...simulateFarm(day, 'echo', movement === 'dodge', 600, true, levels, movement),
       })),
     ),
   )
   const longStandingRuns = modifierDays().map((day) =>
-    simulateFarm(day, 'echo', false, 1800, false, profiles.full, 'stand'),
+    simulateFarm(day, 'echo', false, 1800, true, profiles.full, 'stand'),
   )
   return { simulationLimitSeconds: 600, runs, longStandingLimitSeconds: 1800, longStandingRuns }
 }

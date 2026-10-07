@@ -20,7 +20,6 @@ const arena = (tick) => ({
   crops: [],
   nextWave: Infinity,
   nextBoss: Infinity,
-  lastPulse: tick,
 })
 
 describe('endless survival', () => {

@@ -20,7 +20,6 @@ const arena = (tick = 0) => ({
   nextWave: Infinity,
   nextBoss: Infinity,
   nextBass: Infinity,
-  lastPulse: tick,
   modifier: 'none',
 })
 function spawn(tick) {
@@ -32,9 +31,11 @@ function reward(enemy, tick, lucky = 0, modifier = 'none') {
   const state = arena(tick)
   state.modifier = modifier
   state.gear.lucky = lucky
-  state.lastPulse = tick - 8
+  // A surge is the one attack that never depends on the tick or on a weapon:
+  // it is what banks the reward so the drop can be measured.
+  state.charge = 100
   state.crops = [{ ...enemy, hp: 1, x: 50, y: 50, spawnAt: 0 }]
-  return stepFarm(state, state.position).state
+  return stepFarm(state, state.position, true).state
 }
 
 describe('farm experience progression', () => {
@@ -138,6 +139,8 @@ describe('farm experience progression', () => {
     }
   })
 
+  // 36 full-length simulations: removing the hero's built-in pulse leaves more
+  // monsters alive per frame, so each run costs noticeably more CPU.
   it('keeps all six builds playable across all daily modifiers without injected health or XP', () => {
     const days = modifierDays()
     expect(days).toHaveLength(6)
@@ -165,5 +168,5 @@ describe('farm experience progression', () => {
       expect(run.seconds).toBe(120)
       expect(run.snapshots[120]).toBeGreaterThan(run.snapshots[60])
     }
-  }, 120000)
+  }, 300000)
 })

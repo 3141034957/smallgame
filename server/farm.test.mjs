@@ -115,10 +115,12 @@ const input = {
 }
 // Short runs for the member tests: the character is fixed for a whole run, so
 // two of them are enough to show the replay follows the chosen member.
-const drumRound = playFixture(true, {}, 90, 'bear-drums')
-const guitarRound = playFixture(true, {}, 90, 'cat-guitar')
+// Sixty seconds of dodging: with the chase that ends the run, the recording
+// has to stay inside MAX_FARM_FRAMES, or the upload is rejected on length.
+const drumRound = playFixture(true, {}, 60, 'bear-drums')
+const guitarRound = playFixture(true, {}, 60, 'cat-guitar')
 // The same fixture without a member: this is what an older client, whose run
-// opened with the random starter deal, uploads and has to keep verifying.
+// opened with the random starter deal, uploads.
 const legacyRound = playFixture(false, {}, undefined, null)
 
 function createRequest(store, consumeAttempt) {
@@ -293,17 +295,17 @@ describe('replay-verified all-time farm leaderboard', () => {
     ).not.toBe(guitarRound.score)
   }, 120000)
 
-  it('keeps verifying older uploads, which carry no member and are replayed without one', async () => {
+  it('rejects older uploads: a run without a member can no longer score', async () => {
     expect(legacyRound).not.toBeNull()
     const legacy = { ...legacyRound, name: input.name, playerId: input.playerId }
     // No field at all, an empty string and a null are all "the client did not
-    // pick a member": the run opened with the old random starter deal, so it is
-    // replayed on that path and keeps the score it was played with.
+    // pick a member", so the run opens with the old random starter deal instead
+    // of holding an instrument. Nothing attacks on the band's behalf any more,
+    // so that run harvests nothing and its score stays at zero — and a zero is
+    // not a leaderboard entry, so every old shape is rejected now.
+    expect(legacyRound.score).toBe(0)
     for (const characterId of [undefined, null, ''])
-      expect(verifyFarm({ ...legacy, characterId })).toMatchObject({
-        score: legacyRound.score,
-        characterId: DEFAULT_CHARACTER_ID,
-      })
+      expect(verifyFarm({ ...legacy, characterId })).toBeNull()
     // Proof that the old path really is a different run: replaying the same
     // recording as a member diverges, because that run opens holding an
     // instrument instead of being dealt three starters.
@@ -318,9 +320,10 @@ describe('replay-verified all-time farm leaderboard', () => {
     const store = createFarmStore(':memory:')
     const request = createRequest(store)
     try {
-      const accepted = await request('POST', '/api/farm/score', JSON.stringify(legacy))
-      expect(accepted.status).toBe(200)
-      expect(accepted.data.acceptedScore).toBe(legacyRound.score)
+      // The route agrees: the upload is refused instead of stored.
+      const rejected = await request('POST', '/api/farm/score', JSON.stringify(legacy))
+      expect(rejected.status).toBe(400)
+      expect(rejected.data.acceptedScore).toBeUndefined()
     } finally {
       store.close()
     }

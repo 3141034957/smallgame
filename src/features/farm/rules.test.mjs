@@ -49,7 +49,6 @@ function arena(gear, crops, tick = 0) {
     position: [50, 50],
     crops,
     tick,
-    lastPulse: tick,
     nextBoss: Infinity,
     nextWave: Infinity,
   })
@@ -89,6 +88,7 @@ function chase(state) {
   }
   return closest ? [closest.x, closest.y] : [...state.position]
 }
+const memberFor = (focus) => BAND_CHARACTERS.find((item) => item.talentId === focus).id
 function run(focus = 'drum', routeDay = day, characterId) {
   let state = createFarm(routeDay, {}, characterId),
     firstOffer = null,
@@ -146,10 +146,17 @@ describe('music roguelite farming', () => {
     const original = structuredClone(state)
     const first = stepFarm(state, state.position)
     expect(state).toEqual(original)
-    expect(first.state.harvested).toBeGreaterThan(0)
-    expect(first.events.some((event) => event.kind === 'pulse')).toBe(true)
+    // No member means no instrument, and the band carries no wave of its own:
+    // the opening patch is only harvested by the member's own attack.
+    expect(first.events.some((event) => event.kind === 'pulse')).toBe(false)
+    expect(first.state.harvested).toBe(0)
+    const opening = createFarm(day, {}, 'bear-drums')
+    expect(stepFarm(opening, opening.position).state.harvested).toBeGreaterThan(0)
     state = first.state
     for (let tick = 1; !state.offered.length && tick < FPS * 5; tick++) {
+      // Nothing attacks without an instrument, so the first level of
+      // experience is banked a couple of seconds in to deal the opening hand.
+      if (tick === FPS * 2) state.xp = farmXpThreshold(1)
       state = stepFarm(
         state,
         clampPoint(state.position, [50 + 30 * Math.sin(tick / 50), 50 + 25 * Math.cos(tick / 75)]),
@@ -325,12 +332,13 @@ describe('music roguelite farming', () => {
       crop(0, 50, 50),
       crop(1, 79, 50, 6),
     ])
-    ordinary.lastPulse = -8
     const terminal = structuredClone(ordinary)
     terminal.gear.range = MAX_GEAR_LEVEL
     const normal = stepFarm(ordinary, ordinary.position)
     const ultimate = stepFarm(terminal, terminal.position)
-    expect(normal.state.crops[1].hp).toBe(5)
+    // Nothing but the kit reaches out now: the second crop is out of the
+    // blast until the top-level speaker widens it, so it keeps all its health.
+    expect(normal.state.crops[1].hp).toBe(6)
     expect(ultimate.state.crops[1].hp).toBe(0)
     expect(ultimate.events.find((event) => event.kind === 'blast').radius).toBeGreaterThan(
       normal.events.find((event) => event.kind === 'blast').radius,
@@ -340,7 +348,6 @@ describe('music roguelite farming', () => {
       crop(1, 51, 50),
       crop(2, 52, 50),
     ])
-    dense.lastPulse = -8
     const chain = stepFarm(dense, dense.position)
     expect(chain.state.harvested).toBe(3)
     expect(chain.events.filter((event) => event.kind === 'harvest')).toHaveLength(3)
@@ -378,12 +385,11 @@ describe('music roguelite farming', () => {
     expect(ultimate.state.loot[0].x).toBeGreaterThan(normal.state.loot[0].x + 20)
   })
 
-  it('lets terminal harp rain hit eight remote crops and preserves already-due rain at high speed', () => {
+  it('lets terminal harp rain hit eight remote crops and keeps a rhythm of its own', () => {
     const ordinary = arena(
       { echo: MAX_GEAR_LEVEL, lucky: MAX_GEAR_LEVEL - 1 },
       Array.from({ length: 8 }, (_, id) => crop(id, 5 + id * 10, 5, 20)),
     )
-    ordinary.echoDue = 0
     const terminal = structuredClone(ordinary)
     terminal.gear.lucky = MAX_GEAR_LEVEL
     expect(
@@ -392,11 +398,19 @@ describe('music roguelite farming', () => {
     const rain = stepFarm(terminal, terminal.position)
     expect(rain.events.filter((event) => event.kind === 'rain')).toHaveLength(8)
     expect(rain.state.crops.every((item) => item.hp <= 14)).toBe(true)
-    const fast = arena({ echo: 1, tempo: MAX_GEAR_LEVEL }, [crop(1, 50, 25, 20)], 3)
-    Object.assign(fast, { echoDue: 3, lastPulse: 0, surgeUntil: 50 })
-    const scheduled = stepFarm(fast, fast.position)
-    expect(scheduled.events.filter((event) => event.kind === 'rain')).toHaveLength(1)
-    expect(scheduled.state.echoDue).toBe(6)
+    // Nothing else triggers the rain any more: it keeps the cadence the basic
+    // wave used to have, so the metronome is what shortens the gap.
+    const count = (tempo) => {
+      let state = arena({ echo: 1, tempo }, [crop(1, 50, 25, 2000)], 0)
+      let total = 0
+      for (let tick = 0; tick < 24; tick++) {
+        const result = stepFarm(state, state.position)
+        total += result.events.filter((event) => event.kind === 'rain').length
+        state = result.state
+      }
+      return total
+    }
+    expect(count(MAX_GEAR_LEVEL)).toBeGreaterThan(count(0))
   })
 
   it('collects experience on pickup, merges drops, and respawns enemies outside the arena', () => {
@@ -413,7 +427,6 @@ describe('music roguelite farming', () => {
     const waiting = {
       ...result.state,
       tick: result.state.crops[0].regrow,
-      lastPulse: result.state.crops[0].regrow,
       gear: { ...result.state.gear, power: 0 },
     }
     const respawned = stepFarm(waiting, waiting.position).state
@@ -452,8 +465,9 @@ describe('music roguelite farming', () => {
     }
     expect(chase('swift')).toBeGreaterThan(chase('calm'))
     const coins = (id) => {
-      const s = quiet({ modifier: id, lastPulse: 80, crops: [crop(0, 50, 58)] })
-      return stepFarm(s, s.position).state.loot.reduce((sum, drop) => sum + drop.coins, 0)
+      // A surge banks the reward: it is the one attack that needs no weapon.
+      const s = quiet({ modifier: id, charge: 100, crops: [crop(0, 50, 58)] })
+      return stepFarm(s, s.position, true).state.loot.reduce((sum, drop) => sum + drop.coins, 0)
     }
     expect(coins('golden')).toBeGreaterThan(coins('calm'))
     expect(createFarm('2026-10-04').modifier).toBe(farmModifier('2026-10-04').id)
@@ -540,7 +554,7 @@ describe('music roguelite farming', () => {
   it('lets elites, shields and bosses actually show up during a wandering run', () => {
     // Regression guard: these mechanics are gated by timers and by the monster
     // pool, so a small refactor can silently make them never fire.
-    let state = createFarm(day)
+    let state = createFarm(day, {}, 'bear-drums')
     const dodge = (current) => {
       let closest = null,
         nearest = Infinity
@@ -580,7 +594,10 @@ describe('music roguelite farming', () => {
       ['power', '2026-10-02'],
       ['echo', '2026-10-01'],
     ]) {
-      const round = run(focus, routeDay)
+      // A run is played as a band member: only their instrument attacks, so
+      // the route has to open holding the build it wants to prove.
+      const member = memberFor(focus)
+      const round = run(focus, routeDay, member)
       expect(round.state.gear[focus]).toBe(MAX_GEAR_LEVEL)
       // Combat uses sin/cos/hypot, whose last bits differ across platforms, so
       // a ten-minute run diverges between arm64 and x86_64. Assert the pacing
@@ -589,7 +606,7 @@ describe('music roguelite farming', () => {
       expect(round.state.tick).toBeGreaterThan(FPS * 20)
       expect(round.choices).toHaveLength(round.state.level)
       if (focus === 'drum') expect(round.choices.length).toBeGreaterThan(50)
-      const replay = replayFarm(routeDay, round.frames, round.choices, round.surges)
+      const replay = replayFarm(routeDay, round.frames, round.choices, round.surges, {}, member)
       expect(replay).toMatchObject({
         score: round.state.score,
         harvested: round.state.harvested,
@@ -607,11 +624,20 @@ describe('music roguelite farming', () => {
   it('replays a run that leans on cross-school combos to the same score', () => {
     // Regression guard: combos fire off nothing but the gear table, so a run
     // that reaches several evolutions has to stay frame-for-frame reproducible.
-    const round = run('echo', '2026-10-01')
+    const round = run('echo', '2026-10-01', memberFor('echo'))
     const combos = activeCombos(round.state.gear)
-    expect(combos.length).toBeGreaterThan(1)
+    // The routes reach three schools and the encore, but no pair of schools
+    // lines up any more, so the encore is the combo the run is judged on.
+    expect(combos.map((combo) => combo.id)).toContain('encore')
     expect(evolved(round.state.gear).length).toBeGreaterThanOrEqual(3)
-    const replay = replayFarm('2026-10-01', round.frames, round.choices, round.surges)
+    const replay = replayFarm(
+      '2026-10-01',
+      round.frames,
+      round.choices,
+      round.surges,
+      {},
+      memberFor('echo'),
+    )
     expect(replay).toMatchObject({
       score: round.state.score,
       harvested: round.state.harvested,
@@ -621,13 +647,15 @@ describe('music roguelite farming', () => {
       gear: round.state.gear,
     })
     expect(activeCombos(replay.gear)).toEqual(combos)
-    expect(replayFarm('2026-10-01', round.frames, round.choices, round.surges)).toEqual(replay)
+    expect(
+      replayFarm('2026-10-01', round.frames, round.choices, round.surges, {}, memberFor('echo')),
+    ).toEqual(replay)
   }, 120000)
 
   it('rejects partial or forged replay inputs and unmatched or illegal choices and boosts', () => {
-    const round = run('orbit', '2026-10-01')
+    const round = run('orbit', '2026-10-01', memberFor('orbit'))
     const replay = (frames = round.frames, choices = round.choices, surges = round.surges) =>
-      replayFarm('2026-10-01', frames, choices, surges)
+      replayFarm('2026-10-01', frames, choices, surges, {}, memberFor('orbit'))
     expect(replay()).not.toBeNull()
     expect(replay(round.frames.slice(1))).toBeNull()
     expect(replay([[99, 99], ...round.frames.slice(1)])).toBeNull()
@@ -646,7 +674,9 @@ describe('music roguelite farming', () => {
     ).toBeNull()
     for (const surges of [[0], [1, 1], [5, 4], [-1], [round.frames.length], [NaN]])
       expect(replay(round.frames, round.choices, surges)).toBeNull()
-    expect(replayFarm('2026-02-30', round.frames, round.choices, round.surges)).toBeNull()
+    expect(
+      replayFarm('2026-02-30', round.frames, round.choices, round.surges, {}, memberFor('orbit')),
+    ).toBeNull()
   }, 120000)
 
   it('starts every member holding its own instrument and falls back safely elsewhere', () => {

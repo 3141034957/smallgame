@@ -17,7 +17,6 @@ const arena = (position = [50, 76]) => ({
   crops: [],
   nextWave: Infinity,
   nextBoss: Infinity,
-  lastPulse: 100,
   tick: 100,
 })
 
@@ -50,7 +49,6 @@ describe('unbounded combat world', () => {
   it('keeps portal arrivals harmless during their warning', () => {
     const s = arena()
     s.crops = [{ ...monster(1, 50, 76), spawnAt: 110 }]
-    s.lastPulse = -8
     s.hurtUntil = 0
     const r = stepFarm(s, s.position).state
     expect(r.hp).toBe(100)
@@ -88,13 +86,40 @@ describe('unbounded combat world', () => {
     const frames = [],
       choices = [],
       surges = []
-    while (state.tick < FPS * 60 * 10 && state.hp > 0) {
+    // Nine minutes of travel leaves the last minute to end the run: the
+    // leaderboard only verifies runs of ten minutes or less.
+    while (state.tick < FPS * 60 * 9 && state.hp > 0) {
       while (state.offered.length) {
         const id = state.offered[0]
         choices.push({ tick: state.tick, id })
         state = chooseTalent(state, id)
       }
       const point = clampPoint(state.position, [50 + state.tick * 0.9, 76 - state.tick * 0.4])
+      const burst = state.charge === 100
+      if (burst) surges.push(state.tick)
+      frames.push(point)
+      state = stepFarm(state, point, burst).state
+    }
+    // The journey itself is safe: the drummer out-runs the crowd that spawns
+    // around it. A run is only complete once it is over, so it ends by walking
+    // into the nearest monster, which is how every other finished run dies.
+    while (state.hp > 0 && frames.length < FPS * 60 * 10) {
+      while (state.offered.length) {
+        const id = state.offered[0]
+        choices.push({ tick: state.tick, id })
+        state = chooseTalent(state, id)
+      }
+      let closest = null,
+        nearest = Infinity
+      for (const crop of state.crops) {
+        if (crop.hp <= 0) continue
+        const gap = Math.hypot((crop.x - state.position[0]) * 0.84, crop.y - state.position[1])
+        if (gap < nearest) {
+          nearest = gap
+          closest = crop
+        }
+      }
+      const point = clampPoint(state.position, closest ? [closest.x, closest.y] : state.position)
       const burst = state.charge === 100
       if (burst) surges.push(state.tick)
       frames.push(point)
