@@ -29,8 +29,12 @@ export const START = [50, 76]
 // This table describes the first full loadout, not a cap on player levels.
 // Runtime thresholds below continue the same curve beyond these 50 upgrades.
 export const UPGRADE_STEPS = MAX_EQUIPPED * 2 * MAX_GEAR_LEVEL
+// The quadratic term sets how late a full loadout lands: at 11/20 the whole
+// board was maxed before a long run was over, so the pace now stretches the
+// climb to roughly a quarter of an hour.
+export const XP_QUAD = 18
 export const UPGRADE_XP = Array.from({ length: UPGRADE_STEPS }, (_, index) =>
-  Math.round(20 + 20 * index + 0.55 * index ** 2),
+  Math.round(20 + 20 * index + (XP_QUAD / 20) * index ** 2),
 )
 export const THRESHOLDS = UPGRADE_XP.map((_, index) =>
   UPGRADE_XP.slice(0, index + 1).reduce((sum, cost) => sum + cost, 0),
@@ -40,14 +44,16 @@ export const THRESHOLDS = UPGRADE_XP.map((_, index) =>
 const XP_ROUNDING = [0]
 for (let index = 0; index < 20; index++)
   XP_ROUNDING.push(
-    XP_ROUNDING.at(-1) + 20 * Math.round((11 * index * index) / 20) - 11 * index * index,
+    XP_ROUNDING.at(-1) + 20 * Math.round((XP_QUAD * index * index) / 20) - XP_QUAD * index * index,
   )
-export const farmUpgradeXp = (level) => Math.round(20 + 20 * level + 0.55 * level ** 2)
+export const farmUpgradeXp = (level) => Math.round(20 + 20 * level + (XP_QUAD / 20) * level ** 2)
 export function farmXpThreshold(completedUpgrades) {
   const n = completedUpgrades
   const correction = Math.floor(n / 20) * XP_ROUNDING[20] + XP_ROUNDING[n % 20]
   return (
-    20 * n + 10 * n * (n - 1) + Math.round((11 * n * (n - 1) * (2 * n - 1) + 6 * correction) / 120)
+    20 * n +
+    10 * n * (n - 1) +
+    Math.round((XP_QUAD * n * (n - 1) * (2 * n - 1) + 6 * correction) / 120)
   )
 }
 export const EXPERIENCE_STAGES = [
@@ -294,44 +300,98 @@ export const FULL_HEAL_CARD = {
 // and the run keeps leveling long after that. Late levels then deal one step of
 // raw growth instead of repeating the same full heal until the run ends. The
 // steps are sized like a fraction of a permanent level and only last this run.
-export const STAT_CARD_HP = 5
-export const STAT_CARD_DAMAGE = 0.02
+// Each attribute climbs to MAX_STAT_LEVEL: the line stays short enough that a
+// build still reads as its instruments, never as five maxed numbers.
+export const MAX_STAT_LEVEL = 5
+export const STAT_CARD_HP = 6
+export const STAT_CARD_DAMAGE = 0.03
 export const STAT_CARD_STRIDE = 0.01
+// Healing drops are rare and capped, so restoring more of each one is worth a
+// card without turning the run immortal: five levels reach +60%.
+export const STAT_CARD_REMEDY = 0.12
+// Damage reduction stays below the permanent armour branch so a run still ends.
+export const STAT_CARD_GRIT = 0.04
 const STAT_CARD_DEFINITIONS = [
   {
     id: 'vigor',
     kind: 'stat',
     stat: 'hp',
-    name: '返场体能',
+    name: '体魄',
     icon: '♡',
     color: '#e2878f',
     description: `生命上限 +${STAT_CARD_HP}，并立刻回复同样多的生命，不占用乐器与芯片槽位。`,
     tag: '生命上限',
+    max: MAX_STAT_LEVEL,
+    step: STAT_CARD_HP,
   },
   {
     id: 'overdrive',
     kind: 'stat',
     stat: 'power',
-    name: '过载音压',
+    name: '力量',
     icon: '♫',
     color: '#cfa46b',
     description: `所有乐器与音浪爆发的伤害 +${STAT_CARD_DAMAGE * 100}%。`,
     tag: '全部伤害',
+    max: MAX_STAT_LEVEL,
+    step: STAT_CARD_DAMAGE * 100,
+  },
+  {
+    id: 'remedy',
+    kind: 'stat',
+    stat: 'remedy',
+    name: '回复',
+    icon: '✚',
+    color: '#9ec49a',
+    description: `吃到的回血道具多回复 ${STAT_CARD_REMEDY * 100}%。`,
+    tag: '回血强化',
+    max: MAX_STAT_LEVEL,
+    step: STAT_CARD_REMEDY * 100,
+  },
+  {
+    id: 'grit',
+    kind: 'stat',
+    stat: 'grit',
+    name: '韧性',
+    icon: '◇',
+    color: '#8ea9c9',
+    description: `受到的伤害 -${STAT_CARD_GRIT * 100}%。`,
+    tag: '受伤减免',
+    max: MAX_STAT_LEVEL,
+    step: -STAT_CARD_GRIT * 100,
   },
   {
     id: 'footwork',
     kind: 'stat',
     stat: 'stride',
-    name: '轻快走位',
+    name: '轻步',
     icon: '➜',
     color: '#8fb7a8',
     description: `移动速度 +${STAT_CARD_STRIDE * 100}%，键盘、鼠标与触控都生效。`,
     tag: '移动速度',
+    max: MAX_STAT_LEVEL,
+    step: STAT_CARD_STRIDE * 100,
   },
 ]
 export const STAT_CARDS = STAT_CARD_DEFINITIONS
 export const UPGRADE_CARDS = [...TALENTS, FULL_HEAL_CARD, ...STAT_CARDS]
+// Growth lives in state.growth for this run only: the level a card sits at is
+// the number of times it was picked, so the interface reads it off the run.
+export const statCard = (id) => STAT_CARDS.find((card) => card.id === id)
+export function statCardLevel(state, id) {
+  const card = statCard(id)
+  if (!card) return 0
+  const level = state?.growth?.[card.stat]
+  return Number.isFinite(level) ? level : 0
+}
+// A card at its cap leaves the pool; every other one is still dealable.
+export function statCardsAvailable(state) {
+  return STAT_CARDS.filter((card) => statCardLevel(state, card.id) < card.max)
+}
 export const HEAL_CARD_CHANCE = 0.25
+// Attribute steps share the spare slot with the healing card instead of
+// competing with the focused instrument, so a build still gets its recipe.
+export const STAT_CARD_CHANCE = 0.08
 export const RECIPES = [
   {
     weapon: 'drum',
@@ -577,7 +637,7 @@ export function createFarm(day, permanent, starter) {
     mines: [],
     nextWave: 32,
     nextSurge: 0,
-    growth: { hp: 0, power: 0, stride: 0 },
+    growth: { hp: 0, power: 0, stride: 0, remedy: 0, grit: 0 },
   }
   // The member's own instrument is free and level one; chips still have to be
   // earned. Nothing random is spent here, so a replay that knows the member
@@ -623,7 +683,7 @@ function dealRecovery(state, choices) {
   // An empty hand would freeze the run, so this branch never deals nothing.
   if (!choices.length) {
     const hand = [FULL_HEAL_CARD.id]
-    const growth = STAT_CARDS.map((card) => card.id)
+    const growth = statCardsAvailable(state).map((card) => card.id)
     while (hand.length < STARTER_CHOICES && growth.length)
       hand.push(growth.splice(Math.floor(random(state) * growth.length), 1)[0])
     state.offered = hand
@@ -636,7 +696,15 @@ function dealRecovery(state, choices) {
   if (random(state) < HEAL_CARD_CHANCE) {
     if (choices.length >= STARTER_CHOICES) choices[choices.length - 1] = FULL_HEAL_CARD.id
     else choices.push(FULL_HEAL_CARD.id)
+    state.offered = choices
+    return
   }
+  // Otherwise the spare slot may carry one attribute step. It never touches
+  // the focused instrument leading the hand, and a hand shorter than two
+  // keeps its instrument instead, so no build loses its evolution to this.
+  const growth = statCardsAvailable(state)
+  if (growth.length && choices.length >= 2 && random(state) < STAT_CARD_CHANCE)
+    choices[choices.length - 1] = growth[Math.floor(random(state) * growth.length)].id
   state.offered = choices
 }
 function offer(state) {
@@ -693,9 +761,12 @@ export function chooseTalent(previous, id) {
   if (previous.hp <= 0 || !previous.offered.includes(id)) return null
   // Growth cards are run-only: they never touch the instrument, chip or
   // permanent levels, so nothing about them is saved past this run.
-  const card = STAT_CARDS.find((item) => item.id === id)
+  const card = statCard(id)
+  // A card past its cap is not a legal pick, so a replay that claims one is
+  // rejected instead of growing the run past the level line.
+  if (card && statCardLevel(previous, id) >= card.max) return null
   const growth = card
-    ? { ...previous.growth, [card.stat]: previous.growth[card.stat] + 1 }
+    ? { ...previous.growth, [card.stat]: statCardLevel(previous, id) + 1 }
     : previous.growth
   const state = {
     ...previous,
@@ -865,7 +936,8 @@ export function stepFarm(previous, point, useSurge = false) {
   // Every hit this run lands harder once overload cards are picked; the
   // permanent power level stays the baseline they stack on. This also covers
   // the surge, which fires through the same damage path.
-  const runDamage = stats.damage * (1 + state.growth.power * STAT_CARD_DAMAGE) * combo.damage
+  const runDamage =
+    stats.damage * (1 + statCardLevel(state, 'overdrive') * STAT_CARD_DAMAGE) * combo.damage
   const damage = (crop, amount, chain = false) => {
     if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) return
     const critical = gear.lucky > 0 && (crop.id + state.tick) % Math.max(3, 8 - gear.lucky) === 0
@@ -1127,7 +1199,7 @@ export function stepFarm(previous, point, useSurge = false) {
         .sort(
           (a, b) => distance(a.x, a.y, point[0], point[1]) - distance(b.x, b.y, point[0], point[1]),
         )
-      const count = 1 + Math.floor(gear.whistle / 2)
+      const count = 1 + Math.floor(gear.whistle / 3)
       for (let index = 0; index < count; index++) {
         const target = targets[index] ?? targets[0]
         const angle = target
@@ -1147,7 +1219,7 @@ export function stepFarm(previous, point, useSurge = false) {
           cleared: [],
         })
       }
-      if (state.arrows.length > 12) state.arrows.splice(0, state.arrows.length - 12)
+      if (state.arrows.length > 8) state.arrows.splice(0, state.arrows.length - 8)
     }
   }
   // Arrows chase, pierce and leave a short note behind. Each one is capped in
@@ -1193,8 +1265,8 @@ export function stepFarm(previous, point, useSurge = false) {
     if (distance(arrow.x, arrow.y, point[0], point[1]) > 150) continue
     flying.push(arrow)
   }
-  state.arrows = flying.slice(-12)
-  state.trails = state.trails.filter((trail) => state.tick < trail.expires).slice(-30)
+  state.arrows = flying.slice(-8)
+  state.trails = state.trails.filter((trail) => state.tick < trail.expires).slice(-12)
   for (const trail of state.trails) {
     if ((state.tick + trail.id) % 4) continue
     const radius =
@@ -1409,8 +1481,10 @@ export function stepFarm(previous, point, useSurge = false) {
         state.maxShields = Math.max(state.maxShields, state.shields)
       }
       if (drop.heal) {
-        const healed = Math.min(drop.heal, state.maxHp - state.hp)
-        state.hp += healed
+        // 回复 makes each drop give back more of the same pack.
+        const boost = 1 + statCardLevel(state, 'remedy') * STAT_CARD_REMEDY
+        const healed = Math.round(Math.min(drop.heal * boost, state.maxHp - state.hp) * 100) / 100
+        state.hp = Math.round((state.hp + healed) * 100) / 100
         if (healed)
           events.push({
             id: state.nextId++,
@@ -1454,7 +1528,9 @@ export function stepFarm(previous, point, useSurge = false) {
         lane: 1,
       })
     } else {
-      const taken = Math.round(amount * stats.damageTaken * 100) / 100
+      // 韧性 shaves every hit off the top, stacked on the permanent armour.
+      const grit = 1 - statCardLevel(state, 'grit') * STAT_CARD_GRIT
+      const taken = Math.round(amount * stats.damageTaken * grit * 100) / 100
       state.hp = Math.max(0, Math.round((state.hp - taken) * 100) / 100)
       events.push({
         id: state.nextId++,

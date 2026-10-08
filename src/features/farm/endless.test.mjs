@@ -11,6 +11,7 @@ import {
   finishFarm,
   orbitPositions,
   stepFarm,
+  TALENTS,
 } from './rules.mjs'
 
 const day = '2026-10-04'
@@ -37,15 +38,19 @@ describe('endless survival', () => {
     let state = arena(2 * 60 * FPS)
     state.xp = THRESHOLDS.at(-1)
     state = stepFarm(state, state.position).state
-    // Finish all gear upgrades without consuming optional healing cards.
+    // Finish all gear upgrades without consuming optional healing cards or
+    // the attribute line that shares the spare slot with them.
+    const gearId = (id) => TALENTS.some((talent) => talent.id === id)
     for (let index = 0; index < UPGRADE_STEPS; index++) {
       expect(state.offered.length).toBeGreaterThan(0)
-      expect(state.offered.every((id) => id === 'heal' || state.gear[id] < MAX_GEAR_LEVEL)).toBe(
-        true,
-      )
+      expect(
+        state.offered.every(
+          (id) => id === 'heal' || !gearId(id) || state.gear[id] < MAX_GEAR_LEVEL,
+        ),
+      ).toBe(true)
       state = chooseTalent(
         state,
-        state.offered.find((id) => id !== 'heal'),
+        state.offered.find((id) => gearId(id)),
       )
     }
     expect(state.level).toBe(UPGRADE_STEPS)

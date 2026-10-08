@@ -6,6 +6,7 @@ import {
   THRESHOLDS,
   UPGRADE_STEPS,
   UPGRADE_XP,
+  XP_QUAD,
   chooseTalent,
   createFarm,
   stepFarm,
@@ -41,14 +42,14 @@ function reward(enemy, tick, lucky = 0, modifier = 'none') {
 describe('farm experience progression', () => {
   it('increases every upgrade cost, with cumulative thresholds for a full loadout', () => {
     expect(UPGRADE_XP).toHaveLength(UPGRADE_STEPS)
-    expect(UPGRADE_XP.slice(0, 6)).toEqual([20, 41, 62, 85, 109, 134])
+    expect(UPGRADE_XP.slice(0, 6)).toEqual([20, 41, 64, 88, 114, 143])
     for (let index = 0; index < UPGRADE_XP.length; index++) {
       expect(Number.isSafeInteger(UPGRADE_XP[index])).toBe(true)
       expect(UPGRADE_XP[index]).toBeGreaterThan(UPGRADE_XP[index - 1] ?? 0)
       expect(THRESHOLDS[index] - (THRESHOLDS[index - 1] ?? 0)).toBe(UPGRADE_XP[index])
     }
     expect(UPGRADE_XP.at(-1)).toBe(
-      20 + 20 * (UPGRADE_XP.length - 1) + Math.round(0.55 * (UPGRADE_XP.length - 1) ** 2),
+      20 + 20 * (UPGRADE_XP.length - 1) + Math.round((XP_QUAD / 20) * (UPGRADE_XP.length - 1) ** 2),
     )
   })
 

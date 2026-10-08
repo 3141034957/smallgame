@@ -33,6 +33,7 @@ export const UPGRADE_XP: number[]
 export function farmUpgradeXp(level: number): number
 export function farmXpThreshold(completedUpgrades: number): number
 export const HEAL_CARD_CHANCE: number
+export const STAT_CARD_CHANCE: number
 export const EXPERIENCE_STAGES: { seconds: number; multiplier: number }[]
 export type Point = [number, number]
 export type TalentId =
@@ -78,21 +79,33 @@ export const FULL_HEAL_CARD: {
   tag: string
 }
 // Late levels past a full loadout grow the player one step at a time, and the
-// growth lasts for that run only.
-export type StatCardId = 'vigor' | 'overdrive' | 'footwork'
+// growth lasts for that run only. Every attribute climbs to MAX_STAT_LEVEL.
+export type StatCardId = 'vigor' | 'overdrive' | 'remedy' | 'grit' | 'footwork'
+export const MAX_STAT_LEVEL: number
 export const STAT_CARD_HP: number
 export const STAT_CARD_DAMAGE: number
 export const STAT_CARD_STRIDE: number
+export const STAT_CARD_REMEDY: number
+export const STAT_CARD_GRIT: number
 export const STAT_CARDS: {
   id: StatCardId
   kind: 'stat'
-  stat: 'hp' | 'power' | 'stride'
+  stat: 'hp' | 'power' | 'stride' | 'remedy' | 'grit'
   name: string
   icon: string
   color: string
   description: string
   tag: string
+  max: number
+  step: number
 }[]
+export function statCard(id: StatCardId | string): (typeof STAT_CARDS)[number] | undefined
+// How many times this run already picked the card: the level shown on the card.
+export function statCardLevel(state: FarmState | Gear | null | undefined, id: UpgradeId): number
+// Cards the run can still be dealt: everything below MAX_STAT_LEVEL.
+export function statCardsAvailable(
+  state: FarmState | Gear | null | undefined,
+): (typeof STAT_CARDS)[number][]
 export const UPGRADE_CARDS: (
   (typeof TALENTS)[number] | typeof FULL_HEAL_CARD | (typeof STAT_CARDS)[number]
 )[]
@@ -253,7 +266,7 @@ export type FarmState = {
   lastHarvest: number
   charge: number
   nextSurge: number
-  growth: { hp: number; power: number; stride: number }
+  growth: { hp: number; power: number; stride: number; remedy: number; grit: number }
   nextId: number
   bellRings: number
   nextBoss: number

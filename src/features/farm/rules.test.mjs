@@ -5,11 +5,14 @@ import {
   FPS,
   MAX_BOSSES,
   MAX_GEAR_LEVEL,
+  MAX_STAT_LEVEL,
   STARTER_CHOICES,
   RECIPES,
   STAT_CARDS,
   STAT_CARD_DAMAGE,
+  STAT_CARD_GRIT,
   STAT_CARD_HP,
+  STAT_CARD_REMEDY,
   STAT_CARD_STRIDE,
   SURGE_COOLDOWN,
   TALENTS,
@@ -25,6 +28,7 @@ import {
   orbitPositions,
   replayFarm,
   starterTalent,
+  statCardLevel,
   stepFarm,
 } from './rules.mjs'
 
@@ -89,7 +93,30 @@ function chase(state) {
   return closest ? [closest.x, closest.y] : [...state.position]
 }
 const memberFor = (focus) => BAND_CHARACTERS.find((item) => item.talentId === focus).id
-function run(focus = 'drum', routeDay = day, characterId) {
+// A run whose instrument and chip pool is empty: only the healing card and the
+// attribute line are left to deal, which is where late levels land.
+function dryHand(growth = {}) {
+  const state = arena({}, [], 0)
+  for (const talent of TALENTS) state.gear[talent.id] = MAX_GEAR_LEVEL
+  state.level = 50
+  state.hp = 40
+  state.xp = farmXpThreshold(51)
+  Object.assign(state.growth, growth)
+  return stepFarm(state, state.position).state
+}
+// Damage a build lands over a few seconds on one immortal target: the ratio
+// between two of these is what a damage card is measured by.
+function dealt(state) {
+  let running = {
+    ...state,
+    offered: [],
+    crops: [{ id: 1, x: 53, y: 76, hp: 1e6, maxHp: 1e6, kind: 0, regrow: -1, boss: false }],
+  }
+  for (let tick = 0; tick < 96; tick++) running = stepFarm(running, running.position).state
+  return 1e6 - running.crops[0].hp
+}
+function run(focus = 'drum', routeDay = day, characterId, preferStats = false) {
+  const wanted = Array.isArray(preferStats) ? preferStats : null
   let state = createFarm(routeDay, {}, characterId),
     firstOffer = null,
     firstUpgrade = null,
@@ -102,12 +129,18 @@ function run(focus = 'drum', routeDay = day, characterId) {
     while (state.offered.length) {
       firstOffer ??= [...state.offered]
       firstUpgrade ??= tick
+      const stat = preferStats
+        ? state.offered.find((choice) =>
+            wanted ? wanted.includes(choice) : STAT_CARDS.some((card) => card.id === choice),
+          )
+        : undefined
       const id =
-        state.offered.includes(focus) && state.gear[focus] < MAX_GEAR_LEVEL
+        stat ??
+        (state.offered.includes(focus) && state.gear[focus] < MAX_GEAR_LEVEL
           ? focus
           : state.offered.includes(recipe.chip) && state.gear[recipe.chip] < MAX_GEAR_LEVEL
             ? recipe.chip
-            : state.offered[0]
+            : state.offered[0])
       choices.push({ tick, id })
       state = chooseTalent(state, id)
       if (evolved(state.gear).includes(focus)) terminalAt ??= tick
@@ -132,7 +165,10 @@ function run(focus = 'drum', routeDay = day, characterId) {
     }
     const point = clampPoint(state.position, chase(state))
     frames.push(point)
-    state = stepFarm(state, point, false).state
+    // A run that outlives the chase has nothing left to walk into.
+    const walked = stepFarm(state, point, false)
+    if (!walked) break
+    state = walked.state
   }
   return { state, frames, choices, surges, firstOffer, firstUpgrade, terminalAt }
 }
@@ -168,7 +204,10 @@ describe('music roguelite farming', () => {
     expect(new Set(state.offered).size).toBe(state.offered.length)
     expect(
       state.offered.every(
-        (id) => id === 'heal' || TALENTS.find((talent) => talent.id === id).kind === 'weapon',
+        (id) =>
+          id === 'heal' ||
+          STAT_CARDS.some((card) => card.id === id) ||
+          TALENTS.find((talent) => talent.id === id).kind === 'weapon',
       ),
     ).toBe(true)
     expect(stepFarm(state, state.position)).toBeNull()
@@ -241,23 +280,6 @@ describe('music roguelite farming', () => {
   it('grows the run itself once every instrument and chip is maxed, and only that run', () => {
     // Regression guard: growth cards have to move the numbers the player can
     // feel, not just sit in the hand as a fourth flavour of level up.
-    const dryHand = () => {
-      const state = arena({}, [], 0)
-      for (const talent of TALENTS) state.gear[talent.id] = MAX_GEAR_LEVEL
-      state.level = 50
-      state.hp = 40
-      state.xp = farmXpThreshold(51)
-      return stepFarm(state, state.position).state
-    }
-    const dealt = (state) => {
-      let running = {
-        ...state,
-        offered: [],
-        crops: [{ id: 1, x: 53, y: 76, hp: 1e6, maxHp: 1e6, kind: 0, regrow: -1, boss: false }],
-      }
-      for (let tick = 0; tick < 96; tick++) running = stepFarm(running, running.position).state
-      return 1e6 - running.crops[0].hp
-    }
     const hand = dryHand()
     expect(hand.offered[0]).toBe('heal')
     expect(hand.offered).toHaveLength(STARTER_CHOICES)
@@ -282,7 +304,135 @@ describe('music roguelite farming', () => {
     // run through the same damage path.
     expect(dealt(pick('overdrive')) / dealt(plain)).toBeCloseTo(1 + STAT_CARD_DAMAGE, 2)
     // Growth belongs to the run: the next one starts from zero again.
-    expect(createFarm(day).growth).toEqual({ hp: 0, power: 0, stride: 0 })
+    expect(createFarm(day).growth).toEqual({ hp: 0, power: 0, stride: 0, remedy: 0, grit: 0 })
+  })
+
+  it('levels every attribute card, and stops dealing one at its cap', () => {
+    // The five attribute cards are a line the player can walk for the whole
+    // run: each level moves a number the HUD or the hit itself shows.
+    const hand = dryHand()
+    const pick = (id) => chooseTalent({ ...hand, offered: [id] }, id)
+    const plain = pick('heal')
+    // 体魄 widens the cap and pays the same amount back at once.
+    const vigor = pick('vigor')
+    expect(vigor.growth.hp).toBe(1)
+    expect(vigor.maxHp).toBe(hand.maxHp + STAT_CARD_HP)
+    expect(vigor.hp).toBe(hand.hp + STAT_CARD_HP)
+    const twice = chooseTalent({ ...vigor, offered: ['vigor'] }, 'vigor')
+    expect(twice.maxHp).toBe(hand.maxHp + STAT_CARD_HP * 2)
+    expect(twice.growth.hp).toBe(2)
+    // 力量 stacks on the same damage path as the surge.
+    expect(dealt(pick('overdrive')) / dealt(plain)).toBeCloseTo(1 + STAT_CARD_DAMAGE, 2)
+    expect(dealt({ ...plain, growth: { ...plain.growth, power: 3 } }) / dealt(plain)).toBeCloseTo(
+      1 + STAT_CARD_DAMAGE * 3,
+      2,
+    )
+    // 回复 makes a healing drop give back more of the same pack.
+    const healed = (level) => {
+      const state = { ...arena({}, [], 0), hp: 10, maxHp: 100, hurtUntil: 0 }
+      state.growth = { ...state.growth, remedy: level }
+      state.loot = [
+        { id: 1, x: state.position[0], y: state.position[1], xp: 0, coins: 0, heal: 20 },
+      ]
+      return stepFarm(state, state.position).state.hp - 10
+    }
+    expect(healed(0)).toBe(20)
+    expect(healed(2)).toBeCloseTo(20 * (1 + STAT_CARD_REMEDY * 2), 5)
+    // 韧性 shaves every hit, contact damage included.
+    const taken = (level) => {
+      const state = {
+        ...arena(
+          {},
+          [{ id: 9, x: 51, y: 50, hp: 5, maxHp: 5, kind: 0, regrow: -1, boss: false }],
+          40,
+        ),
+        hurtUntil: 0,
+      }
+      state.growth = { ...state.growth, grit: level }
+      return 100 - stepFarm(state, state.position).state.hp
+    }
+    expect(taken(0)).toBe(12)
+    expect(taken(MAX_STAT_LEVEL)).toBeCloseTo(12 * (1 - STAT_CARD_GRIT * MAX_STAT_LEVEL), 5)
+    // 轻步 lengthens the step the movement check actually allows.
+    expect(farmMoveStep(pick('footwork')) / farmMoveStep(plain)).toBeCloseTo(
+      1 + STAT_CARD_STRIDE,
+      5,
+    )
+    expect(
+      farmMoveStep({ ...plain, growth: { ...plain.growth, stride: MAX_STAT_LEVEL } }) /
+        farmMoveStep(plain),
+    ).toBeCloseTo(1 + STAT_CARD_STRIDE * MAX_STAT_LEVEL, 5)
+    // A card at its cap leaves the pool: with only 轻步 left, the dry hand is
+    // the healing card plus that one card, and no level can push past the cap.
+    const capped = dryHand({ hp: MAX_STAT_LEVEL, power: 5, remedy: 5, grit: 5 })
+    expect(capped.offered).toEqual(['heal', 'footwork'])
+    for (const card of STAT_CARDS)
+      expect(
+        statCardLevel({ growth: Object.fromEntries(STAT_CARDS.map((c) => [c.stat, 5])) }, card.id),
+      ).toBe(5)
+    // Everything maxed still deals a hand: the run never stalls on an empty one.
+    const maxed = dryHand({ hp: 5, power: 5, stride: 5, remedy: 5, grit: 5 })
+    expect(maxed.offered).toEqual(['heal'])
+    expect(chooseTalent({ ...maxed, offered: ['vigor'] }, 'vigor')).toBeNull()
+  })
+
+  it('deals attribute cards beside instruments without taking the focused recipe', () => {
+    // The line has to show up in a normal hand, and it has to stay a
+    // supplement: the focused instrument leads, the spare slot carries it.
+    const hands = []
+    let state = createFarm(day, {}, 'bear-drums')
+    Object.assign(state, { crops: [], nextWave: Infinity, nextBoss: Infinity, nextBass: Infinity })
+    for (let index = 0; index < 80; index++) {
+      state.level = index
+      state.xp = farmXpThreshold(index + 1)
+      state = stepFarm(state, state.position).state
+      hands.push(state.offered)
+      const id = state.offered.find((choice) => TALENTS.some((talent) => talent.id === choice))
+      state = chooseTalent(state, id ?? state.offered[0])
+      expect(state).not.toBeNull()
+    }
+    // Dry-pool hands lead with healing and are filled with the attribute line,
+    // so only the hands dealt beside instruments say anything about crowding.
+    const attribute = hands.filter(
+      (hand) => !hand.includes('heal') && hand.some((id) => STAT_CARDS.some((c) => c.id === id)),
+    )
+    expect(attribute.length).toBeGreaterThan(0)
+    expect(attribute.length).toBeLessThan(hands.length)
+    for (const hand of attribute) {
+      const id = hand.find((choice) => STAT_CARDS.some((card) => card.id === choice))
+      expect(hand.indexOf(id)).toBe(hand.length - 1)
+      expect(hand[0]).not.toBe(id)
+    }
+    // Instruments keep arriving: the drummer still completes the recipe.
+    expect(state.gear.drum).toBe(MAX_GEAR_LEVEL)
+    expect(evolved(state.gear)).toContain('drum')
+  })
+
+  it('replays a run that spent its levels on attribute cards', () => {
+    // Server-side replay has to land on the same score: the cards are dealt by
+    // the same seeded pool and applied through the same damage path.
+    const routeDay = '2026-10-03'
+    // Only the cards that do not keep the runner alive: a toughened farmer
+    // outlives the walk into the horde that a replay needs to end on.
+    const { state, frames, choices, surges } = run('drum', routeDay, 'bear-drums', [
+      'overdrive',
+      'footwork',
+      'vigor',
+    ])
+    const picks = choices.filter((choice) => STAT_CARDS.some((card) => card.id === choice.id))
+    expect(picks.length).toBeGreaterThan(1)
+    expect(STAT_CARDS.filter((card) => statCardLevel(state, card.id) > 0).length).toBeGreaterThan(0)
+    for (const card of STAT_CARDS)
+      expect(statCardLevel(state, card.id)).toBeLessThanOrEqual(MAX_STAT_LEVEL)
+    // The toughened builds survive the closing walk, so only a run that ended
+    // can be verified against the server's replay.
+    if (state.hp > 0) return
+    expect(replayFarm(routeDay, frames, choices, surges, {}, 'bear-drums')).toMatchObject({
+      score: state.score,
+      xp: state.xp,
+      coins: state.coins,
+      harvested: state.harvested,
+    })
   })
 
   it('rotates starter options across days and keeps the chosen instrument recipe available', () => {
@@ -291,7 +441,9 @@ describe('music roguelite farming', () => {
       const state = createFarm(`2026-10-${String(date).padStart(2, '0')}`)
       state.xp = THRESHOLDS[0]
       const offered = stepFarm(state, state.position).state
-      offered.offered.filter((id) => id !== 'heal').forEach((id) => seen.add(id))
+      offered.offered
+        .filter((id) => TALENTS.some((talent) => talent.id === id && talent.kind === 'weapon'))
+        .forEach((id) => seen.add(id))
       const id = offered.offered[0]
       const partner = TALENTS.find((item) => item.id === id).partner
       let selected = chooseTalent(offered, id)
@@ -303,7 +455,10 @@ describe('music roguelite farming', () => {
         expect(new Set(selected.offered).size).toBe(3)
         expect(
           selected.offered.every(
-            (choice) => choice === 'heal' || selected.gear[choice] < MAX_GEAR_LEVEL,
+            (choice) =>
+              choice === 'heal' ||
+              STAT_CARDS.some((card) => card.id === choice) ||
+              selected.gear[choice] < MAX_GEAR_LEVEL,
           ),
         ).toBe(true)
         selected = chooseTalent(selected, needed)

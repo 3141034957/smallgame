@@ -4,7 +4,7 @@ import { evolved, FPS, RECIPES, TALENTS, type FarmRound } from './rules.mjs'
 // trimmed for upload: dropping frames changes the simulation and the replay
 // then disagrees with the score the player actually reached. Runs past this
 // budget stay on the device, and the player is told why they are not ranked.
-export const FARM_MAX_SUBMIT_FRAMES = 10 * 60 * FPS
+export const FARM_MAX_SUBMIT_FRAMES = 20 * 60 * FPS
 export const FARM_TOO_LONG_MESSAGE = `超 ${FARM_MAX_SUBMIT_FRAMES / FPS / 60} 分钟，未上榜（本机保留）`
 export const farmTooLongToSubmit = (round: FarmRound | null) =>
   !!round && round.frames.length > FARM_MAX_SUBMIT_FRAMES
