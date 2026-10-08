@@ -8,7 +8,7 @@ export const MAX_FARM_BODY_BYTES = 1024 * 1024
 export const FARM_SCORE_LIMIT = 20
 // Ten minutes of simulation: enough for any real run, and it keeps a forged
 // body from blocking the event loop during replay verification.
-export const MAX_FARM_FRAMES = 10 * 60 * FPS
+export const MAX_FARM_FRAMES = 20 * 60 * FPS
 export const FARM_PREFIX = FARM_SCORE_PREFIX
 export const farmKey = (day) => `${FARM_PREFIX}${day}`
 export function verifyFarm(input) {
