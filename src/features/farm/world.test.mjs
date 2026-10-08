@@ -5,6 +5,9 @@ import {
   stepFarm,
   chooseTalent,
   replayFarm,
+  farmAreaBonus,
+  farmReach,
+  farmSpawnRadius,
   FPS,
   MAX_BOSSES,
 } from './rules.mjs'
@@ -45,6 +48,26 @@ describe('unbounded combat world', () => {
     expect(r.harvested).toBe(0)
     expect(r.score).toBe(0)
     expect(s.crops[0].x).toBe(-500)
+  })
+  it('grows the arrival ring past the build coverage so a maxed loadout cannot reap a spawn', () => {
+    const s = arena()
+    Object.assign(s.gear, { bell: 5, sustain: 5, range: 5, mute: 5, arp: 5 })
+    s.nextWave = 100
+    const r = stepFarm(s, s.position).state
+    // Three area chips used to stack to 1.75, which covered the whole ring.
+    expect(farmAreaBonus(r.gear)).toBeLessThanOrEqual(1.32)
+    const reach = farmReach(r)
+    expect(reach).toBeGreaterThan(90)
+    expect(farmSpawnRadius(r)).toBe(118)
+    expect(r.crops.length).toBeGreaterThan(0)
+    for (const enemy of r.crops) {
+      const gap = Math.hypot((enemy.x - 50) * 0.84, enemy.y - 76)
+      expect(gap).toBeGreaterThan(reach)
+      expect(gap).toBeLessThanOrEqual(134)
+      expect(enemy.spawnAt).toBe(112)
+    }
+    // An empty loadout keeps the ring the opening minute was balanced around.
+    expect(farmSpawnRadius(arena())).toBe(52)
   })
   it('keeps portal arrivals harmless during their warning', () => {
     const s = arena()

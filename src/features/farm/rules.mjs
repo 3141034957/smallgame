@@ -470,6 +470,47 @@ const enemyHealth = (tick, kind) =>
   Math.floor(tick / 240) +
   Math.floor(Math.max(0, tick - FPS * 60) / (FPS * 30)) ** 2 +
   (kind === 3 ? 2 : 0)
+// Spawn ring: monsters must appear outside whatever the build already covers,
+// or a full loadout reaps them on the frame the protection ends. The ring still
+// cannot grow without limit: past this point arrivals sit off screen and the
+// player waits for a walk that never reads as an attack.
+const SPAWN_RING_BASE = 52,
+  SPAWN_RING_SPREAD = 16,
+  SPAWN_RING_MAX = 118,
+  // The walk from the ring into the build's coverage. Keeping it a fixed gap
+  // rather than a ratio is what stops a maxed ring from starving the run:
+  // arrivals still read as arrivals, but they reach the player quickly.
+  SPAWN_RING_GAP = 14
+// Frames a fresh arrival stays untouchable.
+const SPAWN_GRACE = 12
+// The area chips stop paying out here. Three of them maxed used to reach 1.75,
+// which covered more than the whole ring and turned late runs into a screensaver.
+export const AREA_BONUS_STEP = 0.04
+export const AREA_BONUS_CAP = 1.32
+export function farmAreaBonus(gear) {
+  return Math.min(AREA_BONUS_CAP, 1 + (gear.range + gear.mute + gear.arp) * AREA_BONUS_STEP)
+}
+// How far the build covers *every* direction at once, so arrivals can be placed
+// beyond it. Only the sweeping attacks count: a fan, a horn or a drum blast is
+// aimed at whatever is already close, so widening the ring for them only starves
+// the run without making a single arrival more visible.
+export function farmReach(state) {
+  const gear = state.gear,
+    area = farmAreaBonus(gear),
+    forms = evolved(gear)
+  return Math.max(
+    gear.bell
+      ? (24 + gear.bell * 6 + gear.sustain * 3 + (forms.includes('bell') ? 10 : 0)) * area
+      : 0,
+    gear.deck ? (24 + gear.deck * 3) * area + 12 : 0,
+    gear.orbit ? 13 + gear.orbit * 2 + 8 : 0,
+  )
+}
+// Monsters always arrive a short walk outside the build's coverage, so a maxed
+// ring still shows the horde closing in instead of reaping it on arrival.
+export function farmSpawnRadius(state) {
+  return Math.min(SPAWN_RING_MAX, Math.max(SPAWN_RING_BASE, farmReach(state) + SPAWN_RING_GAP))
+}
 // World coordinates have no arena walls. A short portal warning makes arrivals
 // fair even when a wide desktop camera can see the surrounding spawn ring.
 function placeAtEdge(state, enemy, respawn = false) {
@@ -478,10 +519,12 @@ function placeAtEdge(state, enemy, respawn = false) {
   if (respawn || enemy.xpStage === undefined)
     enemy.xpStage = EXPERIENCE_STAGES.findLastIndex((stage) => state.tick >= stage.seconds * FPS)
   const angle = random(state) * Math.PI * 2,
-    radius = 52 + random(state) * 16
+    radius = farmSpawnRadius(state) + random(state) * SPAWN_RING_SPREAD
   enemy.x = state.position[0] + (Math.cos(angle) * radius) / 0.84
   enemy.y = state.position[1] + Math.sin(angle) * radius
-  enemy.spawnAt = state.tick + 12
+  // A beat and a half of immunity: long enough to read the arrival, short
+  // enough that a wide build still reaps the ring on the next pulse.
+  enemy.spawnAt = state.tick + SPAWN_GRACE
 }
 export function createFarm(day, permanent, starter) {
   const levels = Object.freeze(normalizePermanentLevels(permanent))
@@ -530,6 +573,7 @@ export function createFarm(day, permanent, starter) {
     shots: [],
     dangers: [],
     trails: [],
+    arrows: [],
     mines: [],
     nextWave: 32,
     nextSurge: 0,
@@ -707,6 +751,7 @@ export function stepFarm(previous, point, useSurge = false) {
     shots: previous.shots.map((shot) => ({ ...shot })),
     dangers: previous.dangers.map((danger) => ({ ...danger })),
     trails: previous.trails.map((trail) => ({ ...trail })),
+    arrows: (previous.arrows ?? []).map((arrow) => ({ ...arrow, cleared: [...arrow.cleared] })),
     mines: previous.mines.map((mine) => ({ ...mine })),
     offered: [],
   }
@@ -723,7 +768,7 @@ export function stepFarm(previous, point, useSurge = false) {
   const frenzy = state.combo >= 60 ? 2 : state.combo >= 30 ? 1 : 0
   // Chips are universal stats first: area, haste, power, duration and residue
   // reach every attack. The matching pair only adds the evolution on top.
-  const areaBonus = 1 + (gear.range + gear.mute + gear.arp) * 0.05
+  const areaBonus = farmAreaBonus(gear)
   const hasteBonus = gear.tempo + gear.trigger
   const powerBonus = gear.needle + frenzy
   const durationBonus = gear.sustain + gear.delay
@@ -1071,21 +1116,84 @@ export function stepFarm(previous, point, useSurge = false) {
           damage(crop, gear.power + 1 + powerBonus)
     }
   }
-  // Echo whistle: leave delayed notes on the floor that keep hurting whatever
-  // walks into them. Capped and expired so a long run cannot pile them up.
+  // Echo whistle: the flutist whistles and steers the shot the way Star-Lord
+  // steers his arrow — it chases a monster, pierces a couple of them, and only
+  // leaves a fading note where it passed. Nothing harvests while standing still.
   if (gear.whistle) {
-    const every = Math.max(8, 26 - gear.delay * 4 - hasteBonus)
+    const every = Math.max(7, 18 - gear.delay * 3 - hasteBonus)
     if (state.tick % every === 0) {
-      state.trails.push({
-        id: state.nextId++,
-        x: point[0],
-        y: point[1],
-        damage: (gear.whistle + (forms.includes('whistle') ? 2 : 0) + powerBonus) * combo.residue,
-        expires: state.tick + FPS * (3 + durationBonus),
-      })
-      if (state.trails.length > 30) state.trails.shift()
+      const targets = state.crops
+        .filter((crop) => crop.hp > 0 && state.tick >= (crop.spawnAt ?? 0))
+        .sort(
+          (a, b) => distance(a.x, a.y, point[0], point[1]) - distance(b.x, b.y, point[0], point[1]),
+        )
+      const count = 1 + Math.floor(gear.whistle / 2)
+      for (let index = 0; index < count; index++) {
+        const target = targets[index] ?? targets[0]
+        const angle = target
+          ? Math.atan2(target.y - point[1], (target.x - point[0]) * 0.84)
+          : (index / count) * Math.PI * 2
+        state.arrows.push({
+          id: state.nextId++,
+          x: point[0],
+          y: point[1],
+          angle,
+          damage:
+            (3 + gear.whistle * 2 + (forms.includes('whistle') ? 4 : 0) + powerBonus) *
+            combo.residue,
+          pierce: 2 + Math.floor(gear.whistle / 2) + (forms.includes('whistle') ? 2 : 0),
+          expires: state.tick + FPS * (2 + durationBonus),
+          homing: true,
+          cleared: [],
+        })
+      }
+      if (state.arrows.length > 12) state.arrows.splice(0, state.arrows.length - 12)
     }
   }
+  // Arrows chase, pierce and leave a short note behind. Each one is capped in
+  // flight and in lifetime so a long run cannot pile them up. One shortlist per
+  // frame keeps a screen full of arrows from re-sorting the whole horde.
+  const shortlist = state.crops
+    .filter((crop) => crop.hp > 0 && state.tick >= (crop.spawnAt ?? 0))
+    .sort((a, b) => distance(a.x, a.y, point[0], point[1]) - distance(b.x, b.y, point[0], point[1]))
+    .slice(0, 8)
+  const flying = []
+  for (const arrow of state.arrows) {
+    if (state.tick >= arrow.expires || arrow.pierce <= 0) continue
+    let prey = null
+    for (const crop of shortlist) {
+      if (arrow.cleared.includes(crop.id)) continue
+      if (
+        !prey ||
+        distance(crop.x, crop.y, arrow.x, arrow.y) < distance(prey.x, prey.y, arrow.x, arrow.y)
+      )
+        prey = crop
+    }
+    if (prey && arrow.homing) {
+      const wanted = Math.atan2(prey.y - arrow.y, (prey.x - arrow.x) * 0.84)
+      const turn = Math.atan2(Math.sin(wanted - arrow.angle), Math.cos(wanted - arrow.angle))
+      arrow.angle += Math.max(-0.22, Math.min(0.22, turn))
+    }
+    const speed = 3.8 + gear.whistle * 0.5
+    arrow.x += (Math.cos(arrow.angle) * speed) / 0.84
+    arrow.y += Math.sin(arrow.angle) * speed
+    if (prey && distance(prey.x, prey.y, arrow.x, arrow.y) <= 11) {
+      damage(prey, arrow.damage)
+      arrow.cleared.push(prey.id)
+      arrow.pierce--
+      state.trails.push({
+        id: state.nextId++,
+        x: arrow.x,
+        y: arrow.y,
+        damage: arrow.damage * 0.25,
+        expires: state.tick + FPS,
+      })
+      if (arrow.pierce <= 0) continue
+    }
+    if (distance(arrow.x, arrow.y, point[0], point[1]) > 150) continue
+    flying.push(arrow)
+  }
+  state.arrows = flying.slice(-12)
   state.trails = state.trails.filter((trail) => state.tick < trail.expires).slice(-30)
   for (const trail of state.trails) {
     if ((state.tick + trail.id) % 4) continue
@@ -1104,7 +1212,7 @@ export function stepFarm(previous, point, useSurge = false) {
     if (state.bellRings > 0 && state.tick % 4 === 0) {
       state.bellRings--
       const radius =
-        (24 + gear.bell * 6 + gear.sustain * 4 + (forms.includes('bell') ? 18 : 0)) * areaBonus
+        (24 + gear.bell * 6 + gear.sustain * 3 + (forms.includes('bell') ? 10 : 0)) * areaBonus
       events.push({ id: state.nextId++, kind: 'shock', x: point[0], y: point[1], radius, lane: 2 })
       for (const crop of state.crops) {
         if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
@@ -1140,7 +1248,7 @@ export function stepFarm(previous, point, useSurge = false) {
       const dir = aimAt()
       const norm = Math.max(0.01, Math.hypot(dir[0], dir[1]))
       const heading = [dir[0] / norm, dir[1] / norm]
-      const length = (30 + gear.mute * 6 + (forms.includes('sax') ? 18 : 0)) * areaBonus
+      const length = (30 + gear.mute * 6 + (forms.includes('sax') ? 10 : 0)) * areaBonus
       const half = 13 + gear.mute * 2
       events.push({
         id: state.nextId++,
@@ -1246,7 +1354,7 @@ export function stepFarm(previous, point, useSurge = false) {
       const dir = aimAt()
       const base = Math.atan2(dir[1], dir[0] * 0.84)
       const reach =
-        (36 + gear.arp * 6 + (forms.includes('synth') ? 14 : 0)) * areaBonus * combo.fanArea
+        (36 + gear.arp * 6 + (forms.includes('synth') ? 8 : 0)) * areaBonus * combo.fanArea
       const spread = 0.45 + gear.arp * 0.1 + (forms.includes('synth') ? 0.3 : 0)
       for (const offset of forms.includes('synth') ? [-0.32, 0, 0.32] : [0]) {
         const angle = base + offset

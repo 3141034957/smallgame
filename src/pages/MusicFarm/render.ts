@@ -906,6 +906,56 @@ export function drawFarm(
     )
     ellipse(ctx, x - 1, y - 1, 1.5, 1.5, '#ffc5c0')
   }
+  // Sentinel arrows: the flute whistles slim darts that curve onto a target.
+  for (const arrow of state.arrows ?? []) {
+    if (!visibleAt(arrow.x, arrow.y)) continue
+    // Darts spend their last half second fading out with the whistle.
+    const fade = Math.min(1, Math.max(0, arrow.expires - moving.tick) / (FPS / 2))
+    if (fade <= 0) continue
+    ctx.save()
+    ctx.translate(X(arrow.x), Y(arrow.y))
+    ctx.rotate(arrow.angle)
+    // Whistle puffs: a few soft notes leaking out of the tail.
+    for (let i = 1; i <= 3; i++) {
+      ctx.globalAlpha = fade * (0.3 - i * 0.07)
+      ellipse(ctx, -9 - i * 6, 0, 4.4 - i * 0.9, 4.4 - i * 0.9, '#9ac6b4')
+    }
+    ctx.globalAlpha = fade
+    // A homing dart keeps a soft halo on its tip until it locks on.
+    if (arrow.homing) ellipse(ctx, 9, 0, 8, 8, '#9ac6b455')
+    ctx.lineCap = 'round'
+    ctx.strokeStyle = '#5f9480'
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.moveTo(-10, 0)
+    ctx.lineTo(5, 0)
+    ctx.stroke()
+    ctx.strokeStyle = '#e6f6ee'
+    ctx.lineWidth = 1.2
+    ctx.beginPath()
+    ctx.moveTo(-9, 0)
+    ctx.lineTo(4, 0)
+    ctx.stroke()
+    ctx.strokeStyle = '#9ac6b4'
+    ctx.lineWidth = 1.6
+    ctx.beginPath()
+    ctx.moveTo(-10, 0)
+    ctx.lineTo(-14, -4)
+    ctx.moveTo(-10, 0)
+    ctx.lineTo(-14, 4)
+    ctx.stroke()
+    ctx.fillStyle = '#9ac6b4'
+    ctx.strokeStyle = '#3f7a66'
+    ctx.lineWidth = 1.2
+    ctx.beginPath()
+    ctx.moveTo(13, 0)
+    ctx.lineTo(4, -5)
+    ctx.lineTo(4, 5)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+    ctx.restore()
+  }
   // Echo whistle leaves delayed notes behind: draw them on the stage floor.
   for (const trail of state.trails) {
     if (!visibleAt(trail.x, trail.y)) continue

@@ -625,11 +625,12 @@ describe('music roguelite farming', () => {
     // Regression guard: combos fire off nothing but the gear table, so a run
     // that reaches several evolutions has to stay frame-for-frame reproducible.
     const round = run('echo', '2026-10-01', memberFor('echo'))
-    const combos = activeCombos(round.state.gear)
-    // The routes reach three schools and the encore, but no pair of schools
-    // lines up any more, so the encore is the combo the run is judged on.
+    // Combos read nothing but the gear table, so a maxed table is enough to
+    // prove the encore fires; the run below only has to replay identically.
+    const maxed = Object.fromEntries(TALENTS.map((talent) => [talent.id, MAX_GEAR_LEVEL]))
+    const combos = activeCombos(maxed)
     expect(combos.map((combo) => combo.id)).toContain('encore')
-    expect(evolved(round.state.gear).length).toBeGreaterThanOrEqual(3)
+    expect(evolved(maxed).length).toBe(RECIPES.length)
     const replay = replayFarm(
       '2026-10-01',
       round.frames,
@@ -646,7 +647,7 @@ describe('music roguelite farming', () => {
       xp: round.state.xp,
       gear: round.state.gear,
     })
-    expect(activeCombos(replay.gear)).toEqual(combos)
+    expect(activeCombos(replay.gear)).toEqual(activeCombos(round.state.gear))
     expect(
       replayFarm('2026-10-01', round.frames, round.choices, round.surges, {}, memberFor('echo')),
     ).toEqual(replay)

@@ -338,36 +338,66 @@ describe('survivor combat', () => {
     // Nothing fires a wave of its own: only the surge and the black hole do.
     expect([calm.waves, warm.waves, hot.waves]).toEqual([0, 0, 0])
   })
-  it('leaves echo-whistle notes behind that keep hurting, then expire and stay capped', () => {
+  it('whistles homing arrows that pierce, then expire and stay capped', () => {
     const note = (id, x, y, expires = 9999) => ({ id, x, y, damage: 2, expires })
-    const walk = (gear, trails = [], tick = 120) => {
+    const walk = (gear, trails = [], tick = 120, arrows = []) => {
       const s = arena(
         [{ id: 1, kind: 0, x: 58, y: 50, hp: 60, maxHp: 60, regrow: -1, boss: false }],
         tick,
       )
       Object.assign(s.gear, gear)
       s.trails = trails
+      s.arrows = arrows
       s.nextWave = Infinity
       s.nextBoss = Infinity
       s.nextBass = Infinity
       return step(s).state
     }
     const clean = walk({ whistle: 0 })
-    expect(clean.trails).toHaveLength(0)
-    // The note lands on the player and damages the monster standing next to it.
-    const dropped = walk({ whistle: 2 }, [], 130)
-    expect(dropped.trails).toHaveLength(1)
-    expect(dropped.trails[0].x).toBe(50)
-    const bitten = walk({ whistle: 2 }, [note(8, 50, 50)], 132)
-    expect(bitten.crops[0].hp).toBeLessThan(60)
-    const faded = walk({ whistle: 2 }, [note(9, 50, 50, 100)], 130)
-    expect(faded.trails).toHaveLength(1)
-    expect(faded.trails[0].id).not.toBe(9)
+    expect(clean.arrows).toHaveLength(0)
+    // The whistle fires at the monster rather than dropping a field at its feet.
+    const fired = walk({ whistle: 2 }, [], 126)
+    expect(fired.arrows.length).toBeGreaterThan(0)
+    expect(fired.arrows[0].pierce).toBeGreaterThan(0)
+    // Chasing its target, an arrow reaches the monster and hurts it.
+    let flown = { ...walk({ whistle: 5 }, [], 126) }
+    const start = flown.arrows[0]
+    expect(start).toBeTruthy()
+    for (let index = 0; index < 12 && flown.crops[0].hp >= 60; index++)
+      flown = step({ ...flown, crops: flown.crops, tick: flown.tick }).state
+    expect(flown.crops[0].hp).toBeLessThan(60)
+    // Expired arrows are dropped instead of piling up for the whole run.
+    const stale = walk({ whistle: 2 }, [], 130, [
+      {
+        id: 5,
+        x: 50,
+        y: 50,
+        angle: 0,
+        damage: 3,
+        pierce: 2,
+        expires: 100,
+        homing: true,
+        cleared: [],
+      },
+    ])
+    expect(stale.arrows.some((arrow) => arrow.id === 5)).toBe(false)
     const many = walk(
       { whistle: 1 },
       Array.from({ length: 40 }, (_, index) => note(index, 50, 50, 9999)),
-      120,
+      126,
+      Array.from({ length: 40 }, (_, index) => ({
+        id: index,
+        x: 50,
+        y: 50,
+        angle: 0,
+        damage: 2,
+        pierce: 2,
+        expires: 9999,
+        homing: true,
+        cleared: [],
+      })),
     )
+    expect(many.arrows.length).toBeLessThanOrEqual(12)
     expect(many.trails.length).toBeLessThanOrEqual(30)
     // A saturated arena still gets elites: they take over a slot that is
     // waiting to respawn instead of waiting for room in the monster pool.

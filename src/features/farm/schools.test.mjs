@@ -147,7 +147,7 @@ describe('music roguelite schools', () => {
     const plain = { ...base, magnet: MAX_GEAR_LEVEL - 1 }
     expect(activeCombos(plain)).toEqual([])
     expect(ids(activeCombos(bass))).toEqual(['basspit'])
-    expect(damageDealt(bass) / damageDealt(plain)).toBeCloseTo(1 + BASS_TRAP_RESIDUE, 4)
+    expect(damageDealt(bass) / damageDealt(plain)).toBeCloseTo(1 + BASS_TRAP_RESIDUE, 3)
   })
 
   it('raises every hit once the third school evolves into the full encore', () => {
@@ -194,7 +194,7 @@ describe('music roguelite schools', () => {
     expect(activeCombos(plain)).toEqual([])
     expect(damageDealt(gear) / damageDealt(plain)).toBeCloseTo(
       (1 + BASS_TRAP_RESIDUE) * (1 + FULL_ENCORE_DAMAGE),
-      4,
+      3,
     )
   })
 

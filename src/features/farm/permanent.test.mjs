@@ -145,7 +145,10 @@ describe('permanent growth rules', () => {
       }
       const base = play(0)
       expect(base).toBeGreaterThan(0)
-      expect(play(15)).toBeCloseTo(base * 1.3, 1)
+      // Arrow damage lands on discrete frames and every hit rounds the health,
+      // so the 15 ranks of power read as a band around +30% rather than exact.
+      expect(play(15) / base).toBeGreaterThan(1.27)
+      expect(play(15) / base).toBeLessThan(1.33)
     },
   )
 

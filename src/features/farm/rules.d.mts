@@ -214,6 +214,17 @@ export type Danger = {
   sourceId?: number
 }
 export type Trail = { id: number; x: number; y: number; damage: number; expires: number }
+// Sentinel arrow (flute): a whistled dart that homes in on an enemy.
+export type Arrow = {
+  id: number
+  x: number
+  y: number
+  angle: number
+  damage: number
+  pierce: number
+  expires: number
+  homing?: boolean
+}
 export type Mine = { id: number; x: number; y: number; due: number; damage: number; radius: number }
 export type FarmState = {
   day: string
@@ -257,6 +268,7 @@ export type FarmState = {
   shields: number
   aim: Point
   shots: Shot[]
+  arrows?: Arrow[]
   dangers: Danger[]
   trails: Trail[]
   mines: Mine[]
@@ -287,6 +299,11 @@ export type FarmRound = {
 export function farmMoveStep(state: FarmState): number
 export function clampPoint(previous: Point, desired: Point, step?: number): Point
 export function synergies(gear: Gear): string[]
+export const AREA_BONUS_STEP: number
+export const AREA_BONUS_CAP: number
+export function farmAreaBonus(gear: Gear): number
+export function farmReach(state: FarmState): number
+export function farmSpawnRadius(state: FarmState): number
 // 选角色即选定开局乐器：返回该角色自带的乐器 id，未知的 id 返回 null（回退到旧行为）。
 export function starterTalent(characterId?: string | null): TalentId | null
 export function createFarm(
