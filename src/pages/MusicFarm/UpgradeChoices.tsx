@@ -78,7 +78,9 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
                 <small>乐队成长 · {item.tag}</small>
                 <b>{item.name}</b>
                 <p>{item.description}</p>
-                <strong>本局生效</strong>
+                <div className="farm-choice-note">
+                  <strong>本局生效</strong>
+                </div>
               </button>
             )
           const gearId = item.id
@@ -129,24 +131,30 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
                 </span>
               )}
               <p>{item.description}</p>
-              <div className="farm-recipe-progress">
-                <span className="farm-school-progress">
-                  进化：<b>{recipe.name}</b> · {nextGear[recipe.weapon]}/{MAX_GEAR_LEVEL} ＋{' '}
-                  {nextGear[recipe.chip]}/{MAX_GEAR_LEVEL}
-                </span>
-                {hint && (
-                  <span>
-                    {hint.missing} → {hint.combo.name}
+              {/* Desktop stacks these lines; phones fold them into the card's
+                  last row so one card still reads as one row. */}
+              <div className="farm-choice-note">
+                <div className="farm-recipe-progress">
+                  <span className="farm-school-progress">
+                    进化：<b>{recipe.name}</b> · {nextGear[recipe.weapon]}/{MAX_GEAR_LEVEL} ＋{' '}
+                    {nextGear[recipe.chip]}/{MAX_GEAR_LEVEL}
                   </span>
+                  {hint && (
+                    <span>
+                      {hint.missing} → {hint.combo.name}
+                    </span>
+                  )}
+                </div>
+                {willEvolve && <strong>✦ 这次解锁 {recipe.name}</strong>}
+                {fresh.map((combo) => (
+                  <strong key={combo.id} className="is-combo">
+                    ✦ 触发组合技：{combo.name}
+                  </strong>
+                ))}
+                {!willEvolve && !fresh.length && (
+                  <strong className="is-next">→ {recipe.name}</strong>
                 )}
               </div>
-              {willEvolve && <strong>✦ 这次解锁 {recipe.name}</strong>}
-              {fresh.map((combo) => (
-                <strong key={combo.id} className="is-combo">
-                  ✦ 触发组合技：{combo.name}
-                </strong>
-              ))}
-              {!willEvolve && !fresh.length && <strong>→ {recipe.name}</strong>}
             </button>
           )
         })}

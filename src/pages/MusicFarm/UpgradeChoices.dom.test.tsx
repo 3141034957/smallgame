@@ -58,6 +58,14 @@ it('names the school and how far along its ladder the pick lands', () => {
   expect(card.textContent).toContain('3/5 ＋ 3/5')
 })
 
+it('keeps the evolution lines in one note wrapper, which phones fold into a row', () => {
+  const gear = gearWith({ drum: 2, range: 3 })
+  render(<UpgradeChoices gear={gear} offered={['drum']} state={{ gear }} onSelect={() => {}} />)
+  const note = screen.getByRole('button').querySelector('.farm-choice-note')
+  expect(note?.textContent).toContain('进化：雷霆鼓组')
+  expect(note?.querySelector('.farm-school-progress')).toBeTruthy()
+})
+
 it('flashes a cross-school combo the pick would unlock', () => {
   // 鼓组流 already evolved; topping off the synth's chip completes 共振风暴.
   const gear = gearWith({ drum: 5, range: 5, synth: 5, arp: 4 })
