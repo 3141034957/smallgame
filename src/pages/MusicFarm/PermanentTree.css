@@ -100,12 +100,14 @@
   font-size: 11px;
 }
 
-/* Three schools, always side by side. */
+/* One path, top to bottom: schools stack as milestones along the same column. */
 .farm-growth-tree {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: 24px;
+  gap: 22px;
+  max-width: 620px;
+  margin: 0 auto;
 }
 .farm-growth-branch {
   min-width: 0;
@@ -457,7 +459,7 @@
 }
 @media (max-width: 1000px) {
   .farm-growth-tree {
-    gap: 14px;
+    gap: 18px;
   }
   .farm-growth-brand {
     padding: 7px 9px;
@@ -521,15 +523,14 @@
     padding: 16px 12px 30px;
   }
   .farm-growth-tree {
-    gap: 8px;
+    gap: 16px;
   }
+  /* One column keeps room for the school ribbon to stay on one line. */
   .farm-growth-brand {
-    flex-direction: column;
-    gap: 4px;
-    padding: 8px 6px;
+    gap: 8px;
+    padding: 7px 10px;
     margin-bottom: 12px;
-    border-left-width: 4px;
-    text-align: center;
+    border-left-width: 5px;
   }
   .farm-growth-brand > span {
     width: 26px;
@@ -538,7 +539,6 @@
     font-size: 15px;
   }
   .farm-growth-brand > small {
-    margin-left: 0;
     font-size: 9px;
   }
   .farm-growth-branch h3 {
