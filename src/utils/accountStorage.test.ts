@@ -19,7 +19,11 @@ import {
   FARM_PROFILE_KEY,
   FARM_DEFAULT_CHARACTER,
 } from '@/features/farm/characters'
-import { normalizePermanentLevels } from '@/features/farm/permanent.mjs'
+import {
+  normalizePermanentLevels,
+  permanentPrice,
+  PERMANENT_UPGRADES,
+} from '@/features/farm/permanent.mjs'
 import { getOrCreatePlayerId } from './playerIdentity'
 const a = 'account_00000000-0000-4000-8000-000000000001'
 const b = 'account_00000000-0000-4000-8000-000000000002'
@@ -33,12 +37,20 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 it('claims old coins, characters, upgrades, statistics and best scores exactly once without deleting originals', () => {
+  // 永久强化是一条链：档案里存的是已购的前三个节点，账本就是它们的定价之和。
+  const levels = normalizePermanentLevels({ 'step-1': 1, 'step-2': 1, 'step-3': 1 })
   const profile = {
     coins: 12000,
     owned: [FARM_DEFAULT_CHARACTER, 'crocodile-beat'],
     selected: 'crocodile-beat',
     rewardedRuns: ['old_run'],
-    growth: { levels: normalizePermanentLevels({ regen: 3 }), spent: 52500 },
+    growth: {
+      levels,
+      spent: PERMANENT_UPGRADES.slice(0, 3).reduce(
+        (sum, item) => sum + permanentPrice(item.id, 0)!,
+        0,
+      ),
+    },
   }
   const source = JSON.stringify(profile)
   localStorage.setItem(FARM_PROFILE_KEY, source)

@@ -9,7 +9,7 @@ import {
   resetFarmUpgrades,
   selectFarmCharacter,
 } from './characters'
-import { permanentPrice, type PermanentId } from './permanent.mjs'
+import { permanentPrice } from './permanent.mjs'
 
 let data: Map<string, string>
 beforeEach(() => {
@@ -113,33 +113,32 @@ describe('survivor character shop', () => {
     expect(loadFarmProfile()).toMatchObject({ coins: 42, selected: FARM_DEFAULT_CHARACTER })
   })
 
-  it('refunds the ranks a save actually owns when the spend ledger is missing or short', () => {
-    const paid = (id: PermanentId, levels: number) =>
-      Array.from({ length: levels }, (_, rank) => permanentPrice(id, rank) ?? 0).reduce(
-        (sum, price) => sum + price,
-        0,
-      )
-    // A legacy save predates the ledger: the ranks alone prove what was paid.
+  it('refunds the steps a save actually owns when the spend ledger is missing or short', () => {
+    // 旧档（某项 > 1 级）折算成链前 N 个节点：账本按已购节点重建，不是凭空返还。
     accountStorage.setItem(
       FARM_PROFILE_KEY,
       JSON.stringify({ coins: 100, growth: { levels: { regen: 2 } } }),
     )
-    expect(loadFarmProfile().growth?.spent).toBe(paid('regen', 2))
+    expect(loadFarmProfile().growth!.levels['step-1']).toBe(1)
+    expect(loadFarmProfile().growth?.spent).toBe(permanentPrice('step-1', 0))
     const legacy = resetFarmUpgrades()
     expect(legacy.error).toBeUndefined()
-    expect(legacy.profile.coins).toBe(100 + paid('regen', 2))
+    expect(legacy.profile.coins).toBe(100 + permanentPrice('step-1', 0)!)
     expect(legacy.profile.growth).toEqual(
-      expect.objectContaining({ spent: 0, levels: expect.objectContaining({ regen: 0 }) }),
+      expect.objectContaining({ spent: 0, levels: expect.objectContaining({ 'step-1': 0 }) }),
     )
     // A damaged value is still sanitized to zero: it must not mint coins.
     accountStorage.setItem(
       FARM_PROFILE_KEY,
-      JSON.stringify({ coins: 7, growth: { levels: { vitality: 3 }, spent: -50 } }),
+      JSON.stringify({
+        coins: 7,
+        growth: { levels: { 'step-1': 1, 'step-2': 1, 'step-3': 1 }, spent: -50 },
+      }),
     )
     expect(loadFarmProfile().growth?.spent).toBe(0)
-    expect(loadFarmProfile().growth?.levels.vitality).toBe(3)
+    expect(loadFarmProfile().growth!.levels['step-3']).toBe(1)
     expect(resetFarmUpgrades().profile.coins).toBe(7)
-    expect(loadFarmProfile().growth?.levels.vitality).toBe(0)
+    expect(loadFarmProfile().growth!.levels['step-1']).toBe(0)
   })
 
   it('handles corrupt saves independently and does not report purchases as saved if storage fails', () => {

@@ -21,6 +21,8 @@ import {
   replayFarm,
   stepFarm,
 } from '../src/features/farm/rules.mjs'
+import { normalizePermanentLevels, permanentLevelCount } from '../src/features/farm/permanent.mjs'
+import { FARM_RULESET } from '../src/features/farm/monsters.mjs'
 import { selectFarmUpgrade } from '../src/features/farm/upgradeSelection.ts'
 import { DEFAULT_CHARACTER_ID } from './identity.mjs'
 
@@ -163,20 +165,13 @@ function createRequest(store, consumeAttempt) {
 
 describe('replay-verified all-time farm leaderboard', () => {
   it('replays purchased attributes from the run snapshot and rejects invalid growth levels', () => {
-    const grown = playFixture(
-      true,
-      {
-        vitality: 12,
-        power: 4,
-        stride: 1,
-        armor: 2,
-        regen: 5,
-        shield: 1,
-      },
-      90,
-    )
+    // 旧档（某几项满级）折算成链前 N 个节点：提交时必须已经是合法的链前缀。
+    const legacy = { vitality: 12, power: 4, stride: 1, armor: 2, regen: 5, shield: 1 }
+    const grown = playFixture(true, normalizePermanentLevels(legacy), 90)
     expect(grown).not.toBeNull()
-    expect(grown.permanent.vitality).toBe(12)
+    expect(permanentLevelCount(grown.permanent)).toBe(12)
+    expect(grown.permanent['step-12']).toBe(1)
+    expect(grown.permanent['step-13']).toBe(0)
     expect(grown.frames.some((point) => point.some((value) => !Number.isInteger(value)))).toBe(true)
     const submission = {
       ...grown,
@@ -185,10 +180,13 @@ describe('replay-verified all-time farm leaderboard', () => {
       characterId: DEFAULT_CHARACTER_ID,
     }
     expect(verifyFarm(submission)?.score).toBe(grown.score)
+    // 链上不存在的 id、非 0/1 的等级、以及旧格式的等级全部拒绝。
     expect(verifyFarm({ ...submission, permanent: { vitality: 99 } })).toBeNull()
     expect(verifyFarm({ ...submission, permanent: null })).toBeNull()
     expect(verifyFarm({ ...submission, permanent: { stride: 1.5 } })).toBeNull()
     expect(verifyFarm({ ...submission, permanent: { unknown: 1 } })).toBeNull()
+    expect(verifyFarm({ ...submission, permanent: { 'step-1': 2 } })).toBeNull()
+    expect(verifyFarm({ ...submission, permanent: { 'step-30': 1 } })).toBeNull()
   })
   it('derives the ranking from a completed endless run, ignoring client-provided rewards', () => {
     expect(round.frames.length).toBeGreaterThan(FPS * 60)
@@ -241,7 +239,7 @@ describe('replay-verified all-time farm leaderboard', () => {
       verifyFarm({ ...defeat, frames: [...lowerRound.frames, lowerRound.frames.at(-1)] }),
     ).toBeNull()
     expect(verifyFarm({ ...defeat, surges: [lowerRound.frames.length] })).toBeNull()
-    expect(farmKey(day)).toBe(`farm:v9-boss-interval:${day}`)
+    expect(farmKey(day)).toBe(`farm:${FARM_RULESET}:${day}`)
   })
 
   it('replays each run with the character it was submitted with', () => {

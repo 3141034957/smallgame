@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import MusicFarm from './index'
 import { awardFarmCoins, FARM_PROFILE_KEY } from '@/features/farm/characters'
+import { PERMANENT_CHAIN } from '@/features/farm/permanent.mjs'
 import { FARM_HELP_SEEN_KEY } from '@/features/farm/help'
 import { activateAccount, installAccountSave } from '@/utils/accountStorage'
 import { testStorage } from '@/test/storage'
@@ -38,25 +39,31 @@ it('uses purchases made on the ready screen at start, then keeps the running sna
       <MusicFarm />
     </MemoryRouter>,
   )
+  // The chain opens one step at a time: step 1 is 生命 +10, step 2 伤害 +1.
+  const [first, second] = PERMANENT_CHAIN
+  const buyStep = (index: number, item: (typeof PERMANENT_CHAIN)[number]) =>
+    screen.getByRole('button', {
+      name: `升级第 ${index} 步 ${item.name}，花费${item.price}金币`,
+    })
   fireEvent.click(screen.getByRole('button', { name: '打开永久强化' }))
-  fireEvent.click(screen.getByRole('button', { name: '升级舞台体魄，花费1500金币' }))
+  fireEvent.click(buyStep(1, first))
   fireEvent.click(screen.getByRole('button', { name: '返回游戏' }))
   await act(async () => fireEvent.click(screen.getByRole('button', { name: '开始无限模式' })))
   expect(screen.getByRole('progressbar', { name: '生命值' }).getAttribute('aria-valuemax')).toBe(
-    '105',
+    '110',
   )
   fireEvent.click(screen.getByRole('button', { name: '打开永久强化' }))
-  fireEvent.click(screen.getByRole('button', { name: '升级舞台体魄，花费2500金币' }))
+  fireEvent.click(buyStep(2, second))
   await act(async () => fireEvent.click(screen.getByRole('button', { name: '返回游戏' })))
   expect(screen.getByRole('progressbar', { name: '生命值' }).getAttribute('aria-valuemax')).toBe(
-    '105',
+    '110',
   )
   fireEvent.click(screen.getByRole('button', { name: '打开永久强化' }))
   fireEvent.click(screen.getByRole('button', { name: '免费重置强化' }))
   fireEvent.click(screen.getByRole('button', { name: '确认重置' }))
   await act(async () => fireEvent.click(screen.getByRole('button', { name: '返回游戏' })))
   expect(screen.getByRole('progressbar', { name: '生命值' }).getAttribute('aria-valuemax')).toBe(
-    '105',
+    '110',
   )
   fireEvent.click(screen.getByRole('button', { name: '暂停游戏' }))
   fireEvent.click(screen.getByRole('button', { name: '重新开始' }))
