@@ -53,6 +53,25 @@ it('completes automatic submission under the StrictMode used by the app', async 
   )
 })
 
+it('ranks a signed-in player under the account name without asking for a nickname', async () => {
+  const account = {
+    user: { id: 'account_board_test', username: 'wqq' },
+    openAccount: vi.fn(),
+    refresh: vi.fn(),
+  }
+  render(
+    <AccountContext.Provider value={account as never}>
+      <FarmBoard round={round} />
+    </AccountContext.Provider>,
+  )
+  await waitFor(() => expect(screen.getByText(/已上榜/)).toBeTruthy())
+  // No nickname field is rendered at all for a signed-in player.
+  expect(screen.queryByLabelText('昵称')).toBeNull()
+  const posts = vi.mocked(farmRequest).mock.calls.filter(([path]) => path === 'score')
+  expect(posts).toHaveLength(1)
+  expect((posts[0][2] as { name: string }).name).toBe('wqq')
+})
+
 it('posts the score once when the effect is replayed after a cleanup', async () => {
   render(
     <StrictMode>

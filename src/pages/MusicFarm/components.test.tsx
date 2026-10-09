@@ -62,6 +62,10 @@ describe('farm screens render', () => {
     expect(html).toContain('无限总榜')
     expect(html).not.toContain('今日词缀')
     expect(html).not.toContain('今日目标')
+    // The three HUD rows share one wrapper so a phone can lay them out as a
+    // single bar; the boss flag only appears once a boss is due or on field.
+    expect(html).toContain('farm-status')
+    expect(html).not.toContain('farm-boss-flag')
   })
   it('opens the run with the instrument of the selected character', () => {
     const saved = localStorage.getItem(GUEST_SAVE_KEY)

@@ -600,14 +600,14 @@
     gap: 4px;
   }
 }
-@media (max-height: 500px) and (min-width: 681px) {
+@media (max-height: 500px) {
   .farm-shop-pill {
     display: none;
   }
 }
 
 /* Landscape phones: shrink the page so nothing overlaps or gets clipped. */
-@media (max-height: 520px) and (min-width: 681px) {
+@media (max-height: 520px) {
   .farm-shop-bar {
     min-height: 62px;
     gap: 6px;

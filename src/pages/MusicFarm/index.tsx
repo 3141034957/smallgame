@@ -119,6 +119,14 @@ export default function MusicFarm() {
   const openingSchool = schoolById(starterTalent(character.id) ?? '')
   const modifier = farmModifier(day)
   const bossesAlive = view.crops.filter((crop) => crop.boss).length
+  const bossCountdown = farmBossCountdown(view)
+  // Phones drop the "wave / boss countdown" line, so the boss only shows up
+  // as a short hint when it is about to land or already on the field.
+  const bossAlert = bossesAlive
+    ? `巨兽 ×${bossesAlive}`
+    : bossCountdown <= 15
+      ? `巨兽 ${bossCountdown}s`
+      : ''
   const growthStats = permanentStats(view.permanent)
   // A spent surge locks the button for a few seconds, so the HUD has to show
   // the wait instead of staying lit up and swallowing the next tap.
@@ -249,8 +257,13 @@ export default function MusicFarm() {
     runId.current = `farm_${Date.now()}_${random.join('_')}`
     phaseRef.current = 'play'
     setPhase('play') // The daily modifier left the start card, so the run announces itself.
-    setNotice(`今日词缀 · ${modifier.name}`)
-    noticeUntil.current = performance.now() + 3400
+    // The pause panel already lists today's modifier, so phones skip the
+    // banner: the compact HUD has no row to spare over the arena.
+    const compactHud = window.matchMedia?.('(max-width: 680px)').matches ?? false
+    if (!compactHud) {
+      setNotice(`今日词缀 · ${modifier.name}`)
+      noticeUntil.current = performance.now() + 3400
+    }
     void prepare()
     field.current?.focus({ preventScroll: true })
   }
@@ -913,73 +926,74 @@ export default function MusicFarm() {
                 </p>
               )}
             </div>
-            <div className={`farm-health ${view.hp <= 30 ? 'is-low' : ''}`}>
-              <span>♥</span>
-              <div
-                role="progressbar"
-                aria-label="生命值"
-                aria-valuemin={0}
-                aria-valuemax={view.maxHp}
-                aria-valuenow={view.hp}
-              >
-                <i style={{ width: `${(view.hp / view.maxHp) * 100}%` }} />
-              </div>
-              <b>
-                {Math.ceil(view.hp)}/{view.maxHp}
-              </b>
-              {view.shields > 0 && (
-                <em className="farm-shield-count" aria-label={`护盾 ${view.shields} 层`}>
-                  🛡 {view.shields}
-                </em>
-              )}
-            </div>
-            <div className="farm-xp">
-              <span>Lv.{view.level + 1}</span>
-              <div
-                role="progressbar"
-                aria-label="经验进度"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round(progress)}
-              >
-                <i style={{ width: `${progress}%` }} />
-              </div>
-              <span>
-                {number(currentXp)} / {number(requiredXp)} 经验
-              </span>
-            </div>
-            <div className="farm-hud">
-              <div>
-                <small>
-                  清怪分数 · 第 {1 + Math.floor(view.tick / (FPS * 15))} 波
-                  {bossesAlive
-                    ? ` · 巨兽 ${bossesAlive} 只`
-                    : ` · 巨兽 ${farmBossCountdown(view)}s`}
-                </small>
-                <strong>{number(view.score)}</strong>
-              </div>
-              <div
-                className={`farm-combo ${view.combo >= 60 ? 'is-frenzy-2' : view.combo >= 30 ? 'is-frenzy-1' : ''}`}
-              >
-                <b>{view.combo}</b>
-                <small>
-                  {view.combo >= 60
-                    ? '狂热 ✦✦ 音浪增强'
-                    : view.combo >= 30
-                      ? '狂热 ✦ 音浪强化'
-                      : '连击 · 最高 ×5'}
-                </small>
-              </div>
-              <div className="farm-time">
-                <b aria-label="已生存时间">
-                  <small>生存</small>
-                  {formatFarmTime(view.tick)}
+            <div className="farm-status">
+              <div className={`farm-health ${view.hp <= 30 ? 'is-low' : ''}`}>
+                <span>♥</span>
+                <div
+                  role="progressbar"
+                  aria-label="生命值"
+                  aria-valuemin={0}
+                  aria-valuemax={view.maxHp}
+                  aria-valuenow={view.hp}
+                >
+                  <i style={{ width: `${(view.hp / view.maxHp) * 100}%` }} />
+                </div>
+                <b>
+                  {Math.ceil(view.hp)}/{view.maxHp}
                 </b>
-                {phase === 'play' && (
-                  <button aria-label="暂停游戏" onClick={() => openPanel('pause')}>
-                    Ⅱ
-                  </button>
+                {view.shields > 0 && (
+                  <em className="farm-shield-count" aria-label={`护盾 ${view.shields} 层`}>
+                    🛡 {view.shields}
+                  </em>
                 )}
+              </div>
+              <div className="farm-xp">
+                <span>Lv.{view.level + 1}</span>
+                <div
+                  role="progressbar"
+                  aria-label="经验进度"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(progress)}
+                >
+                  <i style={{ width: `${progress}%` }} />
+                </div>
+                <span>
+                  {number(currentXp)} / {number(requiredXp)} 经验
+                </span>
+              </div>
+              <div className="farm-hud">
+                <div>
+                  <small>
+                    清怪分数 · 第 {1 + Math.floor(view.tick / (FPS * 15))} 波
+                    {bossesAlive ? ` · 巨兽 ${bossesAlive} 只` : ` · 巨兽 ${bossCountdown}s`}
+                  </small>
+                  {bossAlert && <span className="farm-boss-flag">{bossAlert}</span>}
+                  <strong>{number(view.score)}</strong>
+                </div>
+                <div
+                  className={`farm-combo ${view.combo >= 60 ? 'is-frenzy-2' : view.combo >= 30 ? 'is-frenzy-1' : ''}`}
+                >
+                  <b>{view.combo}</b>
+                  <small>
+                    {view.combo >= 60
+                      ? '狂热 ✦✦ 音浪增强'
+                      : view.combo >= 30
+                        ? '狂热 ✦ 音浪强化'
+                        : '连击 · 最高 ×5'}
+                  </small>
+                </div>
+                <div className="farm-time">
+                  <b aria-label="已生存时间">
+                    <small>生存</small>
+                    {formatFarmTime(view.tick)}
+                  </b>
+                  {phase === 'play' && (
+                    <button aria-label="暂停游戏" onClick={() => openPanel('pause')}>
+                      Ⅱ
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
             <div

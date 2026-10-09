@@ -36,7 +36,10 @@ export function FarmBoard({
   const authenticated = account ? !!account.user : !!activeAccountId()
   const [guestId] = useState(getOrCreatePlayerId)
   const playerId = account?.user?.id ?? activeAccountId() ?? guestId
-  const [name, setName] = useState(getStoredNickname)
+  const [storedName, setStoredName] = useState(getStoredNickname)
+  // A signed-in player is ranked under the account name: there is nothing to
+  // type, and the run goes on the board as soon as it ends.
+  const name = account?.user?.username ?? storedName
   const [draft, setDraft] = useState('')
   const [board, setBoard] = useState<Board | null>(null)
   const [error, setError] = useState('')
@@ -76,14 +79,14 @@ export function FarmBoard({
   const submit = useCallback(
     (nickname: string, target: FarmRound | null | undefined) => {
       if (!authenticated || !target || submitRef.current) return
-      const next = normalizeNickname(nickname)
+      const next = normalizeNickname(nickname || account?.user?.username || '')
       if (!next) {
         setError('先填昵称')
         return
       }
       saveNickname(next)
       attempted.current = target
-      setName(next)
+      setStoredName(next)
       boardRef.current?.abort()
       const controller = new AbortController()
       submitRef.current = controller
@@ -121,7 +124,7 @@ export function FarmBoard({
           }
         })
     },
-    [playerId, characterId, authenticated],
+    [playerId, characterId, authenticated, account?.user?.username],
   )
 
   // A player who already picked a nickname is on the board the moment the run
@@ -129,12 +132,13 @@ export function FarmBoard({
   const submitNow = useRef(submit)
   submitNow.current = submit
   useEffect(() => {
-    if (!authenticated || compact || !round || round.score <= 0 || !name) return
+    if (!authenticated || compact || !round || round.score <= 0) return
+    if (!account?.user?.username && !storedName) return
     if (attempted.current === round) return
     // Through a ref: the submission itself must not be cancelled by the state
     // updates it triggers.
     submitNow.current(name, round)
-  }, [round, name, compact, authenticated, playerId])
+  }, [round, name, storedName, compact, authenticated, playerId, account?.user?.username])
 
   return (
     <section className={`farm-board${compact ? ' is-compact' : ''}`} aria-label="无限总榜">
@@ -174,7 +178,8 @@ export function FarmBoard({
             {board?.own ? `总榜第 ${board.own.rank} 名` : '已上榜'}
           </p>
         ) : (
-          !name && (
+          !account?.user?.username &&
+          !storedName && (
             <form
               onSubmit={(event) => {
                 event.preventDefault()
