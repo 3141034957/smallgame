@@ -30,8 +30,8 @@ const SCHOOL_DEFINITIONS = [
   {
     id: 'whistle',
     name: '长笛流',
-    style: '残留音阵',
-    tagline: '走过的路变成持续伤害区，走位就是输出',
+    style: '追踪哨箭',
+    tagline: '吹哨操控哨箭追敌，穿透后留下音痕',
   },
   {
     id: 'sax',
@@ -114,7 +114,7 @@ export const COMBOS = [
     icon: '🕳️',
     requires: ['power', 'whistle'],
     requirement: '贝斯流 + 长笛流都进化',
-    effect: `长笛残留音阵伤害 +${percent(BASS_TRAP_RESIDUE)}、拾取范围 +${percent(BASS_TRAP_ATTRACTION)}`,
+    effect: `哨箭与音痕伤害 +${percent(BASS_TRAP_RESIDUE)}、拾取范围 +${percent(BASS_TRAP_ATTRACTION)}`,
     bonus: { residue: BASS_TRAP_RESIDUE, attraction: BASS_TRAP_ATTRACTION },
   },
   {

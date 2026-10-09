@@ -29,12 +29,15 @@ export const START = [50, 76]
 // This table describes the first full loadout, not a cap on player levels.
 // Runtime thresholds below continue the same curve beyond these 50 upgrades.
 export const UPGRADE_STEPS = MAX_EQUIPPED * 2 * MAX_GEAR_LEVEL
-// The quadratic term sets how late a full loadout lands: at 11/20 the whole
-// board was maxed before a long run was over, so the pace now stretches the
-// climb to roughly a quarter of an hour.
-export const XP_QUAD = 18
+// Pacing: the early levels must still arrive while the player is still
+// learning to dodge, but the climb to a finished loadout has to last long
+// enough that the build keeps changing. The flat term and the quadratic term
+// are the two knobs; XP_LINEAR feeds the closed form below.
+export const XP_FLAT = 12
+export const XP_LINEAR = 24
+export const XP_QUAD = 34
 export const UPGRADE_XP = Array.from({ length: UPGRADE_STEPS }, (_, index) =>
-  Math.round(20 + 20 * index + (XP_QUAD / 20) * index ** 2),
+  Math.round(XP_FLAT + XP_LINEAR * index + (XP_QUAD / 20) * index ** 2),
 )
 export const THRESHOLDS = UPGRADE_XP.map((_, index) =>
   UPGRADE_XP.slice(0, index + 1).reduce((sum, cost) => sum + cost, 0),
@@ -46,23 +49,25 @@ for (let index = 0; index < 20; index++)
   XP_ROUNDING.push(
     XP_ROUNDING.at(-1) + 20 * Math.round((XP_QUAD * index * index) / 20) - XP_QUAD * index * index,
   )
-export const farmUpgradeXp = (level) => Math.round(20 + 20 * level + (XP_QUAD / 20) * level ** 2)
+export const farmUpgradeXp = (level) =>
+  Math.round(XP_FLAT + XP_LINEAR * level + (XP_QUAD / 20) * level ** 2)
 export function farmXpThreshold(completedUpgrades) {
   const n = completedUpgrades
   const correction = Math.floor(n / 20) * XP_ROUNDING[20] + XP_ROUNDING[n % 20]
   return (
-    20 * n +
-    10 * n * (n - 1) +
+    XP_FLAT * n +
+    (XP_LINEAR / 2) * n * (n - 1) +
     Math.round((XP_QUAD * n * (n - 1) * (2 * n - 1) + 6 * correction) / 120)
   )
 }
+// Harvests stay flat for the first minute and a half: the opening is meant to
+// be survived by moving, not out-levelled.
 export const EXPERIENCE_STAGES = [
   { seconds: 0, multiplier: 1 },
-  { seconds: 30, multiplier: 1.25 },
-  { seconds: 60, multiplier: 1.6 },
-  { seconds: 120, multiplier: 2 },
-  { seconds: 180, multiplier: 2.5 },
-  { seconds: 300, multiplier: 3 },
+  { seconds: 90, multiplier: 1.15 },
+  { seconds: 180, multiplier: 1.4 },
+  { seconds: 300, multiplier: 1.8 },
+  { seconds: 480, multiplier: 2.4 },
 ]
 export const MAX_BOSSES = 4
 // A surge clears every shot and danger and grants a second of invulnerability,
@@ -122,8 +127,8 @@ const TALENT_DEFINITIONS = [
     name: '共鸣音箱',
     icon: '◉',
     color: '#9ebf86',
-    description: '所有攻击范围 +（音浪、爆破、冲刺波、扇形、音刃），配鼓手进化',
-    tag: '收割范围',
+    description: '鼓的爆破伤害更高，连锁更狠，配鼓手进化',
+    tag: '爆破强化',
   },
   {
     id: 'tempo',
@@ -132,7 +137,7 @@ const TALENT_DEFINITIONS = [
     name: '节拍器',
     icon: '⚡',
     color: '#d9bb74',
-    description: '所有攻击节奏更快（音刃转速、箭雨、光柱、号角、音阵等），配吉他手进化',
+    description: '所有攻击节奏更快（音刃转速、箭雨、光柱、号角、哨箭等），配吉他手进化',
     tag: '攻击速度',
   },
   {
@@ -178,8 +183,8 @@ const TALENT_DEFINITIONS = [
     kind: 'weapon',
     partner: 'delay',
     color: '#9ac6b4',
-    description: '走过的地方留下延迟音符，踩到的怪物持续受伤。',
-    tag: '残留音阵',
+    description: '吹哨射出会追着怪物飞的哨箭，穿透后留下淡淡音痕。',
+    tag: '追踪哨箭',
   },
   {
     id: 'delay',
@@ -188,8 +193,8 @@ const TALENT_DEFINITIONS = [
     name: '延迟效果器',
     icon: '◑',
     color: '#84b3a2',
-    description: '残留类更久更密、范围更大，配长笛手进化',
-    tag: '残留强化',
+    description: '哨箭射得更快、飞得更久，音痕也更密，配长笛手进化',
+    tag: '哨箭强化',
   },
   {
     id: 'sax',
@@ -206,8 +211,8 @@ const TALENT_DEFINITIONS = [
     name: '弱音器',
     icon: '◒',
     color: '#c08a4e',
-    description: '所有攻击范围 +、击退更远，配萨克斯进化',
-    tag: '冲刺强化',
+    description: '被号角命中的怪拖慢更久，配萨克斯进化',
+    tag: '拖慢强化',
   },
   {
     id: 'sampler',
@@ -262,7 +267,7 @@ const TALENT_DEFINITIONS = [
     name: '琶音器',
     icon: '◕',
     color: '#86ab7e',
-    description: '所有攻击范围 +、扇形更宽，配合成器进化',
+    description: '扇形音浪伤害更高，配合成器进化',
     tag: '音浪强化',
   },
 ]
@@ -431,9 +436,9 @@ export const RECIPES = [
   {
     weapon: 'whistle',
     chip: 'delay',
-    name: '回音长笛阵',
+    name: '回音哨箭阵',
     icon: '🪈',
-    description: '残留音符更长更痛，整片舞台都是你的音阵',
+    description: '一次吹出多支哨箭，穿透更多，音痕连成一片',
   },
   {
     weapon: 'sax',
@@ -525,9 +530,11 @@ const distance = (ax, ay, bx, by) =>
   Math.sqrt((ax - bx) * (ax - bx) * 0.7056 + (ay - by) * (ay - by))
 // Keep the opening minute familiar, then increase pressure without spawning
 // unbounded entities or letting movement speed grow past controllable levels.
+// The horde has to keep up with a finished build, otherwise the late game
+// stops being a fight for the mowing high and turns into a screensaver.
 const enemyHealth = (tick, kind) =>
   1 +
-  Math.floor(tick / 240) +
+  Math.floor(tick / 300) +
   Math.floor(Math.max(0, tick - FPS * 60) / (FPS * 30)) ** 2 +
   (kind === 3 ? 2 : 0)
 // Spawn ring: monsters must appear outside whatever the build already covers,
@@ -545,10 +552,11 @@ const SPAWN_RING_BASE = 52,
 const SPAWN_GRACE = 12
 // The area chips stop paying out here. Three of them maxed used to reach 1.75,
 // which covered more than the whole ring and turned late runs into a screensaver.
-export const AREA_BONUS_STEP = 0.04
-export const AREA_BONUS_CAP = 1.32
-export function farmAreaBonus(gear) {
-  return Math.min(AREA_BONUS_CAP, 1 + (gear.range + gear.mute + gear.arp) * AREA_BONUS_STEP)
+// Nothing widens an attack any more: three area chips used to stack into a
+// screen-wide aura that removed the need to move. Each of them now deepens
+// its own school instead of inflating every radius in the build.
+export function farmAreaBonus() {
+  return 1
 }
 // How far the build covers *every* direction at once, so arrivals can be placed
 // beyond it. Only the sweeping attacks count: a fan, a horn or a drum blast is
@@ -556,13 +564,13 @@ export function farmAreaBonus(gear) {
 // the run without making a single arrival more visible.
 export function farmReach(state) {
   const gear = state.gear,
-    area = farmAreaBonus(gear),
+    area = 1,
     forms = evolved(gear)
   return Math.max(
     gear.bell
       ? (24 + gear.bell * 6 + gear.sustain * 3 + (forms.includes('bell') ? 10 : 0)) * area
       : 0,
-    gear.deck ? (24 + gear.deck * 3) * area + 12 : 0,
+    gear.deck ? (16 + gear.deck * 3) * area + 12 : 0,
     gear.orbit ? 13 + gear.orbit * 2 + 8 : 0,
   )
 }
@@ -635,7 +643,7 @@ export function createFarm(day, permanent, starter) {
     trails: [],
     arrows: [],
     mines: [],
-    nextWave: 32,
+    nextWave: 48,
     nextSurge: 0,
     growth: { hp: 0, power: 0, stride: 0, remedy: 0, grit: 0 },
   }
@@ -644,7 +652,7 @@ export function createFarm(day, permanent, starter) {
   // rebuilds the exact same opening loadout.
   const opening = starterTalent(starter)
   if (opening) state.gear[opening] = 1
-  for (let id = 0; id < 24; id++) {
+  for (let id = 0; id < 16; id++) {
     const enemy = { id, x: 0, y: 0, kind: 0, hp: 1, maxHp: 1, regrow: -1, boss: false }
     placeAtEdge(state, enemy)
     state.crops.push(enemy)
@@ -839,7 +847,7 @@ export function stepFarm(previous, point, useSurge = false) {
   const frenzy = state.combo >= 60 ? 2 : state.combo >= 30 ? 1 : 0
   // Chips are universal stats first: area, haste, power, duration and residue
   // reach every attack. The matching pair only adds the evolution on top.
-  const areaBonus = farmAreaBonus(gear)
+  const areaBonus = 1
   const hasteBonus = gear.tempo + gear.trigger
   const powerBonus = gear.needle + frenzy
   const durationBonus = gear.sustain + gear.delay
@@ -871,7 +879,7 @@ export function stepFarm(previous, point, useSurge = false) {
     const dropXp =
         Math.round(
           Math.round(
-            (crop.bass ? 110 : crop.boss ? 60 : crop.elite ? 30 : 5 + gear.lucky) *
+            (crop.bass ? 110 : crop.boss ? 45 : crop.elite ? 20 : 4 + gear.lucky) *
               xpMultiplier *
               reward,
           ) *
@@ -964,7 +972,9 @@ export function stepFarm(previous, point, useSurge = false) {
       if (other.hp > 0 && distance(other.x, other.y, x, y) <= radius)
         damage(
           other,
-          ((gear.drum + (boomFlow ? 1 : 0)) * (forms.includes('drum') ? 2 : 1) + powerBonus) *
+          ((2 + gear.drum * 2 + (boomFlow ? 1 : 0)) * (forms.includes('drum') ? 2 : 1) +
+            powerBonus) *
+            (1 + gear.range * 0.12) *
             combo.blast,
           chain,
         )
@@ -989,7 +999,7 @@ export function stepFarm(previous, point, useSurge = false) {
   if (state.tick >= state.nextWave) {
     const count = Math.max(
       1,
-      Math.round((3 + Math.floor(state.tick / 240)) * (modifier?.wave ?? 1)),
+      Math.round((2 + Math.floor(state.tick / 300)) * (modifier?.wave ?? 1)),
     )
     const regularCount = state.crops.filter((crop) => !crop.boss).length
     for (let index = 0; index < count && regularCount + index < 100; index++) {
@@ -1000,7 +1010,9 @@ export function stepFarm(previous, point, useSurge = false) {
       placeAtEdge(state, enemy)
       state.crops.push(enemy)
     }
-    state.nextWave += 12
+    // The opening minute belongs to the player: waves stay sparse until the
+    // build has had a chance to come together.
+    state.nextWave += state.tick < FPS * 90 ? 22 : 16
   }
   // Elites take a dead/free slot, or replace a distant ordinary monster when
   // all 100 slots are alive. An encounter must not depend on killing first.
@@ -1143,12 +1155,12 @@ export function stepFarm(previous, point, useSurge = false) {
         (crop) =>
           crop.hp > 0 &&
           state.tick >= (crop.spawnAt ?? 0) &&
-          (forms.includes('echo') || distance(crop.x, crop.y, point[0], point[1]) <= 38),
+          distance(crop.x, crop.y, point[0], point[1]) <= (forms.includes('echo') ? 52 : 38),
       )
       .sort(
         (a, b) => distance(a.x, a.y, point[0], point[1]) - distance(b.x, b.y, point[0], point[1]),
       )
-      .slice(0, forms.includes('echo') ? 8 : gear.echo + 1)
+      .slice(0, forms.includes('echo') ? 6 : gear.echo + 1)
     for (const crop of targets) {
       events.push({
         id: state.nextId++,
@@ -1176,16 +1188,16 @@ export function stepFarm(previous, point, useSurge = false) {
         kind: 'beam',
         x: point[0],
         y: point[1],
-        radius: 4 + gear.power * 2,
+        radius: 8 + gear.power * 3,
         lane: 2,
       })
       for (const crop of state.crops)
         if (
           crop.hp > 0 &&
-          Math.abs(crop.x - point[0]) <= (4 + gear.power * 2) * areaBonus &&
+          Math.abs(crop.x - point[0]) <= (8 + gear.power * 3) * areaBonus &&
           Math.abs(crop.y - point[1]) <= 120
         )
-          damage(crop, gear.power + 1 + powerBonus)
+          damage(crop, 5 + gear.power * 4 + powerBonus)
     }
   }
   // Echo whistle: the flutist whistles and steers the shot the way Star-Lord
@@ -1211,7 +1223,7 @@ export function stepFarm(previous, point, useSurge = false) {
           y: point[1],
           angle,
           damage:
-            (3 + gear.whistle * 2 + (forms.includes('whistle') ? 4 : 0) + powerBonus) *
+            (2 + gear.whistle * 2 + (forms.includes('whistle') ? 4 : 0) + powerBonus) *
             combo.residue,
           pierce: 2 + Math.floor(gear.whistle / 2) + (forms.includes('whistle') ? 2 : 0),
           expires: state.tick + FPS * (2 + durationBonus),
@@ -1279,18 +1291,21 @@ export function stepFarm(previous, point, useSurge = false) {
   // Star tambourine: a slow, wide ring that also pushes monsters away, so it
   // covers the builds that keep getting cornered.
   if (gear.bell) {
-    const interval = Math.max(10, 30 - gear.sustain * 4 - hasteBonus)
+    const interval = Math.max(8, 22 - gear.sustain * 3 - hasteBonus)
     if (state.tick % interval === 0) state.bellRings = forms.includes('bell') ? 3 : 1
     if (state.bellRings > 0 && state.tick % 4 === 0) {
       state.bellRings--
       const radius =
-        (24 + gear.bell * 6 + gear.sustain * 3 + (forms.includes('bell') ? 10 : 0)) * areaBonus
+        (18 + gear.bell * 4 + gear.sustain * 2 + (forms.includes('bell') ? 8 : 0)) * areaBonus
       events.push({ id: state.nextId++, kind: 'shock', x: point[0], y: point[1], radius, lane: 2 })
       for (const crop of state.crops) {
         if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
         const dist = distance(crop.x, crop.y, point[0], point[1])
         if (dist > radius) continue
-        damage(crop, (gear.bell + (forms.includes('bell') ? 2 : 0) + powerBonus) * combo.shock)
+        damage(
+          crop,
+          (3 + gear.bell * 2 + (forms.includes('bell') ? 4 : 0) + powerBonus) * combo.shock,
+        )
         const factor = 6 / Math.max(1, dist)
         crop.x += (crop.x - point[0] || 1) * factor
         crop.y += (crop.y - point[1] || 1) * factor
@@ -1315,7 +1330,7 @@ export function stepFarm(previous, point, useSurge = false) {
   // Sax: a horn blast down the way you are heading, knocking the row back and
   // leaving it sluggish for a moment.
   if (gear.sax) {
-    const every = Math.max(6, 26 - gear.mute * 3 - hasteBonus)
+    const every = Math.max(6, 22 - gear.mute * 2 - hasteBonus)
     if (state.tick % every === 0) {
       const dir = aimAt()
       const norm = Math.max(0.01, Math.hypot(dir[0], dir[1]))
@@ -1340,7 +1355,7 @@ export function stepFarm(previous, point, useSurge = false) {
         const side = Math.abs(vx * -heading[1] + vy * heading[0])
         if (along < -4 || along > length || side > half + along * 0.9) continue
         damage(crop, (2 + gear.sax * 2 + (forms.includes('sax') ? 4 : 0) + powerBonus) * combo.horn)
-        crop.slowUntil = state.tick + FPS * (forms.includes('sax') ? 3 : 2)
+        crop.slowUntil = state.tick + FPS * (forms.includes('sax') ? 3 : 2) + gear.mute * 6
         crop.x += heading[0] * (forms.includes('sax') ? 9 : 6)
         crop.y += heading[1] * (forms.includes('sax') ? 9 : 6)
       }
@@ -1348,29 +1363,62 @@ export function stepFarm(previous, point, useSurge = false) {
       for (const crop of state.crops) {
         if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
         if (distance(crop.x, crop.y, point[0], point[1]) > 14) continue
-        crop.slowUntil = state.tick + FPS * ((forms.includes('sax') ? 3 : 2) + durationBonus)
+        crop.slowUntil =
+          state.tick + FPS * ((forms.includes('sax') ? 3 : 2) + durationBonus) + gear.mute * 6
       }
     }
   }
-  // Sampler: plants a beat that blows up a beat and a half later.
+  // Sampler: plants a beat where the horde is heading, not merely underfoot.
+  // Traps dropped behind the farmer never get stepped on once arrivals walk
+  // in from outside the build's reach, which made the whole school a no-show.
   if (gear.sampler) {
-    const every = Math.max(8, 28 - gear.trigger * 4 - hasteBonus)
+    const every = Math.max(4, 11 - gear.trigger * 2 - hasteBonus)
     if (state.tick % every === 0) {
+      let ahead = [point[0], point[1]]
+      let nearest = null,
+        closest = Infinity
+      for (const crop of state.crops) {
+        if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
+        const far = distance(crop.x, crop.y, point[0], point[1])
+        if (far < closest) {
+          closest = far
+          nearest = crop
+        }
+      }
+      if (nearest) {
+        const span = Math.max(1, closest),
+          step = Math.min(18, span * 0.6)
+        ahead = [
+          point[0] + ((nearest.x - point[0]) * step) / span,
+          point[1] + ((nearest.y - point[1]) * step) / span,
+        ]
+      }
       state.mines.push({
         id: state.nextId++,
-        x: point[0],
-        y: point[1],
-        due: state.tick + FPS,
-        damage: (gear.sampler + 1 + (forms.includes('sampler') ? 2 : 0) + powerBonus) * combo.mine,
+        x: ahead[0],
+        y: ahead[1],
+        due: state.tick + FPS * 3,
+        damage:
+          (4 + gear.sampler * 3 + (forms.includes('sampler') ? 5 : 0) + powerBonus) * combo.mine,
         radius:
-          (18 + gear.trigger * 4 + residueBonus * 2 + (forms.includes('sampler') ? 10 : 0)) *
+          (16 + gear.trigger * 3 + residueBonus * 2 + (forms.includes('sampler') ? 8 : 0)) *
           areaBonus,
       })
-      if (state.mines.length > 12) state.mines.shift()
+      if (state.mines.length > 16) state.mines.shift()
     }
   }
   state.mines = state.mines.filter((mine) => {
-    if (state.tick < mine.due) return true
+    // A mine is a trap, not a timer: it waits for something to walk into it,
+    // and only fizzles out if the horde never comes near.
+    if (state.tick < mine.due) {
+      const touched = state.crops.some(
+        (crop) =>
+          crop.hp > 0 &&
+          state.tick >= (crop.spawnAt ?? 0) &&
+          distance(crop.x, crop.y, mine.x, mine.y) <= mine.radius * 0.9,
+      )
+      if (!touched) return true
+    }
     events.push({
       id: state.nextId++,
       kind: 'mine',
@@ -1381,14 +1429,20 @@ export function stepFarm(previous, point, useSurge = false) {
     })
     for (const crop of state.crops) {
       if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
-      if (distance(crop.x, crop.y, mine.x, mine.y) <= mine.radius) damage(crop, mine.damage)
+      if (distance(crop.x, crop.y, mine.x, mine.y) > mine.radius) continue
+      damage(crop, mine.damage)
+      // The blast shoves survivors back: this build has no other way to keep
+      // the ring off the farmer while the next mine is being laid.
+      const push = 5 / Math.max(1, distance(crop.x, crop.y, mine.x, mine.y))
+      crop.x += (crop.x - mine.x || 1) * push
+      crop.y += (crop.y - mine.y || 1) * push * 0.6
     }
     return false
   })
   // DJ: wide scratch blades that also bounce a note into a nearby monster.
-  if (gear.deck && state.tick % 2 === 0) {
+  if (gear.deck && state.tick % 3 === 0) {
     const blades = forms.includes('deck') ? 4 : 2
-    const radius = (24 + gear.deck * 3) * areaBonus
+    const radius = (16 + gear.deck * 3) * areaBonus
     for (let index = 0; index < blades; index++) {
       const angle = state.tick * 0.12 + (index * Math.PI * 2) / blades
       const bx = point[0] + (Math.cos(angle) * radius) / 0.84,
@@ -1421,7 +1475,7 @@ export function stepFarm(previous, point, useSurge = false) {
   }
   // Synth: a fan of sound waves down the way you are heading.
   if (gear.synth) {
-    const every = Math.max(3, 12 - gear.arp * 2 - Math.floor(hasteBonus / 2))
+    const every = Math.max(6, 14 - gear.arp * 2 - Math.floor(hasteBonus / 2))
     if (state.tick % every === 0) {
       const dir = aimAt()
       const base = Math.atan2(dir[1], dir[0] * 0.84)
@@ -1448,7 +1502,9 @@ export function stepFarm(previous, point, useSurge = false) {
           if (off > spread) continue
           damage(
             crop,
-            (gear.synth + 1 + (forms.includes('synth') ? 2 : 0) + powerBonus) * combo.fan,
+            (gear.synth + 1 + (forms.includes('synth') ? 2 : 0) + powerBonus) *
+              (1 + gear.arp * 0.12) *
+              combo.fan,
           )
         }
       }
@@ -1460,7 +1516,8 @@ export function stepFarm(previous, point, useSurge = false) {
         if (crop.hp > 0 && distance(crop.x, crop.y, orb[0], orb[1]) <= 9)
           damage(
             crop,
-            ((gear.orbit + (boomFlow ? 1 : 0)) * (forms.includes('orbit') ? 2 : 1) + powerBonus) *
+            ((1 + gear.orbit + (boomFlow ? 1 : 0)) * (forms.includes('orbit') ? 2 : 1) +
+              powerBonus) *
               combo.orbit,
           )
   const attraction = (15 + gear.magnet * 15) * stats.attraction * combo.attraction
