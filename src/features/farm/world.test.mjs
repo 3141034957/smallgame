@@ -37,7 +37,8 @@ describe('unbounded combat world', () => {
     s.crops = [monster(10, -500, 300)]
     s.crops[0].hp = 7
     const r = stepFarm(s, s.position).state
-    expect(r.crops).toHaveLength(4)
+    // The opening wave is two arrivals, plus the monster already on the field.
+    expect(r.crops).toHaveLength(3)
     for (const enemy of r.crops) {
       const distance = Math.hypot((enemy.x - 1500) * 0.84, enemy.y + 2000)
       expect(distance).toBeGreaterThanOrEqual(52)
@@ -54,11 +55,14 @@ describe('unbounded combat world', () => {
     Object.assign(s.gear, { bell: 5, sustain: 5, range: 5, mute: 5, arp: 5 })
     s.nextWave = 100
     const r = stepFarm(s, s.position).state
-    // Three area chips used to stack to 1.75, which covered the whole ring.
-    expect(farmAreaBonus(r.gear)).toBeLessThanOrEqual(1.32)
+    // No chip widens an attack any more: the ring only has to clear whatever
+    // the sweeping attacks cover, and that coverage is no longer inflated.
+    expect(farmAreaBonus(r.gear)).toBe(1)
     const reach = farmReach(r)
-    expect(reach).toBeGreaterThan(90)
-    expect(farmSpawnRadius(r)).toBe(118)
+    expect(reach).toBe(79)
+    // The ring always sits one fixed walk beyond that coverage, so a maxed
+    // loadout still watches the horde close in instead of reaping it on arrival.
+    expect(farmSpawnRadius(r)).toBe(reach + 14)
     expect(r.crops.length).toBeGreaterThan(0)
     for (const enemy of r.crops) {
       const gap = Math.hypot((enemy.x - 50) * 0.84, enemy.y - 76)
@@ -109,9 +113,9 @@ describe('unbounded combat world', () => {
     const frames = [],
       choices = [],
       surges = []
-    // Nine minutes of travel leaves the last minute to end the run: the
-    // leaderboard only verifies runs of ten minutes or less.
-    while (state.tick < FPS * 60 * 9 && state.hp > 0) {
+    // Seven minutes of travel leaves three to end the run: a finished loadout
+    // now reaps everything that walks at it, so dying takes a real fight.
+    while (state.tick < FPS * 60 * 7 && state.hp > 0) {
       while (state.offered.length) {
         const id = state.offered[0]
         choices.push({ tick: state.tick, id })

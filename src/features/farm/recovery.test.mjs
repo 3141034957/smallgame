@@ -11,6 +11,8 @@ import {
   STARTER_CHOICES,
   replayFarm,
   clampPoint,
+  XP_FLAT,
+  XP_LINEAR,
   XP_QUAD,
 } from './rules.mjs'
 
@@ -27,7 +29,7 @@ describe('unlimited player levels and recovery cards', () => {
     let total = 0
     for (let level = 0; level < 10000; level++) {
       expect(farmXpThreshold(level)).toBe(total)
-      const cost = Math.round(20 + 20 * level + (XP_QUAD / 20) * level ** 2)
+      const cost = Math.round(XP_FLAT + XP_LINEAR * level + (XP_QUAD / 20) * level ** 2)
       expect(farmUpgradeXp(level)).toBe(cost)
       total += cost
       if (level < THRESHOLDS.length) expect(farmXpThreshold(level + 1)).toBe(THRESHOLDS[level])

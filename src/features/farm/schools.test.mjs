@@ -11,6 +11,7 @@ import {
   SCHOOLS,
   TALENTS,
   activeCombos,
+  chooseTalent,
   comboModifiers,
   comboProgress,
   createFarm,
@@ -34,17 +35,16 @@ const gearWith = (...schoolIds) => {
   return gear
 }
 const ids = (combos) => combos.map((combo) => combo.id)
-// 弱音器把范围加成垫高，让长笛的音阵正好够到这只假想怪，
-// 而黑洞（32）、光柱、主脉冲与音刃都落在它之外：
-// 于是这段时间里打在它身上的伤害只来自残留音阵，可以直接比比值。
-const REACH = { mute: MAX_GEAR_LEVEL }
+// 沙包放在横向 40、直线距离 35 上：贝斯进化前的光柱只吃 |dx| ≤ 23，
+// 进化后的黑洞只覆盖 32，两形态都够不到它；哨箭会自己追上去，
+// 于是打在它身上的伤害只来自长笛一路，可以直接比比值。
 // 一只站着不动、血量极高的假想怪：它既不会死也不会走，
 // 于是同一段时间里打在它身上的总伤害可以直接对比。
 function punchingBag() {
   return {
     id: 1,
-    x: 74,
-    y: 76,
+    x: 90,
+    y: 60,
     kind: 0,
     hp: 1e5,
     maxHp: 1e5,
@@ -140,9 +140,9 @@ describe('music roguelite schools', () => {
   })
 
   it('raises residue damage by exactly the low-end trap multiplier', () => {
-    // 只有长笛的音阵能够到这只怪：贝斯的黑洞与光柱都在它的射程之外，
+    // 只有长笛的哨箭够得到这只怪：贝斯的黑洞与光柱都在它的射程之外，
     // 所以总伤害的比值就是低音陷阱的残留加成。
-    const base = { whistle: MAX_GEAR_LEVEL, delay: MAX_GEAR_LEVEL, power: MAX_GEAR_LEVEL, ...REACH }
+    const base = { whistle: MAX_GEAR_LEVEL, delay: MAX_GEAR_LEVEL, power: MAX_GEAR_LEVEL }
     const bass = { ...base, magnet: MAX_GEAR_LEVEL }
     const plain = { ...base, magnet: MAX_GEAR_LEVEL - 1 }
     expect(activeCombos(plain)).toEqual([])
@@ -151,16 +151,15 @@ describe('music roguelite schools', () => {
   })
 
   it('raises every hit once the third school evolves into the full encore', () => {
-    // 只切换鼓组的芯片：共鸣音箱不产生任何伤害，多出的鼓组进化只带来全场安可。
-    // 鼓点打在最近的怪身上，所以再放一只更近的诱饵怪把鼓点引开：
-    // 这样连满级鼓组的爆炸也够不到假想怪。
+    // 只切换鼓组的芯片：共鸣音箱只强化鼓的爆破伤害，而鼓点打在最近的怪
+    // （诱饵）身上，所以再放一只更近的诱饵怪把鼓点引开：这样连满级鼓组的
+    // 爆炸也够不到假想怪，多出的鼓组进化只带来全场安可。
     const base = {
       whistle: MAX_GEAR_LEVEL,
       delay: MAX_GEAR_LEVEL,
       deck: MAX_GEAR_LEVEL,
       needle: MAX_GEAR_LEVEL,
       drum: MAX_GEAR_LEVEL,
-      ...REACH,
     }
     const two = { ...base, range: MAX_GEAR_LEVEL - 1 }
     const three = { ...base, range: MAX_GEAR_LEVEL }
@@ -182,7 +181,6 @@ describe('music roguelite schools', () => {
       magnet: MAX_GEAR_LEVEL,
       orbit: MAX_GEAR_LEVEL,
       tempo: MAX_GEAR_LEVEL,
-      ...REACH,
     }
     expect(ids(activeCombos(gear))).toEqual(['basspit', 'encore'])
     const modifiers = comboModifiers(gear)
@@ -206,9 +204,14 @@ describe('music roguelite schools', () => {
     expect(second).toEqual(first)
     expect(comboModifiers(structuredClone(state))).toEqual(comboModifiers(state))
     expect(ids(first)).toEqual(['brassfrenzy', 'encore'])
-    // 判定只依赖装备：把整局推进若干帧后结论不变。
+    // 判定只依赖装备：把整局推进若干帧后结论不变。收割会在半路弹出升级，
+    // 而升级弹窗会挡住推进，所以照着第一张手牌选下去——新卡只有一级，
+    // 不会让任何流派进化。
     let running = state
-    for (let tick = 0; tick < 64; tick++) running = stepFarm(running, running.position).state
+    for (let tick = 0; tick < 64; tick++) {
+      while (running.offered.length) running = chooseTalent(running, running.offered[0])
+      running = stepFarm(running, running.position).state
+    }
     expect(ids(activeCombos(running))).toEqual(ids(first))
   })
 

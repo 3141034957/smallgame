@@ -52,7 +52,9 @@ const FOCUS = 'echo'
 function playFixture(
   active = true,
   permanent = {},
-  movingSeconds = MAX_FARM_FRAMES / FPS - 60,
+  // Five minutes of dodging, then the closing walk: a longer opening leaves
+  // the run alive past the frame budget, and a live run cannot be ranked.
+  movingSeconds = 300,
   characterId = DEFAULT_CHARACTER_ID,
 ) {
   let state = createFarm(day, permanent, characterId)

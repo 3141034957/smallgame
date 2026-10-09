@@ -44,22 +44,27 @@ describe('the four new instruments', () => {
     expect(result.state.crops[0].hp).toBeLessThan(20)
     expect(result.state.crops[0].slowUntil).toBeGreaterThan(state.tick)
     expect(result.state.crops[0].x).toBeGreaterThan(58)
-    // The final form reaches further, so a monster far down the row is hit too.
+    // The final form reaches further, so a monster far down the row is hit too:
+    // 62 units out is past the plain horn's 54, inside the evolved horn's 70.
     const ordinary = arena(
       { sax: MAX_GEAR_LEVEL, mute: MAX_GEAR_LEVEL - 1 },
-      [crop(0, 122, 50)],
+      [crop(0, 112, 50)],
       28,
     )
-    const terminal = arena({ sax: MAX_GEAR_LEVEL, mute: MAX_GEAR_LEVEL }, [crop(0, 122, 50)], 22)
+    // The final form also blows on a twelve-frame beat, so pick a tick it fires on.
+    const terminal = arena({ sax: MAX_GEAR_LEVEL, mute: MAX_GEAR_LEVEL }, [crop(0, 112, 50)], 24)
     expect(evolved(terminal.gear)).toContain('sax')
     expect(stepFarm(ordinary, ordinary.position).state.crops[0].hp).toBe(20)
     expect(stepFarm(terminal, terminal.position).state.crops[0].hp).toBeLessThan(20)
   })
 
-  it('arms a sampler beat on the floor and blows it up a second later', () => {
-    const state = arena({ sampler: 2, trigger: 2 }, [crop(0, 52, 52)], 18)
+  it('arms a sampler beat towards the horde and blows it up when one walks in', () => {
+    // The beat is no longer dropped underfoot: it is laid up to eighteen units
+    // along the line to the nearest monster, so a monster has to walk into it.
+    const state = arena({ sampler: 2, trigger: 2 }, [crop(0, 96, 52)], 20)
     const planted = stepFarm(state, state.position).state
     expect(planted.mines).toHaveLength(1)
+    expect(planted.mines[0].x).toBeGreaterThan(60)
     expect(planted.crops[0].hp).toBe(20)
     const due = planted.mines[0].due
     let current = planted
@@ -67,7 +72,9 @@ describe('the four new instruments', () => {
       current = stepFarm(current, current.position).state
     expect(current.mines).toHaveLength(0)
     expect(current.crops[0].hp).toBeLessThan(20)
-    expect(current.tick).toBeGreaterThanOrEqual(due)
+    // A mine is a trap, not a timer: it goes off the moment something reaches
+    // it, so it never outlives its three-second fuse.
+    expect(current.tick).toBeLessThanOrEqual(due)
   })
 
   it('spins dj blades that hit on contact and bounce a note when evolved', () => {
@@ -99,7 +106,7 @@ describe('the four new instruments', () => {
   })
 
   it('fires a synth fan towards the closest monster and only inside its spread', () => {
-    const state = arena({ synth: 2, arp: 2 }, [crop(0, 70, 50), crop(1, 30, 50)], 8)
+    const state = arena({ synth: 2, arp: 2 }, [crop(0, 70, 50), crop(1, 30, 50)], 10)
     const result = stepFarm(state, state.position)
     const fan = result.events.find((event) => event.kind === 'fan')
     expect(fan).toBeTruthy()
@@ -107,7 +114,7 @@ describe('the four new instruments', () => {
     expect(result.state.crops[0].hp).toBeLessThan(20)
     expect(result.state.crops[1].hp).toBe(20)
     // The final form fires three fans at once.
-    const terminal = arena({ synth: MAX_GEAR_LEVEL, arp: MAX_GEAR_LEVEL }, [crop(0, 70, 50)], 9)
+    const terminal = arena({ synth: MAX_GEAR_LEVEL, arp: MAX_GEAR_LEVEL }, [crop(0, 70, 50)], 12)
     expect(evolved(terminal.gear)).toContain('synth')
     expect(
       stepFarm(terminal, terminal.position).events.filter((event) => event.kind === 'fan'),
@@ -153,22 +160,32 @@ describe('loadout slots', () => {
 describe('chips are universal stats', () => {
   it('lets a chip from another pair raise an unrelated instrument', () => {
     // Needle (the DJ chip) is flat damage for every attack.
-    const plain = arena({ synth: 2 }, [crop(0, 70, 50)], 12)
-    const boosted = arena({ synth: 2, needle: 3 }, [crop(0, 70, 50)], 12)
+    const plain = arena({ synth: 2 }, [crop(0, 70, 50)], 14)
+    const boosted = arena({ synth: 2, needle: 3 }, [crop(0, 70, 50)], 14)
     expect(stepFarm(boosted, boosted.position).state.crops[0].hp).toBeLessThan(
       stepFarm(plain, plain.position).state.crops[0].hp,
     )
-    // Resonator (the drum chip) widens every attack's reach.
-    const narrow = arena({ synth: 2 }, [crop(0, 90, 50)], 12)
-    const wide = arena({ synth: 2, range: MAX_EQUIPPED }, [crop(0, 90, 50)], 12)
-    const narrowFan = stepFarm(narrow, narrow.position).events.find((event) => event.kind === 'fan')
-    const wideFan = stepFarm(wide, wide.position).events.find((event) => event.kind === 'fan')
-    expect(wideFan.radius).toBeGreaterThan(narrowFan.radius)
+    // Metronome (the guitar chip) is haste for every attack: the synth fan
+    // sounds on a shorter beat, so more of them land in the same window.
+    const fanBeats = (gear) => {
+      let running = arena({ synth: 2, ...gear }, [crop(0, 70, 50)], 0)
+      let fans = 0
+      for (let tick = 0; tick < 28; tick++) {
+        const result = stepFarm(running, running.position)
+        fans += result.events.filter((event) => event.kind === 'fan').length
+        running = result.state
+      }
+      return fans
+    }
+    // Fourteen frames apart on its own, twelve with five levels of haste.
+    expect(fanBeats({})).toBe(2)
+    expect(fanBeats({ tempo: MAX_EQUIPPED })).toBe(3)
   })
 
   it('lets duration chips lengthen the effects of another instrument', () => {
-    const brief = arena({ sax: 3 }, [crop(0, 58, 50)], 26)
-    const long = arena({ sax: 3, sustain: 3 }, [crop(0, 58, 50)], 26)
+    // The horn blows every twenty-two frames, so pick a tick it sounds on.
+    const brief = arena({ sax: 3 }, [crop(0, 58, 50)], 22)
+    const long = arena({ sax: 3, sustain: 3 }, [crop(0, 58, 50)], 22)
     expect(stepFarm(long, long.position).state.crops[0].slowUntil).toBeGreaterThan(
       stepFarm(brief, brief.position).state.crops[0].slowUntil,
     )

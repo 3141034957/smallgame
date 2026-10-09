@@ -218,6 +218,9 @@ describe('music roguelite farming', () => {
     let state = arena({ whistle: 3, delay: 3 }, [], 100)
     state.nextWave = 100
     let previous = structuredClone(state)
+    // A note only lingers for a second, so the trail an arrow leaves has to be
+    // caught while it is still on the field instead of at the last frame.
+    let lingering = 0
     for (let tick = 0; tick < 40; tick++) {
       const result = stepFarm(
         state,
@@ -227,9 +230,10 @@ describe('music roguelite farming', () => {
       expect(state).toEqual(previous)
       state = result.state
       previous = structuredClone(state)
+      lingering = Math.max(lingering, state.trails.length)
     }
-    expect(state.trails.length).toBeGreaterThan(0)
-    expect(state.trails.length).toBeLessThanOrEqual(30)
+    expect(lingering).toBeGreaterThan(0)
+    expect(lingering).toBeLessThanOrEqual(30)
   })
   it('limits movement and refuses malformed moves, empty charge and finished rounds', () => {
     const state = createFarm(day)
@@ -411,7 +415,10 @@ describe('music roguelite farming', () => {
   it('replays a run that spent its levels on attribute cards', () => {
     // Server-side replay has to land on the same score: the cards are dealt by
     // the same seeded pool and applied through the same damage path.
-    const routeDay = '2026-10-03'
+    // Attribute cards are dealt into the spare slot, so only some days offer
+    // one at all: the day has to be one that spends more than one level on the
+    // attribute line before the run ends.
+    const routeDay = '2026-10-20'
     // Only the cards that do not keep the runner alive: a toughened farmer
     // outlives the walk into the horde that a replay needs to end on.
     const { state, frames, choices, surges } = run('drum', routeDay, 'bear-drums', [
@@ -437,7 +444,9 @@ describe('music roguelite farming', () => {
 
   it('rotates starter options across days and keeps the chosen instrument recipe available', () => {
     const seen = new Set()
-    for (let date = 1; date <= 10; date++) {
+    // The tenth instrument only turns up on the eleventh day, so the window
+    // has to cover it before the rotation can be called complete.
+    for (let date = 1; date <= 12; date++) {
       const state = createFarm(`2026-10-${String(date).padStart(2, '0')}`)
       state.xp = THRESHOLDS[0]
       const offered = stepFarm(state, state.position).state
@@ -518,8 +527,8 @@ describe('music roguelite farming', () => {
     terminal.gear.tempo = MAX_GEAR_LEVEL
     expect(orbitPositions(ordinary)).toHaveLength(6)
     expect(orbitPositions(terminal)).toHaveLength(8)
-    expect(stepFarm(ordinary, ordinary.position).state.crops[0].hp).toBe(15)
-    expect(stepFarm(terminal, terminal.position).state.crops[0].hp).toBe(10)
+    expect(stepFarm(ordinary, ordinary.position).state.crops[0].hp).toBe(14)
+    expect(stepFarm(terminal, terminal.position).state.crops[0].hp).toBe(8)
   })
 
   it('changes the bass column beam into a wide black hole that pulls remote loot', () => {
@@ -533,7 +542,7 @@ describe('music roguelite farming', () => {
     const normal = stepFarm(ordinary, ordinary.position)
     const ultimate = stepFarm(terminal, terminal.position)
     expect(normal.events.some((event) => event.kind === 'beam')).toBe(true)
-    expect(normal.state.crops.map((item) => item.hp)).toEqual([14, 20])
+    expect(normal.state.crops.map((item) => item.hp)).toEqual([0, 20])
     expect(ultimate.events.some((event) => event.kind === 'blackhole')).toBe(true)
     expect(ultimate.events.some((event) => event.kind === 'beam')).toBe(false)
     expect(ultimate.state.crops.map((item) => item.hp)).toEqual([20, 11])
@@ -551,8 +560,10 @@ describe('music roguelite farming', () => {
       stepFarm(ordinary, ordinary.position).events.filter((event) => event.kind === 'rain'),
     ).toHaveLength(0)
     const rain = stepFarm(terminal, terminal.position)
-    expect(rain.events.filter((event) => event.kind === 'rain')).toHaveLength(8)
-    expect(rain.state.crops.every((item) => item.hp <= 14)).toBe(true)
+    // The finished voice picks six targets and nothing outside its 52 range,
+    // so the two furthest crops of the eight keep every point of health.
+    expect(rain.events.filter((event) => event.kind === 'rain')).toHaveLength(6)
+    expect(rain.state.crops.filter((item) => item.hp <= 14)).toHaveLength(6)
     // Nothing else triggers the rain any more: it keeps the cadence the basic
     // wave used to have, so the metronome is what shortens the gap.
     const count = (tempo) => {
@@ -576,7 +587,7 @@ describe('music roguelite farming', () => {
     expect(result.state.xp).toBe(0)
     expect(result.state.loot).toHaveLength(1)
     expect(result.state.loot[0]).toMatchObject({
-      xp: 3 + Math.round(5 * reward),
+      xp: 3 + Math.round(4 * reward),
       coins: 5 + Math.round(8 * reward),
     })
     const waiting = {
@@ -605,7 +616,7 @@ describe('music roguelite farming', () => {
       return stepFarm(s, s.position).state.crops.length
     }
     expect(wave('swarm')).toBeGreaterThan(wave('calm'))
-    expect(wave('nonsense')).toBe(3)
+    expect(wave('nonsense')).toBe(2)
     const health = (id) => {
       const s = quiet({ modifier: id, nextWave: 100 })
       return stepFarm(s, s.position).state.crops[0].maxHp
@@ -760,7 +771,9 @@ describe('music roguelite farming', () => {
       expect(round.terminalAt).toBeLessThan(FPS * 150)
       expect(round.state.tick).toBeGreaterThan(FPS * 20)
       expect(round.choices).toHaveLength(round.state.level)
-      if (focus === 'drum') expect(round.choices.length).toBeGreaterThan(50)
+      // The drum route banks 36 levels before the closing walk: fewer than the
+      // old reward table did, but still far more than a run needs for a recipe.
+      if (focus === 'drum') expect(round.choices.length).toBeGreaterThan(30)
       const replay = replayFarm(routeDay, round.frames, round.choices, round.surges, {}, member)
       expect(replay).toMatchObject({
         score: round.state.score,
@@ -864,7 +877,9 @@ describe('music roguelite farming', () => {
   it('deals a normal first hand to a run that already holds an instrument', () => {
     const opening = (characterId) => {
       let state = createFarm(day, {}, characterId)
-      for (let tick = 0; !state.offered.length && tick < FPS * 5; tick++)
+      // The first hand costs 24 XP now, so the opening walk has to last a few
+      // seconds longer before the first deal is due.
+      for (let tick = 0; !state.offered.length && tick < FPS * 8; tick++)
         state = stepFarm(
           state,
           clampPoint(state.position, [

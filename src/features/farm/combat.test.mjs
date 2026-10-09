@@ -189,11 +189,15 @@ describe('survivor combat', () => {
     }
     const idle = ring({ bell: 0 }, 120)
     expect(idle.events.some((event) => event.kind === 'shock')).toBe(false)
-    const struck = ring({ bell: 1 }, 120)
+    // A ring only lands on a tick that is both on its 22-frame cadence and on
+    // the four-frame beat it is actually struck on.
+    const struck = ring({ bell: 1 }, 88)
     expect(struck.state.crops[0].hp).toBeLessThan(40)
     expect(struck.state.crops[0].x).toBeGreaterThan(56)
-    expect(struck.events.find((event) => event.kind === 'shock').radius).toBe(30)
-    // The final form fires three rings in a row instead of one.
+    expect(struck.events.find((event) => event.kind === 'shock').radius).toBe(22)
+    // The final form queues three rings instead of one, and its cadence drops to
+    // every eight frames: the burst re-arms before the last queued ring is spent,
+    // so rings keep landing on the four-frame beat.
     const first = ring({ bell: MAX_GEAR_LEVEL, sustain: MAX_GEAR_LEVEL }, 120)
     expect(first.events.filter((event) => event.kind === 'shock')).toHaveLength(1)
     expect(first.state.bellRings).toBe(2)
@@ -201,10 +205,10 @@ describe('survivor combat', () => {
     const third = step({ ...second.state, tick: 128 })
     expect(second.events.filter((event) => event.kind === 'shock')).toHaveLength(1)
     expect(third.events.filter((event) => event.kind === 'shock')).toHaveLength(1)
-    expect(third.state.bellRings).toBe(0)
-    // The ring cadence shortens with the top-level chip, so the quiet tick moves too.
+    expect(third.state.bellRings).toBe(2)
+    // The ring keeps its four-frame pulse: nothing sounds between two beats.
     expect(
-      step({ ...third.state, tick: 132 }).events.filter((event) => event.kind === 'shock'),
+      step({ ...third.state, tick: 130 }).events.filter((event) => event.kind === 'shock'),
     ).toHaveLength(0)
   })
   it('sends gold-record elites after 45 seconds: tougher, dashing and worth more', () => {
@@ -457,7 +461,8 @@ describe('survivor combat', () => {
     const s = arena([], 100)
     s.nextWave = 100
     const r = step(s).state
-    expect(r.crops).toHaveLength(3)
+    // The opening wave starts at two arrivals and grows once every 300 ticks.
+    expect(r.crops).toHaveLength(2)
     expect(r.crops.every((e) => Math.hypot(e.x - 50, e.y - 50) > 40)).toBe(true)
     const capped = { ...s, crops: Array.from({ length: 100 }, (_, id) => enemy(id, 0, -10, 0)) }
     expect(step(capped).state.crops).toHaveLength(100)

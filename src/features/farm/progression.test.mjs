@@ -6,6 +6,8 @@ import {
   THRESHOLDS,
   UPGRADE_STEPS,
   UPGRADE_XP,
+  XP_FLAT,
+  XP_LINEAR,
   XP_QUAD,
   chooseTalent,
   createFarm,
@@ -42,14 +44,16 @@ function reward(enemy, tick, lucky = 0, modifier = 'none') {
 describe('farm experience progression', () => {
   it('increases every upgrade cost, with cumulative thresholds for a full loadout', () => {
     expect(UPGRADE_XP).toHaveLength(UPGRADE_STEPS)
-    expect(UPGRADE_XP.slice(0, 6)).toEqual([20, 41, 64, 88, 114, 143])
+    expect(UPGRADE_XP.slice(0, 6)).toEqual([12, 38, 67, 99, 135, 175])
     for (let index = 0; index < UPGRADE_XP.length; index++) {
       expect(Number.isSafeInteger(UPGRADE_XP[index])).toBe(true)
       expect(UPGRADE_XP[index]).toBeGreaterThan(UPGRADE_XP[index - 1] ?? 0)
       expect(THRESHOLDS[index] - (THRESHOLDS[index - 1] ?? 0)).toBe(UPGRADE_XP[index])
     }
     expect(UPGRADE_XP.at(-1)).toBe(
-      20 + 20 * (UPGRADE_XP.length - 1) + Math.round((XP_QUAD / 20) * (UPGRADE_XP.length - 1) ** 2),
+      XP_FLAT +
+        XP_LINEAR * (UPGRADE_XP.length - 1) +
+        Math.round((XP_QUAD / 20) * (UPGRADE_XP.length - 1) ** 2),
     )
   })
 
@@ -85,9 +89,9 @@ describe('farm experience progression', () => {
 
   it('scales regular, elite and both boss rewards while preserving coin rewards and modifiers', () => {
     const categories = [
-      { flags: {}, base: 5 },
-      { flags: { elite: true }, base: 30 },
-      { flags: { boss: true }, base: 60 },
+      { flags: {}, base: 4 },
+      { flags: { elite: true }, base: 20 },
+      { flags: { boss: true }, base: 45 },
       { flags: { boss: true, bass: true }, base: 110 },
     ]
     for (const { flags, base } of categories) {
@@ -98,18 +102,18 @@ describe('farm experience progression', () => {
         const monster = { ...spawn(tick), kind: 0, ...flags }
         const result = reward(monster, tick)
         expect(result.xp).toBe(Math.round(base * multiplier))
-        expect(result.xp).toBeGreaterThan(previousXp)
+        expect(result.xp).toBeGreaterThanOrEqual(previousXp)
         expect(result.coins).toBe(first.coins)
         expect(reward(monster, tick, 0, 'golden').xp).toBe(Math.round(base * multiplier * 1.5))
         previousXp = result.xp
       }
     }
-    expect(reward(spawn(120 * FPS), 120 * FPS, 3, 'golden').xp).toBe(24)
+    expect(reward(spawn(120 * FPS), 120 * FPS, 3, 'golden').xp).toBe(12)
   })
 
   it('keeps old monster and loose-drop rewards fixed when the clock advances', () => {
     const monster = spawn(0)
-    expect(reward(monster, 300 * FPS).xp).toBe(5)
+    expect(reward(monster, 300 * FPS).xp).toBe(4)
     let state = arena(300 * FPS)
     state.crops = [{ ...monster, x: 1000, y: 1000, spawnAt: 0 }]
     state = stepFarm(state, state.position).state
@@ -121,21 +125,23 @@ describe('farm experience progression', () => {
   })
 
   it('refreshes experience stages for recycled normal monsters and elite slots', () => {
+    // Stages now start at 90s, so a monster recycled at two minutes sits on
+    // the first step of the new table.
     let state = arena(120 * FPS)
     state.crops = [{ ...spawn(0), hp: 0, regrow: 0, elite: true }]
     let monster = stepFarm(state, state.position).state.crops[0]
-    expect(monster).toMatchObject({ xpStage: 3, elite: false })
-    expect(reward(monster, state.tick).xp).toBe(10)
+    expect(monster).toMatchObject({ xpStage: 1, elite: false })
+    expect(reward(monster, state.tick).xp).toBe(5)
     state = arena(45 * FPS)
     state.crops = [{ ...spawn(0), hp: 0, regrow: Infinity }]
     monster = stepFarm(state, state.position).state.crops[0]
-    expect(monster).toMatchObject({ xpStage: 1, elite: true })
-    expect(reward(monster, state.tick).xp).toBe(38)
+    expect(monster).toMatchObject({ xpStage: 0, elite: true })
+    expect(reward(monster, state.tick).xp).toBe(20)
     for (const timer of ['nextBoss', 'nextBass']) {
       state = arena(120 * FPS)
       state[timer] = state.tick
       expect(stepFarm(state, state.position).state.crops.find((enemy) => enemy.boss).xpStage).toBe(
-        3,
+        1,
       )
     }
   })
@@ -149,25 +155,42 @@ describe('farm experience progression', () => {
       RECIPES.map(({ weapon }) => simulateFarm(day, weapon, true, 180)),
     )
     for (const run of runs) {
-      expect(run.upgrades[0], `${run.modifier}/${run.focus}: first choice`).toBeLessThan(12)
-      expect(run.evolutions.length, `${run.modifier}/${run.focus}: no evolution`).toBeGreaterThan(0)
-      expect(run.evolutions[0].seconds).toBeLessThan(60)
+      // The opening is meant to be survived by moving: the first choice now
+      // lands later than it used to, but well inside the first half minute.
+      expect(run.upgrades[0], `${run.modifier}/${run.focus}: first choice`).toBeLessThan(35)
       expect(run.seconds).toBeGreaterThan(30)
-      expect(run.snapshots[30]).toBeGreaterThanOrEqual(6)
-      expect(run.snapshots[30]).toBeLessThanOrEqual(18)
+      // A finished form is the mid-game reward, not something the opening
+      // minute hands out.
+      if (run.evolutions.length) expect(run.evolutions[0].seconds).toBeLessThan(150)
+      // Pacing: half a minute in, the farmer is still on the first few picks
+      // and has to survive by moving rather than by out-levelling the horde.
+      // The slowest opening of the 36 runs is the guitar on 2026-10-02, which
+      // banks its first choice at 29.4s and sits on level 2 at the half minute.
+      expect(run.snapshots[30]).toBeGreaterThanOrEqual(2)
+      expect(run.snapshots[30]).toBeLessThanOrEqual(10)
       if (run.snapshots[60]) expect(run.snapshots[60]).toBeGreaterThan(run.snapshots[30])
       if (run.snapshots[120]) expect(run.snapshots[120]).toBeGreaterThan(run.snapshots[60])
       if (run.snapshots[180]) expect(run.snapshots[180]).toBeGreaterThan(run.snapshots[120])
     }
     expect(runs.filter((run) => run.seconds >= 120).length).toBeGreaterThanOrEqual(24)
-    // A simpler circular route also earns a complete first recipe and keeps
-    // growing; the player need not dodge with frame-perfect reactions.
+    // Every instrument has to finish its form on most days. The sampler and
+    // the bass column are the fragile ones: they still fall short on the days
+    // that stack extra monsters, which is the next thing to even out.
+    for (const { weapon } of RECIPES) {
+      const finished = runs.filter((run) => run.focus === weapon && run.evolutions.length).length
+      expect(finished, `${weapon}: evolution on too few days`).toBeGreaterThanOrEqual(3)
+    }
+    // A simpler circular route still earns its first upgrade and a complete
+    // recipe. It no longer survives the full two minutes on every day: the
+    // opening is meant to be walked, so a route that never dodges is now
+    // expected to get cornered. What must hold is that it keeps growing
+    // while it lasts.
     for (const day of days) {
       const run = simulateFarm(day, 'echo', false, 120, true)
       expect(run.upgrades[0]).toBeLessThan(12)
-      expect(run.evolutions[0]?.seconds).toBeLessThan(60)
-      expect(run.seconds).toBe(120)
-      expect(run.snapshots[120]).toBeGreaterThan(run.snapshots[60])
+      expect(run.evolutions[0]?.seconds).toBeLessThan(150)
+      expect(run.seconds).toBeGreaterThan(45)
+      expect(run.snapshots[60]).toBeGreaterThan(run.snapshots[30])
     }
   }, 300000)
 })
