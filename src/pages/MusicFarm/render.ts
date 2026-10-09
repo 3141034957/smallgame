@@ -7,6 +7,8 @@ import {
   type Crop,
   type FarmEvent,
   type FarmState,
+  type Gear,
+  type Lane,
   type Point,
 } from '../../features/farm/rules.mjs'
 import {
@@ -44,6 +46,138 @@ const COLORS = ['#f3a0b0', '#f7ab67', '#ed817c', '#f3cd67']
 const INK = '#405446'
 const X = (value: number) => value * 3.6
 const Y = (value: number) => value * 4.3
+
+// monsterFor() walks the monster table with a fresh closure on every call and a
+// crop asks for its monster once per frame. Only the four branches it can take
+// matter, so resolve them once here: same objects, no per-frame lookup.
+const REGULAR_MONSTERS = ([0, 1, 2, 3] as Lane[]).map((kind) => monsterFor({ kind, boss: false }))
+const BASS_MONSTER = monsterFor({ kind: 0, boss: false, bass: true })
+const BOSS_MONSTER = monsterFor({ kind: 0, boss: true })
+const ELITE_MONSTER = monsterFor({ kind: 0, boss: false, elite: true })
+const monsterOf = (crop: Crop) =>
+  crop.bass
+    ? BASS_MONSTER
+    : crop.boss
+      ? BOSS_MONSTER
+      : crop.elite
+        ? ELITE_MONSTER
+        : REGULAR_MONSTERS[crop.kind]
+
+// Hit flashes used to be matched by `${event.x}:${event.y}` templates: one build
+// per hit and one per crop per frame. World coordinates stay inside the arena,
+// so a 1/1024 unit grid is far finer than a pixel and fits one numeric key.
+const HIT_STEP = 1e7
+const hitKey = (x: number, y: number) => Math.round(x * 1024) * HIT_STEP + Math.round(y * 1024)
+
+// evolved() rebuilds two arrays per call and the hero, orbit and deck visuals
+// all ask in the same frame. Gear levels only move on an upgrade, so remember
+// the numbers that produced the last answer instead of the gear object itself.
+let gearKeys: string[] = []
+let gearValues: number[] = []
+let gearForms: string[] = []
+let gearCached = false
+function evolvedForms(gear: Gear): string[] {
+  if (gearCached) {
+    let index = 0
+    let same = true
+    for (const key in gear) {
+      if (gearKeys[index] !== key || gearValues[index] !== gear[key as keyof Gear]) {
+        same = false
+        break
+      }
+      index++
+    }
+    if (same && index === gearKeys.length) return gearForms
+  }
+  gearKeys = []
+  gearValues = []
+  for (const key in gear) {
+    gearKeys.push(key)
+    gearValues.push(gear[key as keyof Gear])
+  }
+  gearForms = evolved(gear)
+  gearCached = true
+  return gearForms
+}
+
+// Gradients are the expensive part of a canvas frame; all of these are defined
+// in a fixed local space so one instance per context works for every frame and
+// every canvas size (the current transform scales them at paint time).
+const gradientCache = new WeakMap<CanvasRenderingContext2D, Map<string, CanvasGradient>>()
+function cachedGradient(
+  ctx: CanvasRenderingContext2D,
+  key: string,
+  build: () => CanvasGradient,
+): CanvasGradient {
+  let owned = gradientCache.get(ctx)
+  if (!owned) gradientCache.set(ctx, (owned = new Map()))
+  let gradient = owned.get(key)
+  if (!gradient) {
+    gradient = build()
+    owned.set(key, gradient)
+  }
+  return gradient
+}
+// The combo halo: a fixed disc around the farmer, only its colour changes.
+function comboGlow(ctx: CanvasRenderingContext2D, hot: boolean) {
+  return cachedGradient(ctx, hot ? 'combo-hot' : 'combo-warm', () => {
+    const gradient = ctx.createRadialGradient(0, 0, 8, 0, 0, 40)
+    gradient.addColorStop(0, hot ? '#f2a35c59' : '#f2c96c40')
+    gradient.addColorStop(1, '#f2c96c00')
+    return gradient
+  })
+}
+// The bass beam: a unit-wide gradient, stretched to the beam by the transform.
+function beamGlow(ctx: CanvasRenderingContext2D) {
+  return cachedGradient(ctx, 'beam', () => {
+    const gradient = ctx.createLinearGradient(-1, 0, 1, 0)
+    gradient.addColorStop(0, '#a8b8de00')
+    gradient.addColorStop(0.45, '#d7deff')
+    gradient.addColorStop(0.5, '#fffcf2')
+    gradient.addColorStop(0.55, '#d7deff')
+    gradient.addColorStop(1, '#a8b8de00')
+    return gradient
+  })
+}
+// The black hole: a unit disc, scaled to the event radius by the transform.
+function blackholeGlow(ctx: CanvasRenderingContext2D) {
+  return cachedGradient(ctx, 'blackhole', () => {
+    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 1)
+    gradient.addColorStop(0, '#8670b580')
+    gradient.addColorStop(0.65, '#b9a8d263')
+    gradient.addColorStop(1, '#b9a8d200')
+    return gradient
+  })
+}
+// Warning / hit halos replace shadowBlur: a soft ring that peaks on the sprite
+// edge, transparent in the middle so the monster art is never tinted.
+type GlowPair = { warn: CanvasGradient; hit: CanvasGradient }
+const glowCache = new WeakMap<CanvasRenderingContext2D, Map<number, GlowPair>>()
+function monsterGlow(ctx: CanvasRenderingContext2D, size: number, warn: boolean) {
+  let owned = glowCache.get(ctx)
+  if (!owned) glowCache.set(ctx, (owned = new Map()))
+  let pair = owned.get(size)
+  if (!pair) {
+    const ring = (color: string) => {
+      const gradient = ctx.createRadialGradient(0, 0, size * 0.28, 0, 0, size * 0.72)
+      gradient.addColorStop(0, `${color}00`)
+      gradient.addColorStop(0.35, `${color}b3`)
+      gradient.addColorStop(0.65, `${color}59`)
+      gradient.addColorStop(1, `${color}00`)
+      return gradient
+    }
+    pair = { warn: ring('#e36e95'), hit: ring('#fff6e2') }
+    owned.set(size, pair)
+  }
+  return warn ? pair.warn : pair.hit
+}
+// Sampler mines tick through a 11–16px glyph: quantise to 1/20px and reuse.
+const MINE_FONTS = Array.from(
+  { length: 21 },
+  (_, step) => `bold ${11 + (step * 5) / 20}px system-ui`,
+)
+// Effects alive this frame; reused so a long fight does not churn arrays.
+const activeEffects: Effect[] = []
 
 // Juice helpers: everything stays stateless so a frame can be redrawn anywhere.
 const easeOut = (t: number) => 1 - (1 - t) ** 3
@@ -167,17 +301,21 @@ function sparkle(ctx: CanvasRenderingContext2D, x: number, y: number, size: numb
   ctx.fill()
 }
 
+// worldX/worldY let the caller pass an interpolated position without cloning
+// the crop: the spread used to run once per visible monster per frame.
 function cropSprite(
   ctx: CanvasRenderingContext2D,
   crop: Crop,
+  worldX: number,
+  worldY: number,
   now: number,
   tick: number,
   hit: boolean,
   assets: Assets,
 ) {
   if (crop.hp <= 0) return
-  const x = X(crop.x),
-    y = Y(crop.y)
+  const x = X(worldX),
+    y = Y(worldY)
   if (tick < (crop.spawnAt ?? 0)) {
     const progress = 1 - ((crop.spawnAt ?? 0) - tick) / 12
     ctx.save()
@@ -191,7 +329,7 @@ function cropSprite(
     ctx.restore()
     return
   }
-  const monster = monsterFor(crop)
+  const monster = monsterOf(crop)
   const art = assets.monsters.get(monster.id)
   const winding = tick < (crop.windupUntil ?? -1)
   if (winding && crop.dashDx !== undefined && crop.dashDy !== undefined) {
@@ -202,7 +340,7 @@ function cropSprite(
     ctx.setLineDash([8, 5])
     ctx.beginPath()
     ctx.moveTo(x, y)
-    ctx.lineTo(X(crop.x + crop.dashDx * 20), Y(crop.y + crop.dashDy * 20))
+    ctx.lineTo(X(worldX + crop.dashDx * 20), Y(worldY + crop.dashDy * 20))
     ctx.stroke()
     ctx.restore()
   }
@@ -214,9 +352,13 @@ function cropSprite(
     winding ||
     tick < (crop.attackUntil ?? -1) ||
     (!crop.boss && crop.kind === 2 && (tick + crop.id) % 64 >= 52)
+  // shadowBlur blurred every glowing monster on the CPU; a cached ring gradient
+  // reads the same and costs one fill.
   if (warning || hit) {
-    ctx.shadowColor = warning ? '#e36e95' : '#fff6e2'
-    ctx.shadowBlur = warning ? 10 : 18
+    ctx.fillStyle = monsterGlow(ctx, monster.size, warning)
+    ctx.beginPath()
+    ctx.arc(0, 0, monster.size * 0.72, 0, Math.PI * 2)
+    ctx.fill()
   }
   if (crop.elite || warning) {
     ctx.strokeStyle = crop.elite ? '#dba23e' : '#dc759a'
@@ -227,7 +369,6 @@ function cropSprite(
   }
   if (art) ctx.drawImage(art, -monster.size / 2, -monster.size / 2, monster.size, monster.size)
   else ctx.drawImage(assets.crops[crop.kind], -32, -32, 64, 64)
-  ctx.shadowBlur = 0
   if (crop.boss) {
     const bottom = monster.size / 2 + 3
     ctx.fillStyle = '#fffdf3'
@@ -259,12 +400,12 @@ function drawHero(
   state: FarmState,
   now: number,
   assets: Assets,
-  character?: HTMLCanvasElement | null,
-  scale = 1,
+  character: HTMLCanvasElement | null | undefined,
+  scale: number,
+  ultimate: boolean,
 ) {
   const x = X(state.position[0]),
-    y = Y(state.position[1]),
-    ultimate = evolved(state.gear).length > 0
+    y = Y(state.position[1])
   const bob = Math.sin(now / 150) * 1.1
   ctx.save()
   ctx.translate(x, y + bob)
@@ -281,12 +422,7 @@ function drawHero(
   }
   if (state.tick < state.hurtUntil && state.tick > 32)
     ctx.globalAlpha = Math.floor(now / 80) % 2 ? 0.45 : 1
-  if (state.combo >= 30) {
-    const heat = ctx.createRadialGradient(0, 0, 8, 0, 0, 40)
-    heat.addColorStop(0, state.combo >= 60 ? '#f2a35c59' : '#f2c96c40')
-    heat.addColorStop(1, '#f2c96c00')
-    ellipse(ctx, 0, 4, 40, 40, heat)
-  }
+  if (state.combo >= 30) ellipse(ctx, 0, 4, 40, 40, comboGlow(ctx, state.combo >= 60))
   if (state.shields > 0) {
     ctx.strokeStyle = '#7fd4e8'
     ctx.lineWidth = 2
@@ -526,14 +662,13 @@ function groundEffect(
   } else if (event.kind === 'beam') {
     const beamWidth = X(event.radius ?? 5)
     ctx.globalAlpha = (1 - progress) * 0.65
-    const gradient = ctx.createLinearGradient(x - beamWidth, 0, x + beamWidth, 0)
-    gradient.addColorStop(0, '#a8b8de00')
-    gradient.addColorStop(0.45, '#d7deff')
-    gradient.addColorStop(0.5, '#fffcf2')
-    gradient.addColorStop(0.55, '#d7deff')
-    gradient.addColorStop(1, '#a8b8de00')
-    ctx.fillStyle = gradient
-    ctx.fillRect(x - beamWidth, y - Y(120), beamWidth * 2, Y(240))
+    // One unit-wide gradient stretched to the beam instead of a new one per cast.
+    ctx.save()
+    ctx.translate(x, 0)
+    ctx.scale(beamWidth, 1)
+    ctx.fillStyle = beamGlow(ctx)
+    ctx.fillRect(-1, y - Y(120), 2, Y(240))
+    ctx.restore()
     ctx.strokeStyle = '#789fcaba'
     ctx.lineWidth = 1
     ctx.beginPath()
@@ -651,14 +786,14 @@ function groundEffect(
   } else if (event.kind === 'blackhole') {
     ctx.translate(x, y)
     ctx.globalAlpha = (1 - progress) * 0.55
-    const gradient = ctx.createRadialGradient(0, 0, 1, 0, 0, radius)
-    gradient.addColorStop(0, '#8670b580')
-    gradient.addColorStop(0.65, '#b9a8d263')
-    gradient.addColorStop(1, '#b9a8d200')
-    ctx.fillStyle = gradient
+    // A unit disc scaled by the radius: one gradient for every black hole.
+    ctx.save()
+    ctx.scale(radius, radius)
+    ctx.fillStyle = blackholeGlow(ctx)
     ctx.beginPath()
-    ctx.arc(0, 0, radius, 0, Math.PI * 2)
+    ctx.arc(0, 0, 1, 0, Math.PI * 2)
     ctx.fill()
+    ctx.restore()
     ctx.rotate(now / 210)
     ctx.strokeStyle = '#8d80b7'
     ctx.lineWidth = 2
@@ -798,6 +933,8 @@ export function drawFarm(
 ): void {
   if (width <= 0 || height <= 0) return
   const assets = assetsFor(ctx)
+  // One evolved() for the hero halo, the orbit ring and the deck blades.
+  const forms = evolvedForms(state.gear)
   const moving = pose ? { ...state, position: pose.position, tick: pose.tick } : state
   const camera = farmCamera(moving.position, width, height)
   ctx.save()
@@ -812,12 +949,18 @@ export function drawFarm(
     X(x) <= camera.right + margin &&
     Y(y) >= camera.top - margin &&
     Y(y) <= camera.bottom + margin
-  const active = effects.filter(({ born }) => now - born >= 0 && now - born < 900)
+  // Refilled in place: the same array backs every pass below, so a long fight
+  // does not leave one throwaway list per frame behind.
+  activeEffects.length = 0
+  for (const effect of effects) {
+    const age = now - effect.born
+    if (age >= 0 && age < 900) activeEffects.push(effect)
+  }
 
   // Boss kills, damage taken and the surge shake the stage for a few frames.
   let shakeX = 0,
     shakeY = 0
-  for (const { event, born } of active) {
+  for (const { event, born } of activeEffects) {
     const age = now - born
     if (age > 260) continue
     const power =
@@ -835,7 +978,7 @@ export function drawFarm(
       Math.max(-shake, Math.min(shake, shakeY)),
     )
   // Sample dense drum bursts; every important weapon cast still gets its own visual.
-  for (const { event, born } of active) {
+  for (const { event, born } of activeEffects) {
     // Low-effect mode keeps the telegraphs that must be dodged and drops the rest.
     if (pose?.simple && event.kind !== 'slam' && event.kind !== 'surge') continue
     if (event.kind === 'blast' && event.id % 3 !== 0) continue
@@ -852,11 +995,9 @@ export function drawFarm(
     const progress = (now - born) / duration
     if (progress < 1) groundEffect(ctx, event, progress, now)
   }
-  const hitIds = new Set(
-    active
-      .filter(({ event, born }) => event.kind === 'hit' && now - born < 140)
-      .map(({ event }) => `${event.x}:${event.y}`),
-  )
+  const hitIds = new Set<number>()
+  for (const { event, born } of activeEffects)
+    if (event.kind === 'hit' && now - born < 140) hitIds.add(hitKey(event.x, event.y))
   for (const danger of state.dangers) {
     // Long runs pile up off-screen warnings; only circles touching the view
     // are worth drawing. The off-screen boss arrows below stay untouched.
@@ -890,17 +1031,29 @@ export function drawFarm(
   }
   for (const crop of state.crops) {
     if (!visibleAt(crop.x, crop.y)) continue
-    const before = pose?.previousEnemies?.get(crop.id),
-      alpha = pose?.alpha ?? 1
-    const visible =
-      before && Math.hypot(crop.x - before.x, crop.y - before.y) < 15
-        ? {
-            ...crop,
-            x: before.x + (crop.x - before.x) * alpha,
-            y: before.y + (crop.y - before.y) * alpha,
-          }
-        : crop
-    cropSprite(ctx, visible, now, moving.tick, hitIds.has(`${crop.x}:${crop.y}`), assets)
+    const before = pose?.previousEnemies?.get(crop.id)
+    let worldX = crop.x,
+      worldY = crop.y
+    if (before) {
+      const dx = crop.x - before.x,
+        dy = crop.y - before.y
+      // Same 15-unit test as Math.hypot, without the square root.
+      if (dx * dx + dy * dy < 225) {
+        const alpha = pose?.alpha ?? 1
+        worldX = before.x + dx * alpha
+        worldY = before.y + dy * alpha
+      }
+    }
+    cropSprite(
+      ctx,
+      crop,
+      worldX,
+      worldY,
+      now,
+      moving.tick,
+      hitIds.has(hitKey(crop.x, crop.y)),
+      assets,
+    )
   }
   for (const shot of state.shots) {
     if (!visibleAt(shot.x, shot.y)) continue
@@ -977,8 +1130,6 @@ export function drawFarm(
     ctx.save()
     ctx.globalAlpha = alpha * (0.35 + Math.sin(now / 220 + trail.id) * 0.15)
     ellipse(ctx, X(trail.x), Y(trail.y) + 6, 11, 4, '#9ac6b455')
-    ctx.restore()
-    ctx.save()
     ctx.globalAlpha = alpha * 0.9
     ctx.drawImage(assets.notes[0], X(trail.x) - 13, Y(trail.y) - 15, 26, 26)
     ctx.restore()
@@ -991,8 +1142,6 @@ export function drawFarm(
     ctx.save()
     ctx.globalAlpha = 0.45 + Math.sin(now / (110 - armed * 70) + mine.id) * 0.25
     ellipse(ctx, X(mine.x), Y(mine.y) + 5, 9 + armed * 3, 4 + armed * 2, '#b795e070')
-    ctx.restore()
-    ctx.save()
     ctx.globalAlpha = 0.9
     ctx.strokeStyle = '#8f6fc0'
     ctx.lineWidth = 1.5
@@ -1000,7 +1149,8 @@ export function drawFarm(
     ctx.arc(X(mine.x), Y(mine.y), 6 + armed * 3, 0, Math.PI * 2)
     ctx.stroke()
     ctx.fillStyle = '#6f4f9e'
-    ctx.font = `bold ${11 + armed * 5}px system-ui`
+    // 21 pre-built strings replace a template per mine per frame.
+    ctx.font = MINE_FONTS[Math.round(armed * 20)]
     ctx.textAlign = 'center'
     ctx.fillText('✸', X(mine.x), Y(mine.y) + 4)
     ctx.restore()
@@ -1032,7 +1182,7 @@ export function drawFarm(
     } else ctx.drawImage(assets.loot, x - 9, y - 9, 18, 18)
   }
   const orbit = orbitPositions(moving),
-    terminalOrbit = evolved(state.gear).includes('orbit')
+    terminalOrbit = forms.includes('orbit')
   if (orbit.length && !pose?.simple) {
     ctx.save()
     ctx.strokeStyle = terminalOrbit ? '#c4a0d380' : '#b6a1ca40'
@@ -1056,7 +1206,7 @@ export function drawFarm(
   }
   const deckLevel = state.gear.deck
   if (deckLevel && !pose?.simple) {
-    const terminalDeck = evolved(state.gear).includes('deck')
+    const terminalDeck = forms.includes('deck')
     const blades = terminalDeck ? 4 : 2
     const reach = 24 + deckLevel * 3
     ctx.save()
@@ -1092,8 +1242,8 @@ export function drawFarm(
       ctx.restore()
     }
   }
-  drawHero(ctx, moving, now, assets, pose?.character, heroScale(width, height))
-  for (const { event, born } of active) {
+  drawHero(ctx, moving, now, assets, pose?.character, heroScale(width, height), forms.length > 0)
+  for (const { event, born } of activeEffects) {
     if (!visibleAt(event.x, event.y)) continue
     airEffect(ctx, event, (now - born) / 900)
   }
@@ -1104,7 +1254,9 @@ export function drawFarm(
     ctx.lineWidth = 4 + Math.sin(now / 100)
     ctx.strokeRect(2, 2, width - 4, height - 4)
   }
-  const recentHurt = active.find(({ event, born }) => event.kind === 'hurt' && now - born < 220)
+  const recentHurt = activeEffects.find(
+    ({ event, born }) => event.kind === 'hurt' && now - born < 220,
+  )
   if (recentHurt) {
     ctx.strokeStyle = `rgba(218,73,112,${(1 - (now - recentHurt.born) / 220) * 0.7})`
     ctx.lineWidth = 12
@@ -1127,10 +1279,7 @@ export function drawFarm(
     ctx.lineTo(-7, -7)
     ctx.closePath()
     ctx.fill()
-    ctx.restore()
-    ctx.save()
     ctx.globalAlpha = 0.75
-    ctx.fillStyle = '#cf456f'
     ctx.font = '700 9px system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.fillText('巨兽', marker.x, marker.y + 20)

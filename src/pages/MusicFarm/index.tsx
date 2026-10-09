@@ -36,7 +36,14 @@ import {
   todayRoute,
   validDay,
 } from '@/features/farm/rules.mjs'
-import type { Choice, FarmEvent, FarmRound, Point, UpgradeId } from '@/features/farm/rules.mjs'
+import type {
+  Choice,
+  FarmEvent,
+  FarmRound,
+  FarmState,
+  Point,
+  UpgradeId,
+} from '@/features/farm/rules.mjs'
 import { selectFarmUpgrade } from '@/features/farm/upgradeSelection'
 import { schoolById } from '@/features/farm/schools.mjs'
 import { AUTH_FORM_EVENT } from '@/features/auth/context'
@@ -118,7 +125,15 @@ export default function MusicFarm() {
   const character = FARM_CHARACTERS.find((item) => item.id === profile.selected)!
   const openingSchool = schoolById(starterTalent(character.id) ?? '')
   const modifier = farmModifier(day)
-  const bossesAlive = view.crops.filter((crop) => crop.boss).length
+  // Bosses are rare, so the count is cached per view instead of rescanning
+  // hundreds of crops on every re-render.
+  const bossCache = useRef<{ source: FarmState | null; count: number }>({ source: null, count: 0 })
+  if (bossCache.current.source !== view) {
+    let count = 0
+    for (const crop of view.crops) if (crop.boss) count++
+    bossCache.current = { source: view, count }
+  }
+  const bossesAlive = bossCache.current.count
   const bossCountdown = farmBossCountdown(view)
   // Phones drop the "wave / boss countdown" line, so the boss only shows up
   // as a short hint when it is about to land or already on the field.
@@ -396,10 +411,10 @@ export default function MusicFarm() {
     // The chain of automatic picks that follows must not overwrite it.
     const card = talent(selection.choices[0].id)
     if (card.kind === 'recovery') {
-      setNotice(`${card.icon} 已恢复满血！`)
+      setNotice(`${card.icon} 已恢复满血`)
       noticeUntil.current = performance.now() + 2600
     } else if (card.kind === 'weapon' && next.gear[card.id] === 1) {
-      setNotice(`${card.icon} ${card.name} ${card.characterId ? '加入乐队！' : '就位！'}`)
+      setNotice(`${card.icon} ${card.name} ${card.characterId ? '加入' : '就位'}`)
       noticeUntil.current = performance.now() + 2600
     }
     // Cross-school combos are the rarest news in a run, so they win the HUD
@@ -519,9 +534,34 @@ export default function MusicFarm() {
       },
     })
     const input = controls.current
-    let previousEnemies = new Map<number, { x: number; y: number }>()
-    let previousShots = new Map<number, { x: number; y: number }>()
-    let previousLoot = new Map<number, { x: number; y: number }>()
+    // Interpolation needs the coordinates of the previous tick. Every layer
+    // keeps two maps and swaps them: the live one is drawn while the spare is
+    // refilled, reusing the point objects that are already in there.
+    type Pose = Map<number, { x: number; y: number }>
+    type PoseSwap = { live: Pose; spare: Pose }
+    const poseSwap = (): PoseSwap => ({ live: new Map(), spare: new Map() })
+    const syncPose = <T extends { id: number; x: number; y: number }>(
+      pose: PoseSwap,
+      entries: readonly T[],
+      keep?: (entry: T) => boolean,
+    ) => {
+      const previous = pose.live
+      pose.live = pose.spare
+      pose.spare = previous
+      pose.live.clear()
+      for (const entry of entries) {
+        if (keep && !keep(entry)) continue
+        const point = previous.get(entry.id)
+        if (point) {
+          point.x = entry.x
+          point.y = entry.y
+          pose.live.set(entry.id, point)
+        } else pose.live.set(entry.id, { x: entry.x, y: entry.y })
+      }
+    }
+    const enemyPose = poseSwap()
+    const shotPose = poseSwap()
+    const lootPose = poseSwap()
     let frame = 0,
       last = 0,
       elapsed = 0,
@@ -582,31 +622,34 @@ export default function MusicFarm() {
             if (state.gear.orbit) audio.current?.playLane(1, [64, 67, 72, 69][beat % 4], 0.12)
             if (state.gear.echo) audio.current?.playLane(3, [76, 79, 84, 81][beat % 4], 0.24)
           }
-          const harvests = result.events.filter(
-            (event) => event.kind === 'harvest' || event.kind === 'boss',
-          )
-          harvests
-            .slice(0, 4)
-            .forEach((event, index) => audio.current?.playLane(1, event.midi, index * 0.025))
+          // One pass over the events collects every cue, then the sounds and
+          // the HUD line fire in the order the separate scans used to.
+          let tones = 0,
+            shock = false,
+            block = false,
+            boss = false
+          let arrival: FarmEvent | null = null
+          for (const event of result.events) {
+            if (event.kind === 'boss') boss = true
+            if (event.kind === 'harvest' || event.kind === 'boss') {
+              if (tones < 4) audio.current?.playLane(1, event.midi, tones * 0.025)
+              tones++
+            } else if (event.kind === 'shock') shock = true
+            else if (event.kind === 'block') block = true
+            else if (event.kind === 'arrival') arrival ??= event
+          }
           if (useSurge) {
             audio.current?.playLane(0)
             audio.current?.playLane(3, 84)
           }
-          if (result.events.some((event) => event.kind === 'shock'))
-            audio.current?.playLane(2, 71, 0.1)
-          if (result.events.some((event) => event.kind === 'block'))
-            audio.current?.playLane(3, 79, 0.08)
-          const arrival = result.events.find((event) => event.kind === 'arrival')
+          if (shock) audio.current?.playLane(2, 71, 0.1)
+          if (block) audio.current?.playLane(3, 79, 0.08)
           if (arrival) {
-            setNotice(
-              arrival.bass
-                ? '低音炮王登场！弹幕成环，别站在原地'
-                : '鼓噪巨兽登场！躲开红圈，击败它爆经验',
-            )
+            setNotice(arrival.bass ? '低音炮王 · 躲弹幕' : '鼓噪巨兽 · 躲红圈')
             noticeUntil.current = now + 2400
           }
-          if (result.events.some((event) => event.kind === 'boss')) {
-            setNotice('Boss 击破！回血与经验全部飞向你 ✦')
+          if (boss) {
+            setNotice('Boss 击破 · 回血 + 经验')
             noticeUntil.current = now + 2200
           }
           let blasts = 0,
@@ -623,13 +666,9 @@ export default function MusicFarm() {
             effects.current.push({ event, born: now })
           }
           effects.current = effects.current.slice(-180)
-          previousEnemies = new Map(
-            state.crops
-              .filter((enemy) => enemy.hp > 0)
-              .map((enemy) => [enemy.id, { x: enemy.x, y: enemy.y }]),
-          )
-          previousShots = new Map(state.shots.map((shot) => [shot.id, { x: shot.x, y: shot.y }]))
-          previousLoot = new Map(state.loot.map((drop) => [drop.id, { x: drop.x, y: drop.y }]))
+          syncPose(enemyPose, state.crops, (enemy) => enemy.hp > 0)
+          syncPose(shotPose, state.shots)
+          syncPose(lootPose, state.loot)
           state = result.state
           model.current = state
           // Resolve a lone offer before publishing or interrupting movement for a dialog.
@@ -733,9 +772,9 @@ export default function MusicFarm() {
           simple: !settingsRef.current.effects,
           position: displayPosition.current,
           tick: state.tick + (elapsed * FPS) / 1000,
-          previousLoot,
-          previousEnemies,
-          previousShots,
+          previousLoot: lootPose.live,
+          previousEnemies: enemyPose.live,
+          previousShots: shotPose.live,
           alpha: Math.min(1, (elapsed * FPS) / 1000),
         })
         if (showPerformance) {
@@ -1267,9 +1306,6 @@ export default function MusicFarm() {
             {performanceView.moves} 次/秒 · 坐标 {view.position.join(',')}{' '}
           </output>
         )}
-        <footer className="farm-footer">
-          一点音乐，一整场快乐 ♡ <span>原创合成音乐 · 演示版</span>
-        </footer>
       </div>
       {(panel || upgrade) && (
         <div
