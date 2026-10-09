@@ -57,7 +57,7 @@ describe('farm screens render', () => {
     )
     expect(html).toContain('怪潮乐队历险记')
     expect(html).toContain('带上你的乐队')
-    expect(html).toContain('0 / 20 经验')
+    expect(html).toContain('0 / 12 经验')
     // The start screen stays focused: leaderboard and start button, nothing else.
     expect(html).toContain('无限总榜')
     expect(html).not.toContain('今日词缀')

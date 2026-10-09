@@ -248,12 +248,19 @@ function cropSprite(
   ctx.restore()
 }
 
+// A phone screen is a small window onto the same arena: keeping the farmer at
+// desktop size eats the room needed to read the horde closing in, so the hero
+// shrinks with the field and keeps its proportions on a wide desktop.
+function heroScale(width: number, height: number) {
+  return Math.min(1, Math.max(0.8, Math.min(width, height) / 520))
+}
 function drawHero(
   ctx: CanvasRenderingContext2D,
   state: FarmState,
   now: number,
   assets: Assets,
   character?: HTMLCanvasElement | null,
+  scale = 1,
 ) {
   const x = X(state.position[0]),
     y = Y(state.position[1]),
@@ -290,10 +297,16 @@ function drawHero(
     ctx.globalAlpha = 1
   }
   if (character) {
-    ellipse(ctx, 0, 17, 16, 5, '#70608030')
-    ctx.drawImage(character, -40, -52, 80, 80)
+    ellipse(ctx, 0, 17 * scale, 16 * scale, 5 * scale, '#70608030')
+    ctx.drawImage(character, -40 * scale, -52 * scale, 80 * scale, 80 * scale)
   } else
-    ctx.drawImage(assets.heroPlaceholder[state.tick < state.surgeUntil ? 1 : 0], -40, -40, 80, 80)
+    ctx.drawImage(
+      assets.heroPlaceholder[state.tick < state.surgeUntil ? 1 : 0],
+      -40 * scale,
+      -40 * scale,
+      80 * scale,
+      80 * scale,
+    )
   ctx.restore()
 }
 
@@ -1079,7 +1092,7 @@ export function drawFarm(
       ctx.restore()
     }
   }
-  drawHero(ctx, moving, now, assets, pose?.character)
+  drawHero(ctx, moving, now, assets, pose?.character, heroScale(width, height))
   for (const { event, born } of active) {
     if (!visibleAt(event.x, event.y)) continue
     airEffect(ctx, event, (now - born) / 900)

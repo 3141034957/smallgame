@@ -1127,9 +1127,6 @@ export default function MusicFarm() {
             <div className="farm-controls">
               <div>
                 <b>✦ {number(view.coins)}</b>
-                <small>
-                  {view.harvested} 击败 · {view.bosses} Boss
-                </small>
               </div>
               <button
                 className={`farm-surge ${surgeStatus.ready ? 'is-ready' : ''} ${
@@ -1186,8 +1183,7 @@ export default function MusicFarm() {
                   : ''}
               </small>
               <p>
-                生存 {(view.tick / FPS).toFixed(1)} 秒 · {view.harvested} 击败 · {view.maxCombo}{' '}
-                连击
+                生存 {(view.tick / FPS).toFixed(1)} 秒 · {view.maxCombo} 连击
               </p>
               {forms.length > 0 && (
                 <p className="farm-final-build">

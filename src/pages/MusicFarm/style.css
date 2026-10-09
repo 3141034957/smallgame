@@ -197,10 +197,19 @@
 }
 .farm-hud strong {
   display: block;
-  font-size: 26px;
+  font-size: 22px;
   line-height: 1.25;
   font-weight: 950;
   font-variant-numeric: tabular-nums;
+}
+/* The horde is the point of the screen, so the readouts stay light: a shadow
+   for legibility over sprites instead of a panel that hides the field. */
+.farm-status,
+.farm-controls {
+  text-shadow: 0 1px 2px #fdf8e8cc;
+}
+.farm-status {
+  pointer-events: none;
 }
 .farm-combo {
   text-align: center;
