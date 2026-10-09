@@ -13,7 +13,6 @@ export function FarmHelp({ onClose }: { onClose: () => void }) {
       <p>拖动走位，乐队自动攻击。</p>
       <p>躲开弹幕，捡经验升级。</p>
       <h3 className="farm-monsters-title">流派与组合技</h3>
-      <p>乐器 ＋ 芯片 都到 Lv.{MAX_GEAR_LEVEL} → 终极形态；多个流派成型自动触发组合技。</p>
       <div className="farm-school-list">
         {SCHOOL_LIST.map((school) => (
           <div key={school.id} style={{ '--school-color': school.color } as CSSProperties}>

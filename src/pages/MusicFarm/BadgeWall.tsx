@@ -80,7 +80,18 @@ export function BadgeWall({ log, career }: { log: FarmAchievementLog; career: Fa
                       : `${formatFarmAchievement(achievement, log.best[achievement.id] ?? 0)} / ${formatFarmAchievement(achievement, achievement.target)}`}
                   </em>
                   {!done && (
-                    <i className="farm-badge-bar" aria-hidden="true">
+                    <i
+                      className="farm-badge-bar"
+                      role="progressbar"
+                      aria-label={`${achievement.name} 进度`}
+                      aria-valuemin={0}
+                      aria-valuemax={achievement.target}
+                      aria-valuenow={Math.min(
+                        achievement.target,
+                        log.best[achievement.id] ?? 0,
+                      )}
+                      aria-valuetext={`${formatFarmAchievement(achievement, log.best[achievement.id] ?? 0)} / ${formatFarmAchievement(achievement, achievement.target)}`}
+                    >
                       <b
                         style={{
                           width: `${Math.min(100, ((log.best[achievement.id] ?? 0) / achievement.target) * 100)}%`,

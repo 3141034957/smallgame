@@ -36,8 +36,8 @@
   letter-spacing: 1px;
 }
 .farm-board-heading button {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border: 1px solid #dfd4e9;
   border-radius: 50%;
   background: #f4ecf8;
@@ -234,14 +234,19 @@
   padding: 12px 12px 10px;
   border-radius: 18px;
   box-shadow: none;
+  /* Shrinkable column so the list can absorb the leftover height instead of
+     the start card overflowing its own scroll container. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 .farm-board.is-compact .farm-board-heading h2 {
   margin: 4px 0 0;
   font-size: 16px;
 }
 .farm-board.is-compact .farm-board-heading button {
-  width: 30px;
-  height: 30px;
+  width: 40px;
+  height: 40px;
   font-size: 17px;
 }
 .farm-board.is-compact .farm-board-columns {
@@ -249,7 +254,8 @@
   font-size: 8px;
 }
 .farm-board.is-compact .farm-board-list {
-  max-height: min(46dvh, 440px);
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -297,4 +303,10 @@
   padding: 10px 14px;
   background: #dbe7b7;
   color: #304235;
+}
+@media (prefers-reduced-motion: reduce) {
+  .farm-board * {
+    animation: none !important;
+    transition: none !important;
+  }
 }

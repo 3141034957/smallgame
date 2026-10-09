@@ -70,8 +70,8 @@
   gap: 8px;
 }
 .farm-header nav button {
-  height: 36px;
-  width: 36px;
+  height: 40px;
+  width: 40px;
   border: 1px solid #cddac7;
   background: #ffffffa6;
   color: var(--green);
@@ -170,6 +170,8 @@
   color: #73906b;
   font-size: 12px;
   padding: 10px 0;
+  /* Underlined text alone measured ~32px: the floor keeps it a 40px target. */
+  min-height: 40px;
   text-decoration: underline;
   text-underline-offset: 4px;
 }
@@ -235,8 +237,8 @@
   background: #eaf0dc;
   color: #6b8660;
   border-radius: 9px;
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  height: 40px;
   font-weight: 900;
 }
 .farm-xp {
@@ -417,8 +419,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 18px;
-  overflow: auto;
+  /* `viewport-fit=cover` lets the backdrop reach under the notch, so the
+     dialog has to be inset by the same safe areas it used to ignore. */
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  /* Only `.farm-dialog` scrolls: a scrollable backdrop nested around it made
+     the whole page slide while the dialog was still scrolling. */
+  overflow: hidden;
 }
 .farm-dialog {
   position: relative;
@@ -431,7 +438,10 @@
   padding: 30px;
   max-width: 530px;
   width: 100%;
-  max-height: calc(100dvh - 36px);
+  /* Of the backdrop's content box, not `100dvh`: now that the backdrop is
+     padded by the safe areas and no longer scrolls, a viewport-relative cap
+     could exceed it and be clipped. */
+  max-height: 100%;
   overflow: auto;
 }
 .farm-dialog h2 {
@@ -963,9 +973,6 @@
   }
 }
 @media (max-width: 380px) {
-  .music-farm {
-    padding: 10px;
-  }
   .farm-intro h1 {
     font-size: 22px;
   }
@@ -977,9 +984,6 @@
   }
   .farm-ready p {
     font-size: 11px;
-  }
-  .farm-game {
-    padding: 9px;
   }
   .farm-dialog {
     padding: 21px 15px;
@@ -1095,8 +1099,8 @@
   letter-spacing: 1.1px;
 }
 .farm-header nav button {
-  height: 34px;
-  width: 34px;
+  height: 40px;
+  width: 40px;
   background: #fffaf0cc;
 }
 .farm-layout {
@@ -1115,6 +1119,17 @@
   box-shadow: none;
   padding: 0;
   overflow: hidden;
+}
+/* Re-declared after the unconditional `.music-farm` / `.farm-game` rules
+   above: placed before them, the 380px tightening never reached a 360px
+   phone because those later rules reset the same properties. */
+@media (max-width: 380px) {
+  .music-farm {
+    padding: 10px;
+  }
+  .farm-game {
+    padding: 9px;
+  }
 }
 .farm-hud {
   position: absolute;
@@ -1233,7 +1248,9 @@
   backdrop-filter: none;
   justify-content: flex-start;
   padding: max(10px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
-  overflow-y: auto;
+  /* One scroll container: the leaderboard list inside the card. Scrolling here
+     as well trapped the wheel/touch in whichever container the gesture hit. */
+  overflow: hidden;
 }
 .farm-start-card {
   display: flex;
@@ -1245,6 +1262,8 @@
   padding: 20px 22px 18px;
   max-width: 340px;
   width: calc(100% - 40px);
+  max-height: 100%;
+  min-height: 0;
   margin: auto;
   box-shadow: 0 10px 30px #6f88532e;
 }
@@ -1304,7 +1323,10 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: 82px 12px 24px;
+  /* 82px/24px cleared the header and the home indicator only while the safe
+     areas were still zero. */
+  padding: calc(max(12px, env(safe-area-inset-top)) + 70px) 12px
+    max(24px, env(safe-area-inset-bottom));
   background: radial-gradient(at 50% 0, #fff8d9, #edf2e1);
 }
 .is-result-page .farm-shell,
@@ -1389,12 +1411,14 @@
   }
   /* Icon-first and tight: six buttons still fit a 375px screen. */
   .farm-header nav button {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     flex: 0 0 auto;
   }
+  /* Six 40px buttons plus five gaps must still leave the brand a title line
+     on a 375px screen: 240 + 10 = 250px of a ~347px header. */
   .farm-header nav {
-    gap: 3px;
+    gap: 2px;
     flex: 0 0 auto;
   }
   .farm-brand {
@@ -1503,6 +1527,14 @@
     min-height: 42px;
     padding: 10px;
   }
+  /* Short screens drop the two 44px shop pills instead of growing the card:
+     the header shop button still reaches the same page. */
+  .farm-shop-pill {
+    display: none;
+  }
+  .farm-board.is-compact .farm-board-list {
+    max-height: min(22dvh, 180px);
+  }
 }
 @media (max-height: 500px) {
   .farm-game {
@@ -1553,9 +1585,11 @@
   .farm-time b {
     font-size: 18px;
   }
+  /* Landscape keeps the smallest allowed target: the HUD has a hard height
+     budget on a 390px-tall screen. */
   .farm-time button {
-    width: 25px;
-    height: 25px;
+    width: 36px;
+    height: 36px;
   }
   .farm-xp {
     top: calc(max(8px, env(safe-area-inset-top)) + 166px);

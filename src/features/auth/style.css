@@ -3,7 +3,8 @@
   inset: 0;
   z-index: 3000;
   overflow-y: auto;
-  padding: 32px 20px;
+  padding: max(32px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+    max(32px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
   display: flex;
   background:
     radial-gradient(ellipse at 20% 10%, #fff9db 0, transparent 40%),
@@ -242,6 +243,8 @@
 }
 .account-bar button {
   padding: 4px 8px;
+  /* 4px/8px padding measured ~25px tall: the floor keeps it a 40px target. */
+  min-height: 40px;
   border-radius: 6px;
   background: #fffaf0;
   border: 1px solid #cddac7;
@@ -264,6 +267,58 @@
   .account-scene img,
   .account-scene > span {
     display: none;
+  }
+}
+/* Short viewports (landscape phones, ~390px tall) hide decoration instead of
+   letting the login card grow past one screen. */
+@media (max-height: 620px) {
+  .account-overlay {
+    padding: max(8px, env(safe-area-inset-top)) 14px max(8px, env(safe-area-inset-bottom));
+  }
+  .account-band {
+    display: none;
+  }
+  .account-card {
+    padding: 14px 18px;
+    border-radius: 18px;
+  }
+  .account-card h2 {
+    font-size: 20px;
+    margin: 2px 0 10px;
+  }
+  .account-tabs {
+    margin-bottom: 10px;
+  }
+  .account-tabs button {
+    padding: 9px;
+  }
+  .account-card form > label {
+    margin: 8px 0 5px;
+  }
+  .account-card input {
+    padding: 9px;
+  }
+  .account-hint {
+    margin: 4px 0 8px;
+    font-size: 10px;
+  }
+  .account-primary {
+    padding: 11px;
+    margin-top: 12px;
+  }
+  .account-error,
+  .account-notice {
+    margin-top: 8px;
+  }
+  .account-close {
+    margin-bottom: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .account-overlay *,
+  .account-bar * {
+    animation: none !important;
+    transition: none !important;
   }
 }
 @media (max-width: 480px) {
