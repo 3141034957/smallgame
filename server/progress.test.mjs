@@ -6,7 +6,7 @@ import { beforeEach, afterEach, expect, it } from 'vitest'
 import { createAuthStore } from './auth-store.mjs'
 import { createAuthHandler } from './auth.mjs'
 import { handleProgressRequest } from './progress.mjs'
-import { PROGRESS_LIMIT } from '../src/features/auth/progress.mjs'
+import { PROGRESS_LIMIT, sanitizeProgress } from '../src/features/auth/progress.mjs'
 
 let store, registered, auth
 const data = {
@@ -61,6 +61,21 @@ it('saves guest progress during registration and restores it using the authentic
   ).toEqual({ data: next, revision: 2 })
   expect(store.progress(another.user.id).data).toEqual({})
 })
+it('drops keys from games that no longer exist instead of breaking the cloud read', async () => {
+  // A snapshot saved before the other games were removed still carries their
+  // keys; serving those as-is makes every client report the cloud as broken,
+  // so the read keeps only the entries this build understands.
+  const stale = {
+    ...data,
+    'mochi-melody-player-v1': '{"coins":5}',
+    'farm-best-v9-boss-interval:not-a-date': '1',
+  }
+  expect(Object.keys(sanitizeProgress(stale)).sort()).toEqual(Object.keys(data).sort())
+  const read = await request('GET')
+  expect(read.status).toBe(200)
+  expect(Object.keys(read.body.data).sort()).toEqual(Object.keys(data).sort())
+})
+
 it('rejects stale overwrites and makes an identical retry idempotent', async () => {
   const next = { ...data, 'farm-career-v1': '{"runs":3}' }
   expect((await request('POST', { data: next, revision: 1 })).status).toBe(200)

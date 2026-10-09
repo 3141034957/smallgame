@@ -1,13 +1,19 @@
 import { AuthError } from './auth-store.mjs'
 import { allowAccountWrite, sendJson } from './auth.mjs'
-import { PROGRESS_LIMIT } from '../src/features/auth/progress.mjs'
+import { PROGRESS_LIMIT, sanitizeProgress } from '../src/features/auth/progress.mjs'
 
 export async function handleProgressRequest(req, res, store, authenticate) {
   try {
     const user = authenticate()
     if (!user)
       return sendJson(res, 401, { error: '登录已失效，请重新登录后同步；本机进度仍保留。' })
-    if (req.method === 'GET') return sendJson(res, 200, store.progress(user.id))
+    if (req.method === 'GET') {
+      const snapshot = store.progress(user.id)
+      return sendJson(res, 200, {
+        ...snapshot,
+        data: sanitizeProgress(snapshot?.data),
+      })
+    }
     if (req.method !== 'POST')
       return sendJson(res, 405, { error: '不支持的进度操作。' }, { Allow: 'GET, POST' })
     if (!allowAccountWrite(req, res)) return

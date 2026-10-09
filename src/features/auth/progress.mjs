@@ -14,6 +14,17 @@ export const PROGRESS_KEYS = [
 export function isProgressKey(key) {
   return PROGRESS_KEYS.includes(key) || /^farm-best-v[\w-]+:\d{4}-\d{2}-\d{2}$/.test(key)
 }
+// Snapshots saved before a game was removed still carry its keys, and a client
+// that cannot read them reports the whole cloud as broken. Keeping only the
+// entries this build understands lets those accounts load again.
+export function sanitizeProgress(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return {}
+  return Object.fromEntries(
+    Object.entries(data).filter(
+      ([key, value]) => isProgressKey(key) && typeof value === 'string' && value.length <= 65536,
+    ),
+  )
+}
 export function validProgress(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return false
   const entries = Object.entries(data)
