@@ -20,6 +20,10 @@ export const MAX_GEAR_LEVEL: number
 export const STARTER_CHOICES: number
 export const MAX_EQUIPPED: number
 export const UPGRADE_STEPS: number
+// 升级曲线的三个旋钮：XP 是累计的，farmUpgradeXp / farmXpThreshold 由它们推出。
+export const XP_FLAT: number
+export const XP_LINEAR: number
+export const XP_QUAD: number
 export const HEAL_COOLDOWN: number
 export const HEAL_TTL: number
 export const HEAL_WOUNDED: number
@@ -237,6 +241,8 @@ export type Arrow = {
   pierce: number
   expires: number
   homing?: boolean
+  // 已经穿透过的怪物 id，一支哨箭不会重复命中同一个目标。
+  cleared?: number[]
 }
 export type Mine = { id: number; x: number; y: number; due: number; damage: number; radius: number }
 export type FarmState = {
@@ -290,6 +296,8 @@ export type FarmState = {
 export type Choice = { tick: number; id: UpgradeId }
 export type FarmRound = {
   permanent?: PermanentLevels
+  // finishFarm 会盖上当前规则集版本，服务端据此拒绝旧版本的成绩。
+  ruleset?: string
   outcome: 'defeated'
   hp: number
   seconds: number
@@ -311,10 +319,6 @@ export type FarmRound = {
 }
 export function farmMoveStep(state: FarmState): number
 export function clampPoint(previous: Point, desired: Point, step?: number): Point
-export function synergies(gear: Gear): string[]
-export const AREA_BONUS_STEP: number
-export const AREA_BONUS_CAP: number
-export function farmAreaBonus(gear: Gear): number
 export function farmReach(state: FarmState): number
 export function farmSpawnRadius(state: FarmState): number
 // 选角色即选定开局乐器：返回该角色自带的乐器 id，未知的 id 返回 null（回退到旧行为）。

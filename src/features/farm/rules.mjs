@@ -11,6 +11,10 @@ import { comboModifiers } from './schools.mjs'
 export { todayRoute, validDay }
 // 流派与跨流派组合技是数据层，但玩法上属于同一套规则，从这里一并导出给界面。
 export * from './schools.mjs'
+// MONSTERS 是一张常量表，这几个 id 每帧都要用：预取一次，避免每 tick 线性扫描。
+const ELITE_MONSTER = MONSTERS.find((monster) => monster.id === 'elite')
+const DRUM_BOSS = MONSTERS.find((monster) => monster.id === 'drum-boss')
+const BASS_BOSS = MONSTERS.find((monster) => monster.id === 'bass-boss')
 export const FPS = 16
 export const MOVE_STEP = 3
 // Every band member and piece of gear climbs to this level; reaching it on a
@@ -516,11 +520,6 @@ export function clampPoint(previous, desired, step = MOVE_STEP) {
     Math.round((previous[1] + dy * scale) * precision) / precision,
   ]
 }
-export function synergies(gear) {
-  return RECIPES.filter(
-    (recipe) => gear[recipe.weapon] >= MAX_GEAR_LEVEL && gear[recipe.chip] >= MAX_GEAR_LEVEL,
-  ).map((recipe) => recipe.name)
-}
 const random = (state) => {
   state.seed = (Math.imul(state.seed, 1664525) + 1013904223) >>> 0
   return state.seed / 4294967296
@@ -550,14 +549,6 @@ const SPAWN_RING_BASE = 52,
   SPAWN_RING_GAP = 14
 // Frames a fresh arrival stays untouchable.
 const SPAWN_GRACE = 12
-// The area chips stop paying out here. Three of them maxed used to reach 1.75,
-// which covered more than the whole ring and turned late runs into a screensaver.
-// Nothing widens an attack any more: three area chips used to stack into a
-// screen-wide aura that removed the need to move. Each of them now deepens
-// its own school instead of inflating every radius in the build.
-export function farmAreaBonus() {
-  return 1
-}
 // How far the build covers *every* direction at once, so arrivals can be placed
 // beyond it. Only the sweeping attacks count: a fan, a horn or a drum blast is
 // aimed at whatever is already close, so widening the ring for them only starves
@@ -625,8 +616,8 @@ export function createFarm(day, permanent, starter) {
     nextId: 100,
     bellRings: 0,
     modifier: modifier.id,
-    nextBoss: MONSTERS.find((monster) => monster.id === 'drum-boss').starts * FPS,
-    nextBass: MONSTERS.find((monster) => monster.id === 'bass-boss').starts * FPS,
+    nextBoss: DRUM_BOSS.starts * FPS,
+    nextBass: BASS_BOSS.starts * FPS,
     surgeUntil: -1,
     hp: stats.maxHp,
     maxHp: stats.maxHp,
@@ -1017,7 +1008,7 @@ export function stepFarm(previous, point, useSurge = false) {
   // Elites take a dead/free slot, or replace a distant ordinary monster when
   // all 100 slots are alive. An encounter must not depend on killing first.
   if (
-    state.tick >= MONSTERS.find((monster) => monster.id === 'elite').starts * FPS &&
+    state.tick >= ELITE_MONSTER.starts * FPS &&
     state.tick % 72 === 0 &&
     state.crops.filter((crop) => crop.elite && crop.hp > 0).length < 5
   ) {
@@ -1063,7 +1054,7 @@ export function stepFarm(previous, point, useSurge = false) {
     }
   }
   if (state.tick >= state.nextBoss) {
-    state.nextBoss += MONSTERS.find((monster) => monster.id === 'drum-boss').interval * FPS
+    state.nextBoss += DRUM_BOSS.interval * FPS
     // Bass shares the boss cap, so an arrival due on this very tick reserves a
     // slot for it even though it spawns later in the same frame.
     const limit = state.nextBass <= state.tick ? MAX_BOSSES - 1 : MAX_BOSSES
@@ -1088,7 +1079,7 @@ export function stepFarm(previous, point, useSurge = false) {
   // A slower, tankier boss joins later: it fires ring barrages and wide slams
   // instead of chasing, so late runs need movement instead of just damage.
   if (state.tick >= state.nextBass) {
-    state.nextBass += MONSTERS.find((monster) => monster.id === 'bass-boss').interval * FPS
+    state.nextBass += BASS_BOSS.interval * FPS
     if (state.crops.filter((crop) => crop.boss).length < MAX_BOSSES) {
       const index = state.bosses + state.crops.filter((crop) => crop.boss).length
       const maxHp = 95 + index * 60

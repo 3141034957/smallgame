@@ -5,7 +5,6 @@ import {
   stepFarm,
   chooseTalent,
   replayFarm,
-  farmAreaBonus,
   farmReach,
   farmSpawnRadius,
   FPS,
@@ -57,7 +56,6 @@ describe('unbounded combat world', () => {
     const r = stepFarm(s, s.position).state
     // No chip widens an attack any more: the ring only has to clear whatever
     // the sweeping attacks cover, and that coverage is no longer inflated.
-    expect(farmAreaBonus(r.gear)).toBe(1)
     const reach = farmReach(r)
     expect(reach).toBe(79)
     // The ring always sits one fixed walk beyond that coverage, so a maxed
