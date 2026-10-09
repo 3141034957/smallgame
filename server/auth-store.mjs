@@ -23,7 +23,7 @@ export class AuthError extends Error {
   }
 }
 
-async function hashPassword(password) {
+export async function hashPassword(password) {
   const salt = randomBytes(16)
   const hash = await derive(password, salt, 32, HASH_OPTIONS)
   return `scrypt$32768$8$3$${salt.toString('base64url')}$${hash.toString('base64url')}`
