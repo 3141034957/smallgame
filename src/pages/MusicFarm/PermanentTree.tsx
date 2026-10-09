@@ -106,19 +106,18 @@ export function PermanentTree({
                       >
                         {tier}
                       </span>
+                      {/* The icon tile rides the rail, like a path marker. */}
+                      <span
+                        className={`farm-growth-tile${level ? ' is-trained' : ''}${maxed ? ' is-maxed' : ''}`}
+                        aria-hidden="true"
+                      >
+                        {item.icon}
+                        {maxed && <i className="farm-growth-seal">✓</i>}
+                      </span>
                       <article
                         className={`farm-growth-node${level ? ' is-trained' : ''}${maxed ? ' is-maxed' : ''}`}
                         aria-label={item.name}
                       >
-                        {maxed && (
-                          <span className="farm-growth-seal" aria-hidden="true">
-                            ✓
-                          </span>
-                        )}
-                        <span className="farm-growth-badge" aria-hidden="true">
-                          {item.icon}
-                        </span>
-                        <small className="farm-growth-tag">第 {tier} 层</small>
                         <h4>
                           {item.name}
                           <em>

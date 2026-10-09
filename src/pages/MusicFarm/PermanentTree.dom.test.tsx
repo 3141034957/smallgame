@@ -75,7 +75,8 @@ it('labels a maxed node as finished instead of offering a null price', () => {
     expect(node.className).toContain('is-maxed')
     const meter = within(node).getByRole('progressbar')
     expect(meter.querySelectorAll('i.is-on')).toHaveLength(item.max)
-    expect(node.querySelector('.farm-growth-seal')!.textContent).toBe('✓')
+    // Seal and tier chip live on the path tile next to the node card.
+    expect(node.parentElement!.querySelector('.farm-growth-seal')!.textContent).toBe('✓')
     expect(node.parentElement!.querySelector('.farm-growth-tier.is-maxed')).toBeTruthy()
   }
   expect(document.body.textContent).not.toContain('null')
