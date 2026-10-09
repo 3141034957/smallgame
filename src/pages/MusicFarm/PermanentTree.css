@@ -1,4 +1,7 @@
 .farm-growth {
+  --branch-survival: #38775b;
+  --branch-power: #ae7138;
+  --branch-movement: #5079a0;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -64,25 +67,16 @@
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 32px 0;
+  padding: 20px 0;
 }
 .farm-growth-intro span {
   font-size: 12px;
   color: #557b69;
 }
-.farm-growth-intro h3 {
-  margin: 10px 0;
-  font-size: clamp(20px, 3vw, 30px);
-}
-.farm-growth-intro p {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.7;
-}
 .farm-growth-total {
   flex-shrink: 0;
   text-align: center;
-  padding: 14px 22px;
+  padding: 10px 18px;
   background: #fffef5;
   border: 2px solid #d9e4d5;
   border-radius: 18px;
@@ -90,91 +84,29 @@
 }
 .farm-growth-total strong {
   display: block;
-  font-size: 34px;
+  font-size: 28px;
 }
 .farm-growth-total strong small {
-  font-size: 16px;
+  font-size: 14px;
   color: #789081;
 }
-.farm-growth-total > span {
-  font-size: 11px;
-}
 
-/* One path, top to bottom: schools stack as milestones along the same column. */
-.farm-growth-tree {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: start;
-  gap: 22px;
-  max-width: 620px;
-  margin: 0 auto;
-}
-.farm-growth-branch {
-  min-width: 0;
-  --branch-color: #38775b;
-  --talent-color: var(--branch-color);
-  --branch-fill: 0%;
-}
-.farm-growth-branch.is-power {
-  --branch-color: #ae7138;
-}
-.farm-growth-branch.is-movement {
-  --branch-color: #5079a0;
-}
-/* School banner: the colored ribbon naming the school. */
-.farm-growth-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 18px;
-  padding: 9px 12px;
-  border-radius: 14px;
-  border: 2px solid var(--branch-color);
-  border-left-width: 7px;
-  background: linear-gradient(
-    to right,
-    color-mix(in srgb, var(--branch-color) 22%, #fffef5),
-    #fffef5
-  );
-  box-shadow: 0 4px 0 color-mix(in srgb, var(--branch-color) 18%, #fffaf0);
-  color: var(--branch-color);
-}
-.farm-growth-brand > span {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
-  border: 2px solid var(--branch-color);
-  background: color-mix(in srgb, var(--branch-color) 14%, white);
-  font-size: 19px;
-}
-.farm-growth-brand > small {
-  margin-left: auto;
-  font-size: 10px;
-  color: color-mix(in srgb, var(--branch-color) 60%, #8f957f);
-  white-space: nowrap;
-}
-.farm-growth-branch h3 {
-  font-size: 17px;
-  margin: 0;
-}
-
-/* Talent path: square icon tiles ride the rail, one step per talent. */
+/* One chain, top to bottom: every step is one flat bonus. */
 .farm-growth-nodes {
   position: relative;
   display: grid;
-  gap: 18px;
+  gap: 10px;
   margin: 0;
   padding: 0;
   list-style: none;
+  max-width: 520px;
+  margin-inline: auto;
 }
 .farm-growth-nodes::before,
 .farm-growth-nodes::after {
   content: '';
   position: absolute;
-  left: 20px;
+  left: 18px;
   width: 8px;
   border-radius: 8px;
 }
@@ -185,19 +117,15 @@
 }
 .farm-growth-nodes::after {
   top: 0;
-  height: var(--branch-fill);
-  background: linear-gradient(
-    to bottom,
-    var(--branch-color),
-    color-mix(in srgb, var(--branch-color) 55%, white)
-  );
-  box-shadow: 0 0 12px color-mix(in srgb, var(--branch-color) 45%, transparent);
+  height: var(--chain-fill, 0%);
+  background: linear-gradient(to bottom, #38775b, #57a67f);
+  box-shadow: 0 0 12px #38775b45;
   transition: height 0.35s ease;
 }
 .farm-growth-step {
   position: relative;
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-columns: 44px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
 }
@@ -207,207 +135,117 @@
   z-index: 2;
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
   border: 2px solid #d3dfd5;
   background: #f1f2e6;
   color: #9aa08d;
-  font-size: 26px;
-  font-style: normal;
-  box-shadow: 0 4px 0 #e5ecdf;
+  font-size: 23px;
+  box-shadow: 0 3px 0 #e5ecdf;
   transition:
     background 0.15s,
     border-color 0.15s,
     box-shadow 0.15s;
 }
-.farm-growth-tile.is-trained {
-  border-color: var(--branch-color);
-  background: color-mix(in srgb, var(--branch-color) 18%, #fffef5);
-  color: var(--branch-color);
-  box-shadow: 0 4px 0 color-mix(in srgb, var(--branch-color) 40%, #fffaf0);
-}
-.farm-growth-tile.is-maxed {
+.farm-growth-step.is-trained .farm-growth-tile {
   border-color: var(--branch-color);
   background: var(--branch-color);
   color: #fffef5;
-  box-shadow: 0 4px 0 color-mix(in srgb, var(--branch-color) 60%, #1d3327);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--branch-color) 60%, #1d3327);
 }
-/* Mastery seal on the corner of a finished talent. */
-.farm-growth-seal {
-  position: absolute;
-  top: -7px;
-  right: -7px;
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--branch-color);
-  color: #fffef5;
-  font-size: 11px;
-  font-weight: 700;
-  font-style: normal;
-  box-shadow: 0 2px 0 color-mix(in srgb, var(--branch-color) 60%, #1d3327);
-}
-/* Tier chip rides the tile corner instead of the rail. */
-.farm-growth-tier {
-  position: absolute;
-  z-index: 3;
-  left: -8px;
-  top: -10px;
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 2px solid #d3dfd5;
-  background: #fffef5;
-  color: #9aa08d;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  box-shadow: 0 2px 0 #e5ecdf;
-}
-.farm-growth-tier.is-trained {
+/* The step waiting to be bought: lit outline, still readable. */
+.farm-growth-step.is-next .farm-growth-tile {
   border-color: var(--branch-color);
   background: color-mix(in srgb, var(--branch-color) 16%, #fffef5);
   color: var(--branch-color);
 }
-.farm-growth-tier.is-maxed {
+.farm-growth-step.is-locked .farm-growth-tile {
+  background: #e8eade;
+  color: #a9ad9c;
+  font-size: 17px;
+}
+.farm-growth-step.is-locked .farm-growth-node {
+  opacity: 0.6;
+}
+/* Step number rides the tile corner. */
+.farm-growth-tier {
+  position: absolute;
+  z-index: 3;
+  left: -8px;
+  top: -8px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #d3dfd5;
+  background: #fffef5;
+  color: #9aa08d;
+  font-size: 10px;
+  font-weight: 700;
+  box-shadow: 0 2px 0 #e5ecdf;
+}
+.farm-growth-step.is-trained .farm-growth-tier {
   border-color: var(--branch-color);
   background: var(--branch-color);
   color: #fffef5;
-  box-shadow: 0 2px 0 color-mix(in srgb, var(--branch-color) 60%, #1d3327);
 }
 
-/* Same card language as the in-run upgrade cards. */
+/* One row: the bonus on the left, the price on the right. */
 .farm-growth-node {
-  position: relative;
-  border: 2px solid color-mix(in srgb, var(--talent-color) 28%, #fffef5);
-  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 2px solid #e2eadf;
+  border-left: 5px solid var(--branch-color);
+  border-radius: 14px;
   background: #fffef5;
-  padding: 15px 14px 14px;
-  box-shadow: 0 5px 0 color-mix(in srgb, var(--talent-color) 22%, #fffaf0);
-  transition:
-    transform 0.15s,
-    background 0.15s,
-    box-shadow 0.15s;
-}
-.farm-growth-node:hover {
-  transform: translateY(-4px);
-  background: color-mix(in srgb, var(--talent-color) 10%, #fffef5);
-}
-.farm-growth-node.is-trained {
-  border-color: var(--talent-color);
-  box-shadow: 0 5px 0 color-mix(in srgb, var(--talent-color) 45%, #fffaf0);
-}
-.farm-growth-node.is-maxed {
-  background: color-mix(in srgb, var(--talent-color) 8%, #fffef5);
+  box-shadow: 0 3px 0 #eceee0;
 }
 .farm-growth-node h4 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.3;
 }
-.farm-growth-node h4 em {
-  display: block;
-  font-style: normal;
-  font-size: 10px;
-  color: #a3a38e;
-  margin-top: 6px;
-}
-.farm-growth-pips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 10px 0 12px;
-}
-.farm-growth-pips > i {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--talent-color) 35%, #dedfcc);
-  background: #f1f2e6;
-}
-.farm-growth-pips > i.is-on {
-  border-color: var(--talent-color);
-  background: var(--talent-color);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--talent-color) 45%, #fffaf0);
-}
-.farm-growth-node p {
-  font-size: 11px;
-  line-height: 1.7;
-  color: #8f957f;
-  margin: 0 0 12px;
-}
-.farm-growth-node dl {
-  margin: 0;
-  font-size: 11px;
-  border-top: 1px dashed #dedfcc;
-  padding-top: 10px;
-  display: grid;
-  gap: 5px;
-}
-.farm-growth-node dl > div {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-.farm-growth-node dt {
+.farm-growth-owned {
   flex-shrink: 0;
-  color: #849389;
-}
-.farm-growth-node dd {
-  margin: 0;
-  color: #6b7e73;
-}
-.farm-growth-node dl > div.is-next dt {
-  color: var(--talent-color);
-}
-.farm-growth-node dl > div.is-next dd {
+  font-size: 12px;
   font-weight: 700;
-  color: var(--talent-color);
+  color: var(--branch-color);
+}
+.farm-growth-sealed {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #8f957f;
 }
 .farm-growth-buy {
-  width: 100%;
-  margin-top: 12px;
-  padding: 11px 8px;
-  border: 2px solid color-mix(in srgb, var(--talent-color) 30%, #fffef5);
-  border-radius: 14px;
+  flex-shrink: 0;
+  min-width: 40px;
+  padding: 9px 14px;
+  border: 2px solid #d9e4d5;
+  border-radius: 12px;
   background: #fffef5;
-  color: color-mix(in srgb, var(--talent-color) 70%, #6b7e73);
+  color: #6b7e73;
   font-weight: 700;
   font-size: 13px;
-  transition:
-    transform 0.15s,
-    background 0.15s,
-    color 0.15s;
 }
 .farm-growth-buy.is-affordable {
-  border-color: var(--talent-color);
-  background: var(--talent-color);
+  border-color: var(--branch-color);
+  background: var(--branch-color);
   color: #fff;
-  box-shadow: 0 4px 0 color-mix(in srgb, var(--talent-color) 62%, #1d3327);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--branch-color) 62%, #1d3327);
 }
 .farm-growth-buy.is-affordable:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 0 color-mix(in srgb, var(--talent-color) 62%, #1d3327);
-}
-.farm-growth-buy.is-affordable:active {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--talent-color) 62%, #1d3327);
-}
-.farm-growth-buy.is-maxed {
-  border-style: dashed;
-  color: var(--talent-color);
+  transform: translateY(-1px);
 }
 .farm-growth-shortfall {
-  display: block;
-  text-align: center;
-  margin-top: 8px;
-  color: #77887d;
+  flex-shrink: 0;
   font-size: 11px;
+  color: #77887d;
 }
 .farm-growth-message {
   padding: 12px 16px;
@@ -421,16 +259,9 @@
   border-color: #f0d3bd;
   color: #974b26;
 }
-.farm-growth-legend {
-  margin-top: 26px;
-  text-align: center;
-  font-size: 11px;
-  line-height: 1.7;
-  color: #8f957f;
-}
 .farm-growth-reset {
-  margin-top: 14px;
-  padding: 20px;
+  margin-top: 18px;
+  padding: 16px;
   border: 2px dashed #bbcebf;
   border-radius: 18px;
   background: #fffef5;
@@ -457,180 +288,47 @@
   color: #fff;
   box-shadow: 0 4px 0 #24503c;
 }
-@media (max-width: 1000px) {
-  .farm-growth-tree {
-    gap: 18px;
-  }
-  .farm-growth-brand {
-    padding: 7px 9px;
-    gap: 7px;
-    margin-bottom: 14px;
-    border-left-width: 5px;
-  }
-  .farm-growth-brand > span {
-    width: 28px;
-    height: 28px;
-    border-radius: 10px;
-    font-size: 16px;
-  }
-  .farm-growth-branch h3 {
-    font-size: 15px;
-  }
-  .farm-growth-nodes {
-    padding-left: 34px;
-    gap: 20px;
-  }
-  .farm-growth-nodes::before,
-  .farm-growth-nodes::after {
-    left: 19px;
-    width: 6px;
-  }
-  .farm-growth-step {
-    grid-template-columns: 44px minmax(0, 1fr);
-    gap: 10px;
-  }
-  .farm-growth-tile {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    font-size: 23px;
-  }
-  .farm-growth-tier {
-    left: -7px;
-    top: -9px;
-    width: 24px;
-    height: 24px;
-    font-size: 10px;
-  }
-  .farm-growth-node {
-    padding: 12px 10px;
-    border-radius: 14px;
-  }
-  .farm-growth-node h4 {
-    font-size: 14px;
-  }
-  .farm-growth-pips {
-    gap: 3px;
-    margin: 8px 0 10px;
-  }
-  .farm-growth-pips > i {
-    width: 9px;
-    height: 9px;
-  }
-}
 @media (max-width: 700px) {
   .farm-growth {
     padding: 16px 12px 30px;
   }
-  .farm-growth-tree {
-    gap: 16px;
-  }
-  /* One column keeps room for the school ribbon to stay on one line. */
-  .farm-growth-brand {
-    gap: 8px;
-    padding: 7px 10px;
-    margin-bottom: 12px;
-    border-left-width: 5px;
-  }
-  .farm-growth-brand > span {
-    width: 26px;
-    height: 26px;
-    border-radius: 9px;
-    font-size: 15px;
-  }
-  .farm-growth-brand > small {
-    font-size: 9px;
-  }
-  .farm-growth-branch h3 {
-    font-size: 13px;
-  }
-  /* The rail now runs through the tiles on every width. */
   .farm-growth-nodes {
-    gap: 14px;
-  }
-  .farm-growth-nodes::before,
-  .farm-growth-nodes::after {
-    left: 19px;
-    width: 6px;
+    max-width: none;
+    gap: 8px;
   }
   .farm-growth-step {
-    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-columns: 40px minmax(0, 1fr);
     gap: 10px;
   }
   .farm-growth-tile {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     border-radius: 12px;
-    font-size: 22px;
-  }
-  .farm-growth-tier {
-    left: -6px;
-    top: -8px;
-    width: 22px;
-    height: 22px;
-    font-size: 9px;
+    font-size: 20px;
   }
   .farm-growth-node {
-    padding: 12px 10px;
-    overflow-wrap: anywhere;
-  }
-  .farm-growth-seal {
-    top: -6px;
-    right: -6px;
-    width: 18px;
-    height: 18px;
-    font-size: 10px;
+    padding: 8px 10px;
   }
   .farm-growth-node h4 {
-    font-size: 13px;
-  }
-  .farm-growth-node p,
-  .farm-growth-node dl,
-  .farm-growth-buy {
-    font-size: 11px;
-    line-height: 1.6;
-  }
-  .farm-growth-node dl > div {
-    display: grid;
-    gap: 2px;
+    font-size: 14px;
   }
   .farm-growth-buy {
-    padding: 10px 4px;
-  }
-  .farm-growth-shortfall {
-    font-size: 10px;
-  }
-  .farm-growth-intro {
-    align-items: start;
-    gap: 12px;
-    padding: 24px 0;
-  }
-  .farm-growth-total {
-    padding: 10px 14px;
-  }
-  .farm-growth-total strong {
-    font-size: 28px;
-  }
-  .farm-growth-bar {
-    gap: 10px;
-  }
-  .farm-growth-wallet strong {
-    font-size: 16px;
+    padding: 9px 12px;
+    font-size: 12px;
   }
   .farm-growth-bar h2 {
     font-size: 20px;
   }
+  .farm-growth-wallet strong {
+    font-size: 16px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .farm-growth-node,
-  .farm-growth-buy,
   .farm-growth-tile,
   .farm-growth-nodes::after {
     transition: none;
   }
-  .farm-growth-node:hover,
-  .farm-growth-buy.is-affordable:hover,
-  .farm-growth-buy.is-affordable:active {
+  .farm-growth-buy.is-affordable:hover {
     transform: none;
   }
 }

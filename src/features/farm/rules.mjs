@@ -504,9 +504,10 @@ export const evolved = (gear) =>
   ).map((recipe) => recipe.weapon)
 const PITCHES = [60, 64, 67, 69, 72, 76]
 export function farmMoveStep(state) {
+  // Permanent growth adds a flat distance per second; run cards stay a ratio.
   return (
-    MOVE_STEP *
-    (1 + (state.permanent?.stride ?? 0) * 0.01 + (state.growth?.stride ?? 0) * STAT_CARD_STRIDE)
+    MOVE_STEP * (1 + (state.growth?.stride ?? 0) * STAT_CARD_STRIDE) +
+    permanentStats(state.permanent).speed / FPS
   )
 }
 export function clampPoint(previous, desired, step = MOVE_STEP) {
@@ -867,16 +868,13 @@ export function stepFarm(previous, point, useSurge = false) {
     )
     const reward = modifier?.reward ?? 1
     const xpMultiplier = EXPERIENCE_STAGES[crop.xpStage ?? 0].multiplier
+    // Permanent wisdom is a flat bonus on top of the stage-scaled drop.
     const dropXp =
         Math.round(
-          Math.round(
-            (crop.bass ? 110 : crop.boss ? 45 : crop.elite ? 20 : 4 + gear.lucky) *
-              xpMultiplier *
-              reward,
-          ) *
-            stats.xp *
-            100,
-        ) / 100,
+          (crop.bass ? 110 : crop.boss ? 45 : crop.elite ? 20 : 4 + gear.lucky) *
+            xpMultiplier *
+            reward,
+        ) + stats.xp,
       dropCoins = Math.round(
         (crop.bass ? 340 : crop.boss ? 200 : crop.elite ? 60 : 8 + crop.kind * 2 + gear.lucky * 5) *
           reward,
@@ -935,12 +933,13 @@ export function stepFarm(previous, point, useSurge = false) {
   // Every hit this run lands harder once overload cards are picked; the
   // permanent power level stays the baseline they stack on. This also covers
   // the surge, which fires through the same damage path.
-  const runDamage =
-    stats.damage * (1 + statCardLevel(state, 'overdrive') * STAT_CARD_DAMAGE) * combo.damage
+  const runDamage = (1 + statCardLevel(state, 'overdrive') * STAT_CARD_DAMAGE) * combo.damage
   const damage = (crop, amount, chain = false) => {
     if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) return
     const critical = gear.lucky > 0 && (crop.id + state.tick) % Math.max(3, 8 - gear.lucky) === 0
-    crop.hp = Math.round((crop.hp - amount * (critical ? 2 : 1) * runDamage) * 100) / 100
+    // Permanent power is a flat hit bonus, applied after the run multipliers.
+    const hit = amount * (critical ? 2 : 1) * runDamage + stats.damage
+    crop.hp = Math.round((crop.hp - hit) * 100) / 100
     if (crop.hp <= 0) {
       crop.hp = 0.001
       harvest(crop, chain)
@@ -1511,7 +1510,7 @@ export function stepFarm(previous, point, useSurge = false) {
               powerBonus) *
               combo.orbit,
           )
-  const attraction = (15 + gear.magnet * 15) * stats.attraction * combo.attraction
+  const attraction = (15 + gear.magnet * 15 + stats.attraction) * combo.attraction
   for (const drop of state.loot) {
     const dist = distance(drop.x, drop.y, point[0], point[1])
     if (dist <= attraction || state.tick < state.surgeUntil) {
@@ -1578,7 +1577,7 @@ export function stepFarm(previous, point, useSurge = false) {
     } else {
       // 韧性 shaves every hit off the top, stacked on the permanent armour.
       const grit = 1 - statCardLevel(state, 'grit') * STAT_CARD_GRIT
-      const taken = Math.round(amount * stats.damageTaken * grit * 100) / 100
+      const taken = Math.round(Math.max(0, amount * grit - stats.armor) * 100) / 100
       state.hp = Math.max(0, Math.round((state.hp - taken) * 100) / 100)
       events.push({
         id: state.nextId++,

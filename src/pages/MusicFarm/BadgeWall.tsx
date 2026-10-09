@@ -86,10 +86,7 @@ export function BadgeWall({ log, career }: { log: FarmAchievementLog; career: Fa
                       aria-label={`${achievement.name} 进度`}
                       aria-valuemin={0}
                       aria-valuemax={achievement.target}
-                      aria-valuenow={Math.min(
-                        achievement.target,
-                        log.best[achievement.id] ?? 0,
-                      )}
+                      aria-valuenow={Math.min(achievement.target, log.best[achievement.id] ?? 0)}
                       aria-valuetext={`${formatFarmAchievement(achievement, log.best[achievement.id] ?? 0)} / ${formatFarmAchievement(achievement, achievement.target)}`}
                     >
                       <b

@@ -2,6 +2,7 @@ import { accountStorage } from '@/utils/accountStorage'
 import { BAND_CHARACTERS, DEFAULT_CHARACTER_ID, migrateCharacterId } from './characterRoster.mjs'
 import {
   normalizePermanentLevels,
+  permanentIsUnlocked,
   permanentLevelCount,
   permanentPrice,
   type FarmGrowth,
@@ -147,6 +148,9 @@ export function buyFarmUpgrade(id: PermanentId, expectedLevel: number): ProfileR
   const price = permanentPrice(id, levels[id])
   if (levels[id] !== expectedLevel)
     return { profile, error: '强化等级已更新，请查看最新价格后重试。', paid: false }
+  // The chain opens one step at a time: earlier steps must be bought first.
+  if (!permanentIsUnlocked(levels, id))
+    return { profile, error: '前面的强化还没升级。', paid: false }
   if (price === null) return { profile, error: '这项强化已满级或暂时无法使用。', paid: false }
   if (profile.coins < price)
     return { profile, error: `还差 ${price - profile.coins} 金币。`, paid: false }

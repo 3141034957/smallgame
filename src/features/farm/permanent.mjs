@@ -1,8 +1,9 @@
-// Shared by simulation, upgrade descriptions and the recovery countdown.
+// Permanent growth is one long chain: every step is a single, flat bonus and
+// buying it is what unlocks the next one. Shared by simulation, the upgrade
+// screen and the recovery countdown — no percentages anywhere in the chain.
 export const RECOVERY = {
   safeSeconds: 8,
   regenSeconds: 12,
-  regenAmounts: [1, 1.5, 2, 2.5, 3],
   shieldSeconds: [180, 150, 120],
 }
 
@@ -12,155 +13,143 @@ export const PERMANENT_BRANCHES = [
   { id: 'movement', name: '操作手感', icon: '✦' },
 ]
 
-// Talent-book order inside a branch: tier 1 is the entry, tier 4 the deepest.
-export const PERMANENT_UPGRADES = [
-  {
-    id: 'vitality',
-    branch: 'survival',
-    tier: 1,
-    name: '舞台体魄',
-    icon: '♡',
-    max: 12,
-    base: 1500,
-    description: '每级生命 +5',
-  },
-  {
-    id: 'armor',
-    branch: 'survival',
-    tier: 2,
-    name: '舞台护甲',
-    icon: '◇',
-    max: 6,
-    base: 3500,
-    description: '每级减伤 2%',
-  },
-  {
-    id: 'regen',
-    branch: 'survival',
-    tier: 3,
-    name: '生命回响',
-    icon: '✚',
-    max: 5,
-    prices: [3500, 14000, 35000, 80000, 160000],
-    description: '受击 8 秒后回血',
-  },
-  {
-    id: 'shield',
-    branch: 'survival',
-    tier: 4,
-    name: '守护音盾',
-    icon: '⬡',
-    max: 3,
-    prices: [18000, 70000, 200000],
-    description: '空盾自动补 1 层',
-  },
-  {
-    id: 'power',
-    branch: 'power',
-    tier: 1,
-    name: '乐感力量',
-    icon: '♫',
-    max: 15,
-    base: 2000,
-    description: '每级伤害 +2%',
-  },
-  {
-    id: 'wisdom',
-    branch: 'power',
-    tier: 2,
-    name: '演奏领悟',
-    icon: '♬',
-    max: 10,
-    base: 2500,
-    description: '每级经验 +2%',
-  },
-  {
-    id: 'stride',
-    branch: 'movement',
-    tier: 1,
-    name: '轻快步伐',
-    icon: '➜',
-    max: 10,
-    base: 1800,
-    description: '每级移速 +1%',
-  },
-  {
-    id: 'magnet',
-    branch: 'movement',
-    tier: 2,
-    name: '音符吸引',
-    icon: '✦',
-    max: 10,
-    base: 1500,
-    description: '每级拾取 +4%',
-  },
+// Every chain step adds one flat amount. `unit` is what the number means.
+export const PERMANENT_STEPS = [
+  { kind: 'vitality', branch: 'survival', icon: '♡', amount: 10, label: '生命 +10' },
+  { kind: 'damage', branch: 'power', icon: '♫', amount: 1, label: '伤害 +1' },
+  { kind: 'attraction', branch: 'movement', icon: '✦', amount: 8, label: '拾取 +8' },
+  { kind: 'speed', branch: 'movement', icon: '➜', amount: 2, label: '移速 +2' },
+  { kind: 'vitality', branch: 'survival', icon: '♡', amount: 10, label: '生命 +10' },
+  { kind: 'xp', branch: 'power', icon: '♬', amount: 2, label: '经验 +2' },
+  { kind: 'armor', branch: 'survival', icon: '◇', amount: 1, label: '减伤 1' },
+  { kind: 'damage', branch: 'power', icon: '♫', amount: 1, label: '伤害 +1' },
+  { kind: 'vitality', branch: 'survival', icon: '♡', amount: 10, label: '生命 +10' },
+  { kind: 'regen', branch: 'survival', icon: '✚', amount: 1, label: '回血 +1' },
+  { kind: 'attraction', branch: 'movement', icon: '✦', amount: 8, label: '拾取 +8' },
+  { kind: 'damage', branch: 'power', icon: '♫', amount: 1, label: '伤害 +1' },
+  { kind: 'vitality', branch: 'survival', icon: '♡', amount: 10, label: '生命 +10' },
+  { kind: 'speed', branch: 'movement', icon: '➜', amount: 2, label: '移速 +2' },
+  { kind: 'armor', branch: 'survival', icon: '◇', amount: 1, label: '减伤 1' },
+  { kind: 'shield', branch: 'survival', icon: '⬡', amount: 180, label: '补盾 180 秒' },
+  { kind: 'xp', branch: 'power', icon: '♬', amount: 2, label: '经验 +2' },
+  { kind: 'vitality', branch: 'survival', icon: '♡', amount: 10, label: '生命 +10' },
+  { kind: 'damage', branch: 'power', icon: '♫', amount: 1, label: '伤害 +1' },
+  { kind: 'attraction', branch: 'movement', icon: '✦', amount: 8, label: '拾取 +8' },
+  { kind: 'regen', branch: 'survival', icon: '✚', amount: 1, label: '回血 +1' },
+  { kind: 'vitality', branch: 'survival', icon: '♡', amount: 10, label: '生命 +10' },
+  { kind: 'armor', branch: 'survival', icon: '◇', amount: 1, label: '减伤 1' },
+  { kind: 'shield', branch: 'survival', icon: '⬡', amount: 150, label: '补盾 150 秒' },
+  { kind: 'xp', branch: 'power', icon: '♬', amount: 2, label: '经验 +2' },
+  { kind: 'attraction', branch: 'movement', icon: '✦', amount: 8, label: '拾取 +8' },
+  { kind: 'damage', branch: 'power', icon: '♫', amount: 1, label: '伤害 +1' },
+  { kind: 'speed', branch: 'movement', icon: '➜', amount: 2, label: '移速 +2' },
+  { kind: 'shield', branch: 'survival', icon: '⬡', amount: 120, label: '补盾 120 秒' },
 ]
 
-export const PERMANENT_TIER_LABELS = ['I', 'II', 'III', 'IV']
-export function permanentTierLabel(tier) {
-  return PERMANENT_TIER_LABELS[tier - 1] ?? String(tier)
-}
-// One branch read top to bottom: its talents ordered by tier. Pure visual order, no gating.
-export function permanentTiers(branch) {
-  return PERMANENT_UPGRADES.filter((item) => item.branch === branch).sort((a, b) => a.tier - b.tier)
-}
+// Prices climb along the chain, so the deep steps stay a real goal.
+const stepPrice = (index) =>
+  50 * Math.round((1200 * (1 + 0.25 * index + 0.06 * index * index)) / 50)
 
-export const PERMANENT_TOTAL_LEVELS = PERMANENT_UPGRADES.reduce((sum, item) => sum + item.max, 0)
-export function normalizePermanentLevels(value) {
-  return Object.fromEntries(
-    PERMANENT_UPGRADES.map(({ id, max }) => [
-      id,
-      Number.isInteger(value?.[id]) && value[id] >= 0 && value[id] <= max ? value[id] : 0,
-    ]),
+export const PERMANENT_UPGRADES = PERMANENT_STEPS.map((step, index) => ({
+  id: `step-${index + 1}`,
+  name: step.label,
+  icon: step.icon,
+  branch: step.branch,
+  kind: step.kind,
+  amount: step.amount,
+  order: index,
+  max: 1,
+  price: stepPrice(index),
+}))
+export const PERMANENT_CHAIN = PERMANENT_UPGRADES
+export const PERMANENT_TOTAL_LEVELS = PERMANENT_UPGRADES.length
+const BY_ID = new Map(PERMANENT_UPGRADES.map((item) => [item.id, item]))
+
+// Old saves stored up to 15 levels per upgrade. Read them as "how many chain
+// steps this player earned" and grant that many steps from the head, so a
+// migrated profile is always a valid, unbroken prefix of the chain.
+const LEGACY_SCALE = {
+  vitality: 1 / 2,
+  power: 1 / 3,
+  armor: 1 / 2,
+  regen: 3 / 5,
+  shield: 1,
+  wisdom: 1 / 3,
+  stride: 1 / 3,
+  magnet: 1 / 2.5,
+}
+export function legacyStepCount(value) {
+  const earned = Object.entries(LEGACY_SCALE).reduce(
+    (sum, [id, scale]) => sum + Math.floor((Number(value?.[id]) || 0) * scale),
+    0,
   )
+  return Math.min(PERMANENT_TOTAL_LEVELS, Math.max(0, earned))
+}
+export function normalizePermanentLevels(value) {
+  if (value && Object.values(value).some((level) => (Number(level) || 0) > 1))
+    return Object.fromEntries(
+      PERMANENT_UPGRADES.map((item, index) => [item.id, index < legacyStepCount(value) ? 1 : 0]),
+    )
+  return Object.fromEntries(PERMANENT_UPGRADES.map((item) => [item.id, value?.[item.id] ? 1 : 0]))
 }
 export function validPermanentLevels(value) {
   return (
     value !== null &&
     typeof value === 'object' &&
     !Array.isArray(value) &&
-    Object.entries(value).every(([id, level]) => {
-      const item = PERMANENT_UPGRADES.find((item) => item.id === id)
-      return item && Number.isInteger(level) && level >= 0 && level <= item.max
-    })
+    Object.entries(value).every(([id, level]) => BY_ID.has(id) && (level === 0 || level === 1))
   )
 }
 export function permanentLevelCount(value) {
   return Object.values(normalizePermanentLevels(value)).reduce((sum, level) => sum + level, 0)
 }
-export function permanentPrice(id, level) {
-  const item = PERMANENT_UPGRADES.find((item) => item.id === id)
-  if (!item || !Number.isInteger(level) || level < 0 || level >= item.max) return null
-  return (
-    item.prices?.[level] ??
-    100 * Math.ceil((item.base * (1 + 0.45 * level + 0.18 * level * level)) / 100)
-  )
+// The chain is unlocked strictly in order: a step opens once every earlier one
+// is owned. Returns the id of the next buyable step, or null when finished.
+export function permanentNextStep(value) {
+  const levels = normalizePermanentLevels(value)
+  return PERMANENT_UPGRADES.find((item) => !levels[item.id])?.id ?? null
 }
+export function permanentIsUnlocked(value, id) {
+  const item = BY_ID.get(id)
+  if (!item) return false
+  const levels = normalizePermanentLevels(value)
+  if (levels[id]) return true
+  return permanentNextStep(levels) === id
+}
+export function permanentPrice(id, level) {
+  const item = BY_ID.get(id)
+  if (!item || level !== 0) return null
+  return item.price
+}
+
 export function permanentStats(value) {
   const levels = normalizePermanentLevels(value)
+  const bought = (kind) =>
+    PERMANENT_UPGRADES.reduce(
+      (sum, item) => (item.kind === kind && levels[item.id] ? sum + item.amount : sum),
+      0,
+    )
+  const shields = PERMANENT_UPGRADES.reduce(
+    (best, item) => (item.kind === 'shield' && levels[item.id] ? item.amount : best),
+    0,
+  )
   return {
-    maxHp: 100 + levels.vitality * 5,
-    damage: 1 + levels.power * 0.02,
-    speed: 1 + levels.stride * 0.01,
-    attraction: 1 + levels.magnet * 0.04,
-    xp: 1 + levels.wisdom * 0.02,
-    damageTaken: 1 - levels.armor * 0.02,
-    regen: RECOVERY.regenAmounts[levels.regen - 1] ?? 0,
-    shieldSeconds: RECOVERY.shieldSeconds[levels.shield - 1] ?? 0,
+    maxHp: 100 + bought('vitality'),
+    damage: bought('damage'),
+    // Units per second added on top of the base walking speed.
+    speed: bought('speed'),
+    attraction: bought('attraction'),
+    xp: bought('xp'),
+    // Life shaved off every hit, flat.
+    armor: bought('armor'),
+    regen: bought('regen'),
+    shieldSeconds: shields,
   }
 }
+
 export function permanentEffect(id, level) {
-  if (id === 'vitality') return `生命上限 ${100 + level * 5}`
-  if (id === 'power') return `伤害 +${level * 2}%`
-  if (id === 'stride') return `移速 +${level}%`
-  if (id === 'magnet') return `拾取半径 +${level * 4}%`
-  if (id === 'wisdom') return `经验 +${level * 2}%`
-  if (id === 'armor') return `减伤 ${level * 2}%`
-  if (id === 'regen')
-    return level
-      ? `每 ${RECOVERY.regenSeconds} 秒恢复 ${RECOVERY.regenAmounts[level - 1]} 生命`
-      : '自动回血未启用'
-  if (id === 'shield')
-    return level ? `空盾 ${RECOVERY.shieldSeconds[level - 1]} 秒补 1 层` : '自动补盾未启用'
-  return ''
+  const item = BY_ID.get(id)
+  if (!item) return ''
+  if (level) return `已获得 · ${item.name}`
+  return item.name
 }
