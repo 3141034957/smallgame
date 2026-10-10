@@ -44,6 +44,37 @@
   color: #8e759f;
   font-size: 20px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.farm-board-heading h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.farm-board .farm-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  vertical-align: middle;
+  display: inline-block;
+  flex: none;
+}
+.farm-board form button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.farm-board form button .farm-icon,
+.farm-board-retry .farm-icon {
+  width: 15px;
+  height: 15px;
+}
+.farm-board-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .farm-board-columns {
   display: grid;

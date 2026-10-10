@@ -5,6 +5,7 @@ import {
 } from '@/features/farm/achievements'
 import { farmCareerFavourite, type FarmCareer } from '@/features/farm/stats'
 import { TALENTS } from '@/features/farm/rules.mjs'
+import { Icon } from './icons'
 
 export function BadgeWall({ log, career }: { log: FarmAchievementLog; career: FarmCareer }) {
   const formatDay = (at: number) => {
@@ -69,7 +70,7 @@ export function BadgeWall({ log, career }: { log: FarmAchievementLog; career: Fa
             return (
               <li key={achievement.id} className={done ? 'is-unlocked' : ''}>
                 <span className="farm-badge-icon" aria-hidden="true">
-                  {done ? achievement.icon : '🔒'}
+                  {done ? achievement.icon : <Icon name="lock" />}
                 </span>
                 <div>
                   <strong>{achievement.name}</strong>

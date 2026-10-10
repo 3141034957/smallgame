@@ -48,6 +48,7 @@ import { selectFarmUpgrade } from '@/features/farm/upgradeSelection'
 import { schoolById } from '@/features/farm/schools.mjs'
 import { AUTH_FORM_EVENT } from '@/features/auth/context'
 import { drawFarm } from './render'
+import { Icon } from './icons'
 import { FarmBoard } from './FarmBoard'
 import { CharacterShop } from './CharacterShop'
 import { PermanentTree } from './PermanentTree'
@@ -907,7 +908,7 @@ export default function MusicFarm() {
                 openPanel('shop')
               }}
             >
-              🛍
+              <Icon name="shop" />
             </button>
             <button
               className="farm-growth-open"
@@ -917,13 +918,13 @@ export default function MusicFarm() {
                 openPanel('growth')
               }}
             >
-              ↗ <span>升级</span>
+              <Icon name="upgrade" /> <span>升级</span>
             </button>
             <button aria-label="查看成就墙" onClick={() => openPanel('badges')}>
-              🏅
+              <Icon name="badges" />
             </button>
             <button aria-label="查看生存排行榜" onClick={() => openPanel('board')}>
-              🏆
+              <Icon name="board" />
             </button>
             <button
               aria-label={muted ? '开启声音' : '静音'}
@@ -934,10 +935,12 @@ export default function MusicFarm() {
                 if (muted || audioError) void prepare(!muted)
               }}
             >
-              {muted ? '♩' : '♫'}
+              <span className={`farm-sound-toggle${muted ? ' is-muted' : ''}`}>
+                <Icon name="sound" />
+              </span>
             </button>
             <button aria-label="查看进化配方" onClick={() => openPanel('help')}>
-              ?
+              <Icon name="help" />
             </button>
           </nav>
         </header>
@@ -1029,7 +1032,7 @@ export default function MusicFarm() {
                   </b>
                   {phase === 'play' && (
                     <button aria-label="暂停游戏" onClick={() => openPanel('pause')}>
-                      Ⅱ
+                      <Icon name="pause" />
                     </button>
                   )}
                 </div>
@@ -1129,7 +1132,7 @@ export default function MusicFarm() {
                         openPanel('shop')
                       }}
                     >
-                      ♬ 角色工坊
+                      <Icon name="workshop" /> <span>角色工坊</span>
                     </button>
                     <button
                       className="farm-shop-pill"
@@ -1138,7 +1141,7 @@ export default function MusicFarm() {
                         openPanel('growth')
                       }}
                     >
-                      ↗ 永久强化
+                      <Icon name="upgrade" /> <span>永久强化</span>
                     </button>
                   </div>
                 </div>

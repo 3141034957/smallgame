@@ -78,6 +78,40 @@
   border-radius: 50%;
   font-size: 19px;
   font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+/* 图片图标（webp 透明底），文字语义由按钮文字或 aria-label 承担。 */
+.farm-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  vertical-align: middle;
+  display: inline-block;
+  flex: none;
+}
+.farm-header nav .farm-growth-open .farm-icon,
+.farm-shop-pill .farm-icon {
+  width: 16px;
+  height: 16px;
+}
+.farm-sound-toggle {
+  position: relative;
+  display: inline-flex;
+}
+.farm-sound-toggle.is-muted::after {
+  content: '';
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  top: 50%;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  transform: rotate(-30deg);
 }
 .farm-layout {
   display: grid;
@@ -1806,8 +1840,14 @@
 .farm-badge-icon {
   font-size: 21px;
   width: 30px;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
+}
+.farm-badge-icon .farm-icon {
+  width: 24px;
+  height: 24px;
 }
 .farm-badge-list strong {
   display: block;

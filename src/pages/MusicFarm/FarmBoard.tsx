@@ -8,6 +8,7 @@ import { FARM_CHARACTERS, FARM_DEFAULT_CHARACTER } from '@/features/farm/charact
 import type { FarmRound } from '@/features/farm/rules.mjs'
 import { migrateCharacterId } from '@/features/farm/characterRoster.mjs'
 import './FarmBoard.css'
+import { Icon } from './icons'
 
 import {
   getOrCreatePlayerId,
@@ -70,7 +71,7 @@ export function FarmBoard({
         if (!controller.signal.aborted) setBoard(value)
       })
       .catch(() => {
-        if (!controller.signal.aborted) setError('连不上，点 ↻ 重试')
+        if (!controller.signal.aborted) setError('连不上，点刷新重试')
       })
     return () => controller.abort()
   }, [playerId, revision])
@@ -145,7 +146,9 @@ export function FarmBoard({
       <div className="farm-board-heading">
         <div>
           <span>SURVIVOR CLUB</span>
-          <h2>🏆 无限总榜</h2>
+          <h2>
+            <Icon name="board" /> 无限总榜
+          </h2>
         </div>
         {!compact && <em>TOP {board?.total ?? '—'}</em>}
         <button
@@ -154,7 +157,7 @@ export function FarmBoard({
           disabled={busy}
           onClick={() => setRevision((value) => value + 1)}
         >
-          ↻
+          <Icon name="refresh" />
         </button>
       </div>
       {!compact && round && !authenticated && (
@@ -197,8 +200,14 @@ export function FarmBoard({
                   placeholder="你的乐手昵称"
                   autoComplete="nickname"
                 />
-                <button type="submit" disabled={busy}>
-                  {busy ? '正在上榜…' : '上榜 ↗'}
+                <button type="submit" disabled={busy} aria-label="上榜">
+                  {busy ? (
+                    '正在上榜…'
+                  ) : (
+                    <>
+                      <Icon name="upgrade" /> 上榜
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -211,7 +220,13 @@ export function FarmBoard({
           disabled={busy}
           onClick={() => submit(name, round)}
         >
-          {busy ? '正在上榜…' : '重新上榜 ↗'}
+          {busy ? (
+            '正在上榜…'
+          ) : (
+            <>
+              <Icon name="upgrade" /> 重新上榜
+            </>
+          )}
         </button>
       )}
       {error && (

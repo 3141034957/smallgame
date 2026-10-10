@@ -101,7 +101,7 @@ it('submits a newly entered nickname only once', async () => {
   localStorage.clear()
   render(<FarmBoard round={round} />)
   fireEvent.change(screen.getByRole('textbox'), { target: { value: '新乐手' } })
-  fireEvent.click(screen.getByRole('button', { name: '上榜 ↗' }))
+  fireEvent.click(screen.getByRole('button', { name: '上榜' }))
   await screen.findByText(/已上榜/)
   expect(vi.mocked(farmRequest).mock.calls.filter(([path]) => path === 'score')).toHaveLength(1)
 })
