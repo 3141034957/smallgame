@@ -1308,9 +1308,11 @@
   backdrop-filter: none;
   justify-content: flex-start;
   padding: max(10px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
-  /* One scroll container: the leaderboard list inside the card. Scrolling here
-     as well trapped the wheel/touch in whichever container the gesture hit. */
-  overflow: hidden;
+  /* The ready/result overlay is the only scroller here: on a short screen the
+     start card and the leaderboard together are taller than the viewport, and
+     clipping the overlay would hide the buttons with no way to reach them. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .farm-start-card {
   display: flex;
@@ -1322,8 +1324,6 @@
   padding: 20px 22px 18px;
   max-width: 340px;
   width: calc(100% - 40px);
-  max-height: 100%;
-  min-height: 0;
   margin: auto;
   box-shadow: 0 10px 30px #6f88532e;
 }
