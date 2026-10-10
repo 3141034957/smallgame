@@ -32,7 +32,7 @@ const total = () => document.querySelector('.farm-growth-total')!.textContent ??
 const chainPrice = (count: number) =>
   PERMANENT_CHAIN.slice(0, count).reduce((sum, item) => sum + item.price, 0)
 
-it('shows all 29 steps at once and leaves only the first one buyable', () => {
+it(`shows all ${PERMANENT_TOTAL_LEVELS} steps at once and leaves only the first one buyable`, () => {
   render(<Tree />)
   expect(screen.getByText('下局生效 · 按顺序解锁')).toBeTruthy()
   expect(screen.getAllByRole('listitem')).toHaveLength(PERMANENT_TOTAL_LEVELS)
@@ -52,7 +52,9 @@ it('shows all 29 steps at once and leaves only the first one buyable', () => {
     )
     expect(card.parentElement!.className).toContain('is-locked')
   }
-  expect(node(2).parentElement!.querySelector('.farm-growth-tile')!.textContent).toBe('🔒')
+  expect(node(2).parentElement!.querySelector('.farm-growth-tile img')!.getAttribute('src')).toBe(
+    '/assets/icons/lock.webp',
+  )
   // Nothing bought yet, so there is nothing to refund.
   expect((screen.getByRole('button', { name: '免费重置强化' }) as HTMLButtonElement).disabled).toBe(
     true,
@@ -78,7 +80,9 @@ it('buys the head of the chain, unlocks the next step and survives a remount', (
   fireEvent.click(screen.getByRole('button', { name: buyLabel(1) }))
   expect(node(1).querySelector('.farm-growth-owned')!.textContent).toBe('已获得 ✓')
   expect(node(1).parentElement!.className).toContain('is-trained')
-  expect(node(1).parentElement!.querySelector('.farm-growth-tile')!.textContent).toBe(step(1).icon)
+  expect(node(1).parentElement!.querySelector('.farm-growth-tile img')!.getAttribute('src')).toBe(
+    `/assets/icons/${step(1).kind}.webp`,
+  )
   // Step 2 opens, step 3 stays shut: the chain never skips ahead.
   expect(buyButtons()).toHaveLength(1)
   expect(screen.getByRole('button', { name: buyLabel(2) })).toBeTruthy()

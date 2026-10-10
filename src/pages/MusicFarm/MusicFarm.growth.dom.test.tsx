@@ -39,31 +39,35 @@ it('uses purchases made on the ready screen at start, then keeps the running sna
       <MusicFarm />
     </MemoryRouter>,
   )
-  // The chain opens one step at a time: step 1 is 生命 +10, step 2 伤害 +1.
+  // The chain opens one step at a time: step 1 is 生命 +1, step 2 经验 +1.
   const [first, second] = PERMANENT_CHAIN
   const buyStep = (index: number, item: (typeof PERMANENT_CHAIN)[number]) =>
     screen.getByRole('button', {
       name: `升级第 ${index} 步 ${item.name}，花费${item.price}金币`,
     })
+  // Only vitality steps move the health bar, and the run snapshots the growth
+  // it started with, so later purchases cannot change it mid-run.
+  const maxHp = (item: (typeof PERMANENT_CHAIN)[number]) =>
+    `${100 + (item.kind === 'vitality' ? item.amount : 0)}`
   fireEvent.click(screen.getByRole('button', { name: '打开永久强化' }))
   fireEvent.click(buyStep(1, first))
   fireEvent.click(screen.getByRole('button', { name: '返回游戏' }))
   await act(async () => fireEvent.click(screen.getByRole('button', { name: '开始无限模式' })))
   expect(screen.getByRole('progressbar', { name: '生命值' }).getAttribute('aria-valuemax')).toBe(
-    '110',
+    maxHp(first),
   )
   fireEvent.click(screen.getByRole('button', { name: '打开永久强化' }))
   fireEvent.click(buyStep(2, second))
   await act(async () => fireEvent.click(screen.getByRole('button', { name: '返回游戏' })))
   expect(screen.getByRole('progressbar', { name: '生命值' }).getAttribute('aria-valuemax')).toBe(
-    '110',
+    maxHp(first),
   )
   fireEvent.click(screen.getByRole('button', { name: '打开永久强化' }))
   fireEvent.click(screen.getByRole('button', { name: '免费重置强化' }))
   fireEvent.click(screen.getByRole('button', { name: '确认重置' }))
   await act(async () => fireEvent.click(screen.getByRole('button', { name: '返回游戏' })))
   expect(screen.getByRole('progressbar', { name: '生命值' }).getAttribute('aria-valuemax')).toBe(
-    '110',
+    maxHp(first),
   )
   fireEvent.click(screen.getByRole('button', { name: '暂停游戏' }))
   fireEvent.click(screen.getByRole('button', { name: '重新开始' }))

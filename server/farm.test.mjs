@@ -21,7 +21,11 @@ import {
   replayFarm,
   stepFarm,
 } from '../src/features/farm/rules.mjs'
-import { normalizePermanentLevels, permanentLevelCount } from '../src/features/farm/permanent.mjs'
+import {
+  normalizePermanentLevels,
+  permanentLevelCount,
+  PERMANENT_UPGRADES,
+} from '../src/features/farm/permanent.mjs'
 import { FARM_RULESET } from '../src/features/farm/monsters.mjs'
 import { selectFarmUpgrade } from '../src/features/farm/upgradeSelection.ts'
 import { DEFAULT_CHARACTER_ID } from './identity.mjs'
@@ -165,9 +169,13 @@ function createRequest(store, consumeAttempt) {
 
 describe('replay-verified all-time farm leaderboard', () => {
   it('replays purchased attributes from the run snapshot and rejects invalid growth levels', () => {
-    // 旧档（某几项满级）折算成链前 N 个节点：提交时必须已经是合法的链前缀。
+    // 提交的强化必须是链前缀；旧档（某几项满级）读回来是空链，不再折算成节点。
     const legacy = { vitality: 12, power: 4, stride: 1, armor: 2, regen: 5, shield: 1 }
-    const grown = playFixture(true, normalizePermanentLevels(legacy), 90)
+    expect(permanentLevelCount(normalizePermanentLevels(legacy))).toBe(0)
+    const prefix = Object.fromEntries(
+      PERMANENT_UPGRADES.map((item, index) => [item.id, index < 12 ? 1 : 0]),
+    )
+    const grown = playFixture(true, prefix, 90)
     expect(grown).not.toBeNull()
     expect(permanentLevelCount(grown.permanent)).toBe(12)
     expect(grown.permanent['step-12']).toBe(1)
@@ -186,7 +194,7 @@ describe('replay-verified all-time farm leaderboard', () => {
     expect(verifyFarm({ ...submission, permanent: { stride: 1.5 } })).toBeNull()
     expect(verifyFarm({ ...submission, permanent: { unknown: 1 } })).toBeNull()
     expect(verifyFarm({ ...submission, permanent: { 'step-1': 2 } })).toBeNull()
-    expect(verifyFarm({ ...submission, permanent: { 'step-30': 1 } })).toBeNull()
+    expect(verifyFarm({ ...submission, permanent: { 'step-201': 1 } })).toBeNull()
   })
   it('derives the ranking from a completed endless run, ignoring client-provided rewards', () => {
     expect(round.frames.length).toBeGreaterThan(FPS * 60)

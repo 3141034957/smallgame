@@ -10,7 +10,6 @@ import {
   RECIPES,
 } from './rules.mjs'
 import {
-  legacyStepCount,
   normalizePermanentLevels,
   permanentIsUnlocked,
   permanentLevelCount,
@@ -27,6 +26,11 @@ const day = '2026-10-06'
 // 永久强化是一条链，只能按顺序解锁，所以任何合法档案都是链的某个前缀。
 const prefix = (count) =>
   Object.fromEntries(PERMANENT_UPGRADES.map((item, index) => [item.id, index < count ? 1 : 0]))
+// 链上只能买到前缀，所以「刚好买到第 n 个某类节点」的存档就是买到它所在的位置。
+const throughKind = (kind, nth = 1) =>
+  PERMANENT_UPGRADES.filter((item) => item.kind === kind)[nth - 1].order + 1
+const kindCount = (kind) => PERMANENT_UPGRADES.filter((item) => item.kind === kind).length
+const full = () => prefix(PERMANENT_TOTAL_LEVELS)
 function quiet(levels = {}) {
   return {
     ...createFarm(day, levels),
@@ -73,27 +77,57 @@ describe('permanent growth rules', () => {
       { 'step-1': -1 },
       { 'step-1': 1.2 },
       { mystery: 1 },
-      { 'step-30': 1 },
+      { 'step-201': 1 },
     ])
       expect(validPermanentLevels(invalid)).toBe(false)
-    // 旧档（某项 > 1 级）会被折算成链前缀，折算结果本身是合法快照。
+    // 旧档的 key 在链上不存在：读回来是空链，空链本身仍是合法快照。
     expect(validPermanentLevels(normalizePermanentLevels({ shield: 3, vitality: 12 }))).toBe(true)
-    expect(permanentLevelCount(normalizePermanentLevels({ shield: 999, power: 2 }))).toBe(
-      PERMANENT_TOTAL_LEVELS,
-    )
-    expect(PERMANENT_UPGRADES).toHaveLength(29)
+    expect(permanentLevelCount(normalizePermanentLevels({ shield: 3, vitality: 12 }))).toBe(0)
+    // 旧档数值再大也不折算：链上没有这些 id，一律清空。
+    expect(permanentLevelCount(normalizePermanentLevels({ shield: 999, power: 2 }))).toBe(0)
+    expect(PERMANENT_UPGRADES).toHaveLength(200)
+    expect(PERMANENT_TOTAL_LEVELS).toBe(200)
     // 每个节点都是单级：order 就是链上的位置。
     expect(PERMANENT_UPGRADES.every((item, index) => item.order === index && item.max === 1)).toBe(
       true,
     )
-    expect(permanentPrice('step-16', 0)).toBe(21900)
+    // 价格是第 N 级 2000 × N，不手写 200 个数字。
+    expect(PERMANENT_UPGRADES.every((item) => item.price === 2000 * (item.order + 1))).toBe(true)
+    expect(permanentPrice('step-16', 0)).toBe(32000)
+    expect(permanentPrice('step-200', 0)).toBe(400000)
     expect(permanentPrice('step-16', 1)).toBeNull()
     expect(permanentPrice('step-1', 1)).toBeNull()
     expect(permanentPrice('missing', 0)).toBeNull()
     // 单级节点：整条链的总价就是每个节点价格之和。
     const cost = PERMANENT_UPGRADES.reduce((sum, item) => sum + permanentPrice(item.id, 0), 0)
-    expect(cost).toBe(712000)
-    expect(RECOVERY).toEqual({ safeSeconds: 8, regenSeconds: 12, shieldSeconds: [180, 150, 120] })
+    expect(cost).toBe(40200000)
+    expect(RECOVERY).toEqual({ safeSeconds: 8, regenSeconds: 12 })
+  })
+
+  it('interleaves the eight effects by quota instead of stacking them in blocks', () => {
+    // 八类节点的配额：合计 200，生命最多、护盾与减伤/回血最少。
+    expect(kindCount('vitality')).toBe(55)
+    expect(kindCount('damage')).toBe(25)
+    expect(kindCount('attraction')).toBe(30)
+    expect(kindCount('speed')).toBe(27)
+    expect(kindCount('xp')).toBe(32)
+    expect(kindCount('armor')).toBe(8)
+    expect(kindCount('regen')).toBe(8)
+    expect(kindCount('shield')).toBe(15)
+    expect(
+      PERMANENT_UPGRADES.every((item) => item.kind && item.branch && item.icon && item.name),
+    ).toBe(true)
+    // 平滑加权轮询：同类节点不会相邻出现，链的前二十步就已经是混合的。
+    for (let index = 1; index < PERMANENT_TOTAL_LEVELS; index += 1)
+      expect(PERMANENT_UPGRADES[index].kind).not.toBe(PERMANENT_UPGRADES[index - 1].kind)
+    expect(new Set(PERMANENT_UPGRADES.slice(0, 15).map((item) => item.kind)).size).toBe(8)
+    // 护盾节点给出买下之后的间隔：170、160 … 30 秒。
+    expect(
+      PERMANENT_UPGRADES.filter((item) => item.kind === 'shield').map((item) => item.amount),
+    ).toEqual([170, 160, 150, 140, 130, 120, 110, 100, 90, 80, 70, 60, 50, 40, 30])
+    expect(PERMANENT_UPGRADES.filter((item) => item.kind === 'shield').at(-1).name).toBe(
+      '补盾 30 秒',
+    )
   })
 
   it('opens the chain one step at a time and never unlocks a step out of order', () => {
@@ -106,14 +140,17 @@ describe('permanent growth rules', () => {
       const levels = prefix(count)
       expect(permanentNextStep(levels)).toBe(PERMANENT_UPGRADES[count].id)
       expect(permanentIsUnlocked(levels, PERMANENT_UPGRADES[count].id)).toBe(true)
-      // 已买过的节点保持解锁，否则重买会被拒绝；后面的永远锁着。
+    }
+    // 买满之前：已买过的节点保持解锁，后面的永远锁着。
+    for (const count of [1, 100, PERMANENT_TOTAL_LEVELS - 1]) {
+      const levels = prefix(count)
       for (const owned of PERMANENT_UPGRADES.slice(0, count))
         expect(permanentIsUnlocked(levels, owned.id)).toBe(true)
       for (const later of PERMANENT_UPGRADES.slice(count + 1))
         expect(permanentIsUnlocked(levels, later.id)).toBe(false)
     }
-    expect(permanentNextStep(prefix(PERMANENT_TOTAL_LEVELS))).toBeNull()
-    expect(permanentIsUnlocked(prefix(PERMANENT_TOTAL_LEVELS), 'step-29')).toBe(true)
+    expect(permanentNextStep(full())).toBeNull()
+    expect(permanentIsUnlocked(full(), PERMANENT_UPGRADES.at(-1).id)).toBe(true)
   })
 
   it('adds every step as a flat amount, with no percentages anywhere', () => {
@@ -127,69 +164,72 @@ describe('permanent growth rules', () => {
       regen: 0,
       shieldSeconds: 0,
     })
-    // 前 5 个节点：生命 +10 ×2、伤害 +1、拾取 +8、移速 +2。
+    // 前 5 个节点是生命、经验、拾取、移速、伤害各一个。
     expect(permanentStats(prefix(5))).toEqual({
-      maxHp: 120,
+      maxHp: 101,
       damage: 1,
-      speed: 2,
-      attraction: 8,
-      xp: 0,
+      speed: 1,
+      attraction: 2,
+      xp: 1,
       armor: 0,
       regen: 0,
       shieldSeconds: 0,
     })
-    // 前 10 个再加生命 +10、经验 +2、减伤 1、伤害 +1、回血 +1。
-    expect(permanentStats(prefix(10))).toEqual({
-      maxHp: 130,
-      damage: 2,
+    // 前 12 个再加生命 ×2、护盾 170 秒、减伤 1、经验 +1、拾取 +2。
+    expect(permanentStats(prefix(12))).toEqual({
+      maxHp: 103,
+      damage: 1,
       speed: 2,
-      attraction: 8,
+      attraction: 4,
       xp: 2,
       armor: 1,
-      regen: 1,
-      shieldSeconds: 0,
+      regen: 0,
+      shieldSeconds: 170,
     })
-    // 护盾节点不累加：取链上最后一个已买的数值。
-    expect(permanentStats(prefix(16)).shieldSeconds).toBe(180)
-    expect(permanentStats(prefix(24)).shieldSeconds).toBe(150)
-    expect(permanentStats(prefix(29))).toEqual({
-      maxHp: 160,
-      damage: 5,
-      speed: 6,
-      attraction: 32,
-      xp: 6,
-      armor: 3,
-      regen: 2,
-      shieldSeconds: 120,
+    // 护盾节点不累加：取已购最后一个（间隔最小）的数值。
+    expect(permanentStats(prefix(throughKind('shield', 1))).shieldSeconds).toBe(170)
+    expect(permanentStats(prefix(throughKind('shield', 2))).shieldSeconds).toBe(160)
+    // 满链：生命 155、伤害 25、拾取 60、移速 27、经验 32、减伤 8、回血 8、补盾 30 秒。
+    expect(permanentStats(full())).toEqual({
+      maxHp: 155,
+      damage: 25,
+      speed: 27,
+      attraction: 60,
+      xp: 32,
+      armor: 8,
+      regen: 8,
+      shieldSeconds: 30,
     })
   })
 
-  it('migrates a legacy multi-level save into an unbroken prefix of the chain', () => {
-    // vitality 1/2 + power 1/3：12 → 6，15 → 5，共 11 个节点。
-    expect(legacyStepCount({ vitality: 12, power: 15 })).toBe(11)
-    const migrated = normalizePermanentLevels({ vitality: 12, power: 15 })
-    expect(permanentLevelCount(migrated)).toBe(11)
-    expect(migrated['step-11']).toBe(1)
-    expect(migrated['step-12']).toBe(0)
-    expect(permanentNextStep(migrated)).toBe('step-12')
-    // 全部旧项加起来超过链长时截断到 29。
+  it('clears a legacy multi-level save instead of converting it into chain steps', () => {
+    // 旧档不再折算：这些 key 在链上不存在，读回来全 0，强化清空。
+    const legacy = {
+      vitality: 12,
+      power: 15,
+      armor: 12,
+      regen: 5,
+      shield: 3,
+      wisdom: 9,
+      stride: 6,
+      magnet: 10,
+    }
+    const cleared = normalizePermanentLevels(legacy)
+    expect(Object.keys(cleared)).toHaveLength(PERMANENT_TOTAL_LEVELS)
+    expect(Object.values(cleared).every((level) => level === 0)).toBe(true)
+    expect(permanentLevelCount(cleared)).toBe(0)
+    // 清空后从头开始：下一个可买的仍然是第一个节点。
+    expect(permanentNextStep(cleared)).toBe('step-1')
+    expect(permanentIsUnlocked(cleared, 'step-1')).toBe(true)
+    expect(permanentIsUnlocked(cleared, 'step-2')).toBe(false)
+    expect(permanentStats(cleared)).toEqual(permanentStats())
+    // 只有部分旧项、或带负数的旧档同样不凭空产出节点。
     expect(
-      legacyStepCount({
-        vitality: 12,
-        power: 15,
-        armor: 12,
-        regen: 5,
-        shield: 3,
-        wisdom: 9,
-        stride: 6,
-        magnet: 10,
-      }),
-    ).toBe(PERMANENT_TOTAL_LEVELS)
-    expect(legacyStepCount({ vitality: 6, power: 9, shield: 1 })).toBe(7)
-    expect(legacyStepCount({ regen: 4 })).toBe(2)
-    // 负数只会被截断，不会凭空产出节点。
-    expect(legacyStepCount({ vitality: -1, regen: 2 })).toBe(0)
-    // 非旧格式（每项 0/1）原样保留，不做折算。
+      permanentLevelCount(normalizePermanentLevels({ vitality: 6, power: 9, shield: 1 })),
+    ).toBe(0)
+    expect(permanentLevelCount(normalizePermanentLevels({ regen: 4 }))).toBe(0)
+    expect(permanentLevelCount(normalizePermanentLevels({ vitality: -1, regen: 2 }))).toBe(0)
+    // 链上的 id 原样保留：正常存档（每项 0/1）不受影响。
     const kept = normalizePermanentLevels({ 'step-1': 1, 'step-9': 1 })
     expect(permanentLevelCount(kept)).toBe(2)
     expect(kept['step-9']).toBe(1)
@@ -197,13 +237,14 @@ describe('permanent growth rules', () => {
   })
 
   it('freezes starting attributes and makes one speed step effective', () => {
-    const levels = prefix(22) // 6 个生命节点 → 160
+    const levels = prefix(throughKind('speed', 4)) // 买到第 4 个移速节点
+    const stats = permanentStats(levels)
     const state = quiet(levels)
     expect(Object.isFrozen(state.permanent)).toBe(true)
-    expect(state.hp).toBe(160)
-    expect(state.maxHp).toBe(160)
-    // 移速是每秒距离单位：前 22 个节点里有 2 个（+2 各），共 +4。
-    expect(permanentStats(levels).speed).toBe(4)
+    expect(state.hp).toBe(stats.maxHp)
+    expect(state.maxHp).toBe(stats.maxHp)
+    // 移速是每秒距离单位：四个移速节点各 +1，共 +4。
+    expect(stats.speed).toBe(4)
     expect(farmMoveStep(state)).toBeCloseTo(MOVE_STEP + 4 / FPS)
     const point = clampPoint(state.position, [100, state.position[1]], farmMoveStep(state))
     expect(point[0] - state.position[0]).toBeCloseTo(MOVE_STEP + 4 / FPS)
@@ -245,13 +286,13 @@ describe('permanent growth rules', () => {
         return { dealt: 1000000 - state.crops[0].hp, hits }
       }
       const bare = play()
-      const grown = play(prefix(29))
+      const grown = play(full())
       expect(bare.dealt).toBeGreaterThan(0)
       expect(bare.hits).toBeGreaterThan(0)
       expect(grown.hits).toBe(bare.hits)
       // 固定数值加成：每次命中只加一次 stats.damage，不跟着暴击和局内倍率一起放大。
       // 每帧的伤害会四舍五入到两位小数，误差按命中次数放宽。
-      const bonus = permanentStats(prefix(29)).damage
+      const bonus = permanentStats(full()).damage
       expect(Math.abs(grown.dealt - bare.dealt - bonus * grown.hits)).toBeLessThan(
         0.01 * grown.hits + 0.01,
       )
@@ -266,35 +307,41 @@ describe('permanent growth rules', () => {
       return stepFarm(state, state.position).state
     }
     expect(attack({}).xp).toBeGreaterThan(0)
-    // 经验 +2 ×3：掉落生成时叠加固定值，与金币无关。
-    expect(attack(prefix(25)).xp).toBe(attack({}).xp + 6)
-    expect(attack(prefix(25)).coins).toBe(attack({}).coins)
+    // 经验 +1 ×3：掉落生成时叠加固定值，与金币无关。
+    expect(attack(prefix(throughKind('xp', 3))).xp).toBe(attack({}).xp + 3)
+    expect(attack(prefix(throughKind('xp', 3))).coins).toBe(attack({}).coins)
     const pull = (levels) => {
       const state = quiet(levels)
       state.loot = [{ id: 1, x: 68, y: 76, xp: 1, coins: 1 }]
       return stepFarm(state, state.position).state.loot[0].x
     }
-    expect(permanentStats(prefix(3)).attraction).toBe(8)
-    expect(pull({})).toBe(68) // 基础半径 15 够不着 15.12
-    expect(pull(prefix(3))).toBeLessThan(68)
+    // 拾取 +2 ×2 = 半径 19：基础半径 15 够不着 18，加上 4 才够得着。
+    expect(permanentStats(prefix(throughKind('attraction', 2))).attraction).toBe(4)
+    expect(pull({})).toBe(68)
+    expect(pull(prefix(throughKind('attraction', 2)))).toBeLessThan(68)
     // 减伤是每次受击固定扣减的点数，不是百分比。
-    expect(permanentStats(prefix(7)).armor).toBe(1)
-    expect(step(quiet(prefix(7)), true).hp).toBe(109)
+    const armored = prefix(throughKind('armor', 1))
+    expect(permanentStats(armored).armor).toBe(1)
+    expect(step(quiet(armored), true).hp).toBe(permanentStats(armored).maxHp - 11)
   })
 
   it('heals at twenty seconds after a hit, then every twelve seconds, and resets on another hit', () => {
-    let state = step(quiet(prefix(10)), true)
-    expect(state.hp).toBe(119)
-    while (state.tick < 320) state = step(state)
-    expect(state.hp).toBe(119)
+    // 买到第 1 个回血节点：每次回复 1 点，周期仍是十二秒。
+    const levels = prefix(throughKind('regen', 1))
+    const taken = 12 - permanentStats(levels).armor
+    const wounded = permanentStats(levels).maxHp - taken
+    let state = step(quiet(levels), true)
+    expect(state.hp).toBe(wounded)
+    while (state.tick < FPS * (RECOVERY.safeSeconds + RECOVERY.regenSeconds)) state = step(state)
+    expect(state.hp).toBe(wounded)
     state = step(state)
-    expect(state.hp).toBe(120)
-    for (let tick = 0; tick < 191; tick++) state = step(state)
-    expect(state.hp).toBe(120)
+    expect(state.hp).toBe(wounded + 1)
+    for (let tick = 0; tick < FPS * RECOVERY.regenSeconds - 1; tick++) state = step(state)
+    expect(state.hp).toBe(wounded + 1)
     state = step(state)
-    expect(state.hp).toBe(121)
+    expect(state.hp).toBe(wounded + 2)
     state = step(state, true)
-    expect(state.hp).toBe(110)
+    expect(state.hp).toBe(wounded + 2 - taken)
     expect(state.regenTicks).toBe(0)
   })
 
@@ -313,10 +360,11 @@ describe('permanent growth rules', () => {
   })
 
   it.each([
-    [16, 180],
-    [24, 150],
-    [29, 120],
-  ])('regenerates only one empty shield after %s chain steps', (count, seconds) => {
+    [1, 170],
+    [3, 150],
+    [15, 30],
+  ])('regenerates only one empty shield after %s shield steps', (nth, seconds) => {
+    const count = throughKind('shield', nth)
     expect(permanentStats(prefix(count)).shieldSeconds).toBe(seconds)
     let state = quiet(prefix(count))
     for (let tick = 0; tick < seconds * FPS - 1; tick++) state = step(state)
@@ -332,13 +380,14 @@ describe('permanent growth rules', () => {
   })
 
   it('restarts the whole empty-shield timer on damage and never banks progress through combat', () => {
-    let state = { ...quiet(prefix(29)), tick: 2000, shieldTicks: 1919 }
+    const ticks = FPS * permanentStats(full()).shieldSeconds
+    let state = { ...quiet(full()), tick: 2000, shieldTicks: ticks - 1 }
     state = step(state, true)
     expect(state.shieldTicks).toBe(0)
     expect(state.shields).toBe(0)
     state = step(state, true) // Ignored during invulnerability: recharge still advances.
     expect(state.shieldTicks).toBe(1)
-    for (let tick = 0; tick < 1918; tick++) state = step(state)
+    for (let tick = 0; tick < ticks - 2; tick++) state = step(state)
     expect(state.shields).toBe(0)
     state = step(state)
     expect(state.shields).toBe(1)
@@ -346,8 +395,8 @@ describe('permanent growth rules', () => {
 
   it('lets pickups cancel a ready automatic shield without generating a second layer', () => {
     const pickup = {
-      ...quiet(prefix(29)),
-      shieldTicks: 1919,
+      ...quiet(full()),
+      shieldTicks: FPS * permanentStats(full()).shieldSeconds - 1,
       loot: [{ id: 1, x: 50, y: 76, xp: 0, coins: 0, shield: 1 }],
     }
     const result = stepFarm(pickup, pickup.position).state
@@ -356,25 +405,33 @@ describe('permanent growth rules', () => {
   })
 
   it('never heals a lethal hit or accumulates recovery while full', () => {
-    const dead = step({ ...quiet(prefix(29)), hp: 5, regenTicks: 191, shieldTicks: 1919 }, true)
+    // 满链减伤 8：一次 12 点伤害还剩 4 点，3 点血照样被打空。
+    const lethal = { ...quiet(full()), hp: 3, regenTicks: FPS * RECOVERY.regenSeconds - 1 }
+    const dead = step(
+      { ...lethal, shieldTicks: FPS * permanentStats(full()).shieldSeconds - 1 },
+      true,
+    )
     expect(dead.hp).toBe(0)
     expect(dead.shields).toBe(0)
     expect(stepFarm(dead, dead.position)).toBeNull()
-    expect(step({ ...quiet(prefix(21)), regenTicks: 191 }).regenTicks).toBe(0)
+    expect(step({ ...quiet(full()), regenTicks: FPS * RECOVERY.regenSeconds - 1 }).regenTicks).toBe(
+      0,
+    )
   })
 
   it.each([1, 2])('keeps %s heal step small, flat and capped at maximum health', (count) => {
-    const levels = prefix(count === 1 ? 10 : 21)
+    const levels = prefix(throughKind('regen', count))
     expect(permanentStats(levels).regen).toBe(count)
-    const ready = { ...quiet(levels), hp: 50, regenTicks: 191 }
+    const ready = { ...quiet(levels), hp: 50, regenTicks: FPS * RECOVERY.regenSeconds - 1 }
     expect(step(ready).hp).toBe(50 + count)
     expect(step({ ...ready, hp: ready.maxHp - 0.25 }).hp).toBe(ready.maxHp)
     expect(RECOVERY.regenSeconds).toBe(12)
   })
 
   it('cannot sustain continuous contact damage even with every defensive step and three stored shields', () => {
-    let state = { ...quiet(prefix(29)), shields: 3 }
-    for (let tick = 0; tick < 24 * FPS && state.hp > 0; tick++) {
+    let state = { ...quiet(full()), shields: 3 }
+    // 满链把每次受击压到 4 点，但仍然顶不住：一分钟的贴身伤害足以打空 155 点血。
+    for (let tick = 0; tick < 60 * FPS && state.hp > 0; tick++) {
       state = step(state, tick % FPS === 0)
       expect(state.regenTicks).toBe(0)
       expect(state.shields).toBeLessThanOrEqual(3)

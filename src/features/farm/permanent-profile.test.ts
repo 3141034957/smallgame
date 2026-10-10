@@ -14,12 +14,14 @@ beforeEach(() => vi.stubGlobal('localStorage', testStorage()))
 afterEach(() => vi.unstubAllGlobals())
 
 it('sells the chain one step at a time, shares the existing wallet and preserves growth when switching characters', () => {
-  awardFarmCoins('first', 2000000)
+  // 全链 200 步共 40,200,000，外加换角色的 600。
+  const chainPrice = PERMANENT_UPGRADES.reduce((sum, item) => sum + item.price, 0)
+  awardFarmCoins('first', chainPrice + 600)
   // 链只能按顺序解锁：跳步购买被拒绝，且不扣币。
   const skipped = buyFarmUpgrade('step-3', 0)
   expect(skipped.paid).toBe(false)
   expect(skipped.error).toBe('前面的强化还没升级。')
-  expect(skipped.profile.coins).toBe(2000000)
+  expect(skipped.profile.coins).toBe(chainPrice + 600)
   for (const item of PERMANENT_UPGRADES) {
     const bought = buyFarmUpgrade(item.id, 0)
     expect(bought.paid).toBe(true)
@@ -27,7 +29,7 @@ it('sells the chain one step at a time, shares the existing wallet and preserves
   }
   expect(permanentLevelCount(loadFarmProfile().growth?.levels)).toBe(PERMANENT_TOTAL_LEVELS)
   // 全部买完后没有下一个节点，再买同样不成交。
-  expect(buyFarmUpgrade('step-29', 0).paid).toBe(false)
+  expect(buyFarmUpgrade(PERMANENT_UPGRADES.at(-1)!.id, 0).paid).toBe(false)
   const before = loadFarmProfile()
   const switched = selectFarmCharacter('cat-guitar').profile
   expect(switched.growth).toEqual(before.growth)
@@ -87,28 +89,49 @@ it('does not deduct coins or reset levels when storage fails', () => {
   expect(loadFarmProfile()).toEqual(before)
 })
 
-it('migrates a legacy multi-level save into a chain prefix and sanitizes damaged growth independently', () => {
+const emptyLevels = Object.fromEntries(PERMANENT_UPGRADES.map((item) => [item.id, 0]))
+
+it('clears a legacy multi-level save and never refunds coins it never charged', () => {
+  // 旧档不折算：链上没有这些 id，读回来是空链，账本也一起归零。
   localStorage.setItem(
     FARM_PROFILE_KEY,
     JSON.stringify({
       coins: 1234,
-      growth: { levels: { vitality: 6, power: 9, shield: 1 }, spent: -50 },
+      growth: { levels: { vitality: 12, power: 15, shield: 3 }, spent: -50 },
     }),
   )
   const profile = loadFarmProfile()
   expect(profile.coins).toBe(1234)
-  // vitality 6 → 3、power 9 → 3、shield 1 → 1：折算成链前 7 个节点。
-  expect(permanentLevelCount(profile.growth?.levels)).toBe(7)
-  expect(profile.growth!.levels['step-7']).toBe(1)
-  expect(profile.growth!.levels['step-8']).toBe(0)
-  // 账本损坏只归零，不凭空铸币。
-  expect(profile.growth?.spent).toBe(0)
-  expect(resetFarmUpgrades().profile.coins).toBe(1234)
-  // 折算后为 0 的旧档不产出任何节点。
-  localStorage.setItem(
-    FARM_PROFILE_KEY,
-    JSON.stringify({ coins: 42, growth: { levels: { vitality: -1, regen: 2 }, spent: -50 } }),
-  )
-  expect(permanentLevelCount(loadFarmProfile().growth?.levels)).toBe(0)
-  expect(loadFarmProfile().growth?.spent).toBe(0)
+  expect(profile.growth).toEqual({ levels: emptyLevels, spent: 0 })
+  expect(permanentLevelCount(profile.growth?.levels)).toBe(0)
+  // 没有已购节点：重置不成交，也就不会凭空返还金币。
+  const reset = resetFarmUpgrades()
+  expect(reset.paid).toBe(false)
+  expect(reset.profile.coins).toBe(1234)
+  expect(loadFarmProfile()).toMatchObject({
+    coins: 1234,
+    growth: { levels: emptyLevels, spent: 0 },
+  })
+})
+
+it('rebuilds a missing or damaged ledger from the steps actually owned', () => {
+  const [first, second] = PERMANENT_UPGRADES
+  const owned = { ...emptyLevels, [first.id]: 1, [second.id]: 1 }
+  const ledger = first.price + second.price
+  // 缺失、负数、小数、null 都按已购节点的价格重建：不照抄损坏值，也不凭空造币。
+  for (const spent of [undefined, -50, 1.5, null]) {
+    // 每轮都用干净存档：重置过的档案会写进账号存档，之后 raw key 不再生效。
+    localStorage.clear()
+    localStorage.setItem(
+      FARM_PROFILE_KEY,
+      JSON.stringify({ coins: 100, growth: { levels: owned, spent } }),
+    )
+    expect(loadFarmProfile().growth).toEqual({ levels: owned, spent: ledger })
+    // 返还的就是重建出来的账本：一次到位，之后再重置不再产出金币。
+    const reset = resetFarmUpgrades()
+    expect(reset.paid).toBe(true)
+    expect(reset.profile.growth).toEqual({ levels: emptyLevels, spent: 0 })
+    expect(reset.profile.coins).toBe(100 + ledger)
+    expect(resetFarmUpgrades().paid).toBe(false)
+  }
 })

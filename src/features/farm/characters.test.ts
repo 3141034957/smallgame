@@ -9,7 +9,7 @@ import {
   resetFarmUpgrades,
   selectFarmCharacter,
 } from './characters'
-import { permanentPrice } from './permanent.mjs'
+import { PERMANENT_UPGRADES, permanentPrice } from './permanent.mjs'
 
 let data: Map<string, string>
 beforeEach(() => {
@@ -113,21 +113,32 @@ describe('survivor character shop', () => {
     expect(loadFarmProfile()).toMatchObject({ coins: 42, selected: FARM_DEFAULT_CHARACTER })
   })
 
-  it('refunds the steps a save actually owns when the spend ledger is missing or short', () => {
-    // 旧档（某项 > 1 级）折算成链前 N 个节点：账本按已购节点重建，不是凭空返还。
+  it('refunds the steps a save actually owns when the spend ledger is missing or damaged', () => {
+    // 账本缺失时按已购节点的价格重建：不凭空返还，也不吞掉真实支出。
     accountStorage.setItem(
       FARM_PROFILE_KEY,
-      JSON.stringify({ coins: 100, growth: { levels: { regen: 2 } } }),
+      JSON.stringify({ coins: 100, growth: { levels: { 'step-1': 1 } } }),
     )
     expect(loadFarmProfile().growth!.levels['step-1']).toBe(1)
     expect(loadFarmProfile().growth?.spent).toBe(permanentPrice('step-1', 0))
-    const legacy = resetFarmUpgrades()
-    expect(legacy.error).toBeUndefined()
-    expect(legacy.profile.coins).toBe(100 + permanentPrice('step-1', 0)!)
-    expect(legacy.profile.growth).toEqual(
+    const refunded = resetFarmUpgrades()
+    expect(refunded.error).toBeUndefined()
+    expect(refunded.paid).toBe(true)
+    expect(refunded.profile.coins).toBe(100 + permanentPrice('step-1', 0)!)
+    expect(refunded.profile.growth).toEqual(
       expect.objectContaining({ spent: 0, levels: expect.objectContaining({ 'step-1': 0 }) }),
     )
-    // A damaged value is still sanitized to zero: it must not mint coins.
+    // 旧档（旧 key）读回来是空链：没有已购节点，重置不成交也不返币。
+    accountStorage.setItem(
+      FARM_PROFILE_KEY,
+      JSON.stringify({ coins: 100, growth: { levels: { regen: 2 }, spent: 9000 } }),
+    )
+    expect(loadFarmProfile().growth!.levels['step-1']).toBe(0)
+    expect(loadFarmProfile().growth?.spent).toBe(0)
+    const cleared = resetFarmUpgrades()
+    expect(cleared.paid).toBe(false)
+    expect(cleared.profile.coins).toBe(100)
+    // 损坏的账本（负数）按已购节点重建：不被照抄，也不凭空造币。
     accountStorage.setItem(
       FARM_PROFILE_KEY,
       JSON.stringify({
@@ -135,9 +146,11 @@ describe('survivor character shop', () => {
         growth: { levels: { 'step-1': 1, 'step-2': 1, 'step-3': 1 }, spent: -50 },
       }),
     )
-    expect(loadFarmProfile().growth?.spent).toBe(0)
+    const [one, two, three] = PERMANENT_UPGRADES
+    const rebuilt = one.price + two.price + three.price
+    expect(loadFarmProfile().growth?.spent).toBe(rebuilt)
     expect(loadFarmProfile().growth!.levels['step-3']).toBe(1)
-    expect(resetFarmUpgrades().profile.coins).toBe(7)
+    expect(resetFarmUpgrades().profile.coins).toBe(7 + rebuilt)
     expect(loadFarmProfile().growth!.levels['step-1']).toBe(0)
   })
 

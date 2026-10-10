@@ -9,6 +9,7 @@ import {
   PERMANENT_TOTAL_LEVELS,
 } from '@/features/farm/permanent.mjs'
 import './PermanentTree.css'
+import { Icon, type IconName } from './icons'
 
 const BRANCH_STYLE = Object.fromEntries(
   PERMANENT_BRANCHES.map((branch) => [branch.id, branch.name]),
@@ -90,9 +91,10 @@ export function PermanentTree({
               <span className="farm-growth-tier" aria-hidden="true">
                 {step}
               </span>
-              {/* The icon tile rides the rail: owned steps glow, locked ones stay shut. */}
+              {/* The icon tile rides the rail: open steps show their icon, locked
+                  ones stay shut. */}
               <span className="farm-growth-tile" aria-hidden="true">
-                {owned ? item.icon : open ? item.icon : '🔒'}
+                <Icon name={open ? (item.kind as IconName) : 'lock'} />
               </span>
               <article className="farm-growth-node" aria-label={`第 ${step} 步 ${item.name}`}>
                 <h4>{item.name}</h4>

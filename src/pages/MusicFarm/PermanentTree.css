@@ -163,7 +163,10 @@
 .farm-growth-step.is-locked .farm-growth-tile {
   background: #e8eade;
   color: #a9ad9c;
-  font-size: 17px;
+}
+.farm-growth-tile .farm-icon {
+  width: 26px;
+  height: 26px;
 }
 .farm-growth-step.is-locked .farm-growth-node {
   opacity: 0.6;

@@ -4,7 +4,6 @@
 export const RECOVERY = {
   safeSeconds: 8,
   regenSeconds: 12,
-  shieldSeconds: [180, 150, 120],
 }
 
 export const PERMANENT_BRANCHES = [
@@ -13,42 +12,61 @@ export const PERMANENT_BRANCHES = [
   { id: 'movement', name: '操作手感', icon: '✦' },
 ]
 
-// Every chain step adds one flat amount. `unit` is what the number means.
-export const PERMANENT_STEPS = [
-  { kind: 'vitality', branch: 'survival', icon: '♡', amount: 10, label: '生命 +10' },
-  { kind: 'damage', branch: 'power', icon: '♫', amount: 1, label: '伤害 +1' },
-  { kind: 'attraction', branch: 'movement', icon: '✦', amount: 8, label: '拾取 +8' },
-  { kind: 'speed', branch: 'movement', icon: '➜', amount: 2, label: '移速 +2' },
-  { kind: 'vitality', branch: 'survival', icon: '♡', amount: 10, label: '生命 +10' },
-  { kind: 'xp', branch: 'power', icon: '♬', amount: 2, label: '经验 +2' },
-  { kind: 'armor', branch: 'survival', icon: '◇', amount: 1, label: '减伤 1' },
-  { kind: 'damage', branch: 'power', icon: '♫', amount: 1, label: '伤害 +1' },
-  { kind: 'vitality', branch: 'survival', icon: '♡', amount: 10, label: '生命 +10' },
-  { kind: 'regen', branch: 'survival', icon: '✚', amount: 1, label: '回血 +1' },
-  { kind: 'attraction', branch: 'movement', icon: '✦', amount: 8, label: '拾取 +8' },
-  { kind: 'damage', branch: 'power', icon: '♫', amount: 1, label: '伤害 +1' },
-  { kind: 'vitality', branch: 'survival', icon: '♡', amount: 10, label: '生命 +10' },
-  { kind: 'speed', branch: 'movement', icon: '➜', amount: 2, label: '移速 +2' },
-  { kind: 'armor', branch: 'survival', icon: '◇', amount: 1, label: '减伤 1' },
-  { kind: 'shield', branch: 'survival', icon: '⬡', amount: 180, label: '补盾 180 秒' },
-  { kind: 'xp', branch: 'power', icon: '♬', amount: 2, label: '经验 +2' },
-  { kind: 'vitality', branch: 'survival', icon: '♡', amount: 10, label: '生命 +10' },
-  { kind: 'damage', branch: 'power', icon: '♫', amount: 1, label: '伤害 +1' },
-  { kind: 'attraction', branch: 'movement', icon: '✦', amount: 8, label: '拾取 +8' },
-  { kind: 'regen', branch: 'survival', icon: '✚', amount: 1, label: '回血 +1' },
-  { kind: 'vitality', branch: 'survival', icon: '♡', amount: 10, label: '生命 +10' },
-  { kind: 'armor', branch: 'survival', icon: '◇', amount: 1, label: '减伤 1' },
-  { kind: 'shield', branch: 'survival', icon: '⬡', amount: 150, label: '补盾 150 秒' },
-  { kind: 'xp', branch: 'power', icon: '♬', amount: 2, label: '经验 +2' },
-  { kind: 'attraction', branch: 'movement', icon: '✦', amount: 8, label: '拾取 +8' },
-  { kind: 'damage', branch: 'power', icon: '♫', amount: 1, label: '伤害 +1' },
-  { kind: 'speed', branch: 'movement', icon: '➜', amount: 2, label: '移速 +2' },
-  { kind: 'shield', branch: 'survival', icon: '⬡', amount: 120, label: '补盾 120 秒' },
+// The shield every run starts with recharges on its own once the chain bought
+// a shield step; each of those steps takes ten more seconds off the wait.
+export const SHIELD_BASE_SECONDS = 180
+const SHIELD_STEP_SECONDS = 10
+// One gold price per step: step N costs N × 2,000, so a 400k-point run (≈40k
+// coins) always covers another step, and the whole chain costs 40,200,000.
+const STEP_PRICE = 2000
+
+// Quotas per effect: every step adds one flat amount, `unit` is what the number
+// means. The chain interleaves the quotas instead of stacking them in blocks.
+export const PERMANENT_KINDS = [
+  { kind: 'vitality', branch: 'survival', icon: '♡', quota: 55, amount: 1, label: '生命 +1' },
+  { kind: 'damage', branch: 'power', icon: '♫', quota: 25, amount: 1, label: '伤害 +1' },
+  { kind: 'attraction', branch: 'movement', icon: '✦', quota: 30, amount: 2, label: '拾取 +2' },
+  { kind: 'speed', branch: 'movement', icon: '➜', quota: 27, amount: 1, label: '移速 +1' },
+  { kind: 'xp', branch: 'power', icon: '♬', quota: 32, amount: 1, label: '经验 +1' },
+  { kind: 'armor', branch: 'survival', icon: '◇', quota: 8, amount: 1, label: '减伤 1' },
+  { kind: 'regen', branch: 'survival', icon: '✚', quota: 8, amount: 1, label: '回血 +1' },
+  { kind: 'shield', branch: 'survival', icon: '⬡', quota: 15, amount: 0, label: '' },
 ]
 
-// Prices climb along the chain, so the deep steps stay a real goal.
-const stepPrice = (index) =>
-  50 * Math.round((1200 * (1 + 0.25 * index + 0.06 * index * index)) / 50)
+// Smooth weighted round-robin: every round each effect banks its quota, the
+// one with the biggest score goes next and then pays the whole pool back, so
+// effects stay spread out and the chain is reproducible without randomness.
+function interleave(kinds) {
+  const total = kinds.reduce((sum, item) => sum + item.quota, 0)
+  const pool = kinds.map((item) => ({ item, score: 0, left: item.quota }))
+  const order = []
+  while (order.length < total) {
+    let weight = 0
+    let best = null
+    for (const entry of pool) {
+      if (!entry.left) continue
+      weight += entry.item.quota
+      entry.score += entry.item.quota
+      if (!best || entry.score > best.score) best = entry
+    }
+    best.score -= weight
+    best.left -= 1
+    order.push(best.item)
+  }
+  return order
+}
+
+// The chain itself: one flat bonus per step, shield steps quoting the wait they
+// leave behind (170, 160 … 30 seconds).
+export const PERMANENT_STEPS = (() => {
+  let shields = 0
+  return interleave(PERMANENT_KINDS).map(({ kind, branch, icon, amount, label }) => {
+    if (kind !== 'shield') return { kind, branch, icon, amount, label }
+    shields += 1
+    const seconds = SHIELD_BASE_SECONDS - SHIELD_STEP_SECONDS * shields
+    return { kind, branch, icon, amount: seconds, label: `补盾 ${seconds} 秒` }
+  })
+})()
 
 export const PERMANENT_UPGRADES = PERMANENT_STEPS.map((step, index) => ({
   id: `step-${index + 1}`,
@@ -59,37 +77,15 @@ export const PERMANENT_UPGRADES = PERMANENT_STEPS.map((step, index) => ({
   amount: step.amount,
   order: index,
   max: 1,
-  price: stepPrice(index),
+  price: STEP_PRICE * (index + 1),
 }))
 export const PERMANENT_CHAIN = PERMANENT_UPGRADES
 export const PERMANENT_TOTAL_LEVELS = PERMANENT_UPGRADES.length
 const BY_ID = new Map(PERMANENT_UPGRADES.map((item) => [item.id, item]))
 
-// Old saves stored up to 15 levels per upgrade. Read them as "how many chain
-// steps this player earned" and grant that many steps from the head, so a
-// migrated profile is always a valid, unbroken prefix of the chain.
-const LEGACY_SCALE = {
-  vitality: 1 / 2,
-  power: 1 / 3,
-  armor: 1 / 2,
-  regen: 3 / 5,
-  shield: 1,
-  wisdom: 1 / 3,
-  stride: 1 / 3,
-  magnet: 1 / 2.5,
-}
-export function legacyStepCount(value) {
-  const earned = Object.entries(LEGACY_SCALE).reduce(
-    (sum, [id, scale]) => sum + Math.floor((Number(value?.[id]) || 0) * scale),
-    0,
-  )
-  return Math.min(PERMANENT_TOTAL_LEVELS, Math.max(0, earned))
-}
+// Saves from the old multi-level tree carry ids this chain never had, so they
+// read back as an empty chain: the growth is cleared, not converted.
 export function normalizePermanentLevels(value) {
-  if (value && Object.values(value).some((level) => (Number(level) || 0) > 1))
-    return Object.fromEntries(
-      PERMANENT_UPGRADES.map((item, index) => [item.id, index < legacyStepCount(value) ? 1 : 0]),
-    )
   return Object.fromEntries(PERMANENT_UPGRADES.map((item) => [item.id, value?.[item.id] ? 1 : 0]))
 }
 export function validPermanentLevels(value) {
@@ -123,28 +119,26 @@ export function permanentPrice(id, level) {
 }
 
 export function permanentStats(value) {
-  const levels = normalizePermanentLevels(value)
-  const bought = (kind) =>
-    PERMANENT_UPGRADES.reduce(
-      (sum, item) => (item.kind === kind && levels[item.id] ? sum + item.amount : sum),
-      0,
-    )
-  const shields = PERMANENT_UPGRADES.reduce(
-    (best, item) => (item.kind === 'shield' && levels[item.id] ? item.amount : best),
-    0,
-  )
-  return {
-    maxHp: 100 + bought('vitality'),
-    damage: bought('damage'),
+  const stats = {
+    maxHp: 100,
+    damage: 0,
     // Units per second added on top of the base walking speed.
-    speed: bought('speed'),
-    attraction: bought('attraction'),
-    xp: bought('xp'),
+    speed: 0,
+    attraction: 0,
+    xp: 0,
     // Life shaved off every hit, flat.
-    armor: bought('armor'),
-    regen: bought('regen'),
-    shieldSeconds: shields,
+    armor: 0,
+    regen: 0,
+    shieldSeconds: 0,
   }
+  // One pass over the chain: every owned step adds its flat amount.
+  for (const item of PERMANENT_UPGRADES) {
+    if (!value?.[item.id]) continue
+    if (item.kind === 'shield') stats.shieldSeconds = item.amount
+    else if (item.kind === 'vitality') stats.maxHp += item.amount
+    else stats[item.kind] += item.amount
+  }
+  return stats
 }
 
 export function permanentEffect(id, level) {
