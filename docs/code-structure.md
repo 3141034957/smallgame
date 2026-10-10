@@ -12,7 +12,7 @@
 - `src/features/farm/permanent.mjs`：局外永久成长的数据与纯函数。成长是一条全局链而非多项多级树：`PERMANENT_CHAIN`（`PERMANENT_UPGRADES` 的别名）是 29 个 `max: 1` 的节点，`permanentNextStep` / `permanentIsUnlocked` 实现严格顺序解锁，`RECOVERY` 保存安全期与回血周期，`normalizePermanentLevels` 只认链上的 29 个 id（旧的多级存档键读回来为全 0，即强化数据直接清空，不做折算），`permanentStats` 汇总成战斗用的固定数值（`maxHp` / `damage` / `speed` / `attraction` / `xp` / `armor` / `regen` / `shieldSeconds`）。加成全为固定数值，链上没有百分比；`rules.mjs` 负责把它们接到伤害、受击、拾取、经验与步长上。
 - `src/features/farm/schools.mjs`：流派（乐器 + 专属芯片 + 进化形态）与跨流派组合技的数据层，只描述数据与纯函数判定；增益由 `rules.mjs` 在 `stepFarm` 里乘到既有数值上，并通过 `rules.mjs` 一并导出给界面，保证客户端与服务端回放共用同一份结果。
 - `src/features/farm/audio.ts`、`calendar.mjs`、`leaderboard.ts`：当前游戏的合成音频、北京时间及每日种子、排行榜请求，不依赖已删除的游戏模块。
-- `src/features/auth/`、`server/auth.mjs`、`server/auth-store.mjs`：可选注册、密码登录与单账号单会话；`cloud.ts` 串行同步账号成长，`server/progress.mjs` 校验版本并保存到 SQLite；Cookie 只存会话令牌。
+- `src/features/auth/`、`server/auth.mjs`、`server/auth-store.mjs`：可选的免密登录（昵称即身份，无密码）与单账号单会话；`enter()` 兼管「新昵称创建 + 继承游客进度」和「已有昵称返回云端存档」，`validation.mjs` 只导出 `ACCOUNT_HINT` 与 `normalizeAccount`；`cloud.ts` 串行同步账号成长，`server/progress.mjs` 校验版本并保存到 SQLite；Cookie 只存会话令牌。
 - `src/utils/accountStorage.ts`：游客与账号成长存档分别保存；新账号继承游客快照，账号存档携带云端版本和待同步标记。`playerIdentity.ts` 提供游客身份、账号身份和当前作用域昵称。
 - `src/utils/localScores.ts`：最佳成绩的存档校验与容错。`src/features/farm/characters.ts` 一次保存金币、所有权、选择及奖励记录；旧角色存档只用于读取迁移。
 - `server/index.mjs`、`farm.mjs`：仅提供怪潮乐队 API，成绩由共享规则回放校验。`farm-store.mjs` 保留历史表名和旧列迁移，已有怪潮乐队排名继续可用，旧玩法记录隔离。`identity.mjs` 校验身份及角色 ID。
