@@ -9,7 +9,8 @@ import {
   PERMANENT_TOTAL_LEVELS,
 } from '@/features/farm/permanent.mjs'
 import './PermanentTree.css'
-import { Icon, type IconName } from './icons'
+import { Icon } from './icons'
+import type { IconName } from './iconSources'
 
 const BRANCH_STYLE = Object.fromEntries(
   PERMANENT_BRANCHES.map((branch) => [branch.id, branch.name]),

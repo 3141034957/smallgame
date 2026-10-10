@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
-import { Icon, talentIcon } from './icons'
+import { Icon } from './icons'
+import { talentIcon } from './iconSources'
 import {
   evolved,
   MAX_EQUIPPED,
