@@ -134,9 +134,9 @@ export function createAuthHandler(store, { secure = null } = {}) {
         } catch {
           throw new AuthError(400, '账号请求格式错误。')
         }
-        const result = url.pathname.endsWith('/register')
-          ? await store.register(input?.account, input?.password, input?.progress)
-          : await store.login(input?.account, input?.password)
+        // Both routes mean the same thing now: claim the nickname, adopting the
+        // guest progress only when the nickname is new.
+        const result = await store.enter(input?.account, input?.progress ?? {})
         res.setHeader('Set-Cookie', cookie(result.token, SESSION_TTL / 1000, isSecure(req)))
         sendJson(res, 200, { user: result.user })
       } catch (error) {

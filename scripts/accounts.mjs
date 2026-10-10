@@ -1,18 +1,17 @@
 // Account tools for the running game database.
 //   node scripts/accounts.mjs list
-//   node scripts/accounts.mjs reset <账号> <新密码>
-// Passwords are stored as salted scrypt hashes, so they can be replaced but
-// never read back: there is no way to recover the password a player chose.
+//   node scripts/accounts.mjs sessions <昵称>
+// Accounts are nickname-only: there is no password to reset, so a stolen
+// nickname can only be handled by renaming or removing the account.
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
-import { hashPassword } from '../server/auth-store.mjs'
-import { normalizeAccount, validPassword, PASSWORD_HINT } from '../src/features/auth/validation.mjs'
+import { normalizeAccount } from '../src/features/auth/validation.mjs'
 
 const projectDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
 const dataDirectory = process.env.DATA_DIR || join(projectDirectory, 'server', 'data')
 const databasePath = join(dataDirectory, 'game.db')
-const [command, username, password] = process.argv.slice(2)
+const [command, username] = process.argv.slice(2)
 
 const db = new DatabaseSync(databasePath)
 try {
@@ -34,26 +33,24 @@ try {
         在线会话: row.sessions,
       })),
     )
-    console.log(`共 ${rows.length} 个账号。密码以加盐哈希保存，无法查看，只能重置。`)
-  } else if (command === 'reset') {
+    console.log(`共 ${rows.length} 个账号。账号只认昵称，没有密码。`)
+  } else if (command === 'sessions') {
     const account = normalizeAccount(username)
-    if (!account) throw new Error('请给出要重置的账号名。')
-    if (!validPassword(password)) throw new Error(`新密码不符合规则：${PASSWORD_HINT}`)
+    if (!account) throw new Error('请给出昵称。')
     const row = db.prepare('SELECT id, username FROM accounts WHERE username=?').get(account)
     if (!row) throw new Error(`账号不存在：${account}`)
-    db.prepare('UPDATE accounts SET password_hash=? WHERE id=?').run(
-      await hashPassword(password),
-      row.id,
-    )
-    // An old session should not keep working after a password change.
-    db.prepare('DELETE FROM account_sessions WHERE account_id=?').run(row.id)
-    console.log(`已重置 ${row.username} 的密码，并让其此前的登录失效。`)
+    // Without a password, dropping the sessions is the only way to kick someone
+    // out of a nickname they are not supposed to be using.
+    const dropped = db
+      .prepare('DELETE FROM account_sessions WHERE account_id=?')
+      .run(row.id).changes
+    console.log(`已让 ${row.username} 的 ${dropped} 个登录失效，进度仍在库中。`)
   } else {
     console.log(`用法：
   node scripts/accounts.mjs list
-  node scripts/accounts.mjs reset <账号> <新密码>
+  node scripts/accounts.mjs sessions <昵称>
 
-密码为加盐哈希，无法查看，只能重置。可用 DATA_DIR 指定数据库目录。`)
+账号只认昵称、没有密码；sessions 只让现有登录失效，不删进度。可用 DATA_DIR 指定数据库目录。`)
   }
 } finally {
   db.close()

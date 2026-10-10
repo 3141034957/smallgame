@@ -1,41 +1,18 @@
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { randomBytes, randomUUID, createHash, scrypt, timingSafeEqual } from 'node:crypto'
-import { promisify } from 'node:util'
-import {
-  normalizeAccount,
-  validPassword,
-  ACCOUNT_HINT,
-  PASSWORD_HINT,
-} from '../src/features/auth/validation.mjs'
+import { randomBytes, randomUUID, createHash } from 'node:crypto'
+import { normalizeAccount, ACCOUNT_HINT } from '../src/features/auth/validation.mjs'
 import { validProgress } from '../src/features/auth/progress.mjs'
 
 export const SESSION_TTL = 7 * 24 * 60 * 60 * 1000
 export const ATTEMPT_WINDOW = 15 * 60 * 1000
-const derive = promisify(scrypt)
-const HASH_OPTIONS = { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 }
 const digest = (token) => createHash('sha256').update(token).digest('hex')
 export class AuthError extends Error {
   constructor(status, message) {
     super(message)
     this.status = status
   }
-}
-
-export async function hashPassword(password) {
-  const salt = randomBytes(16)
-  const hash = await derive(password, salt, 32, HASH_OPTIONS)
-  return `scrypt$32768$8$3$${salt.toString('base64url')}$${hash.toString('base64url')}`
-}
-async function verifyPassword(password, stored) {
-  const parts = stored?.split('$')
-  const valid = parts?.length === 6 && parts.slice(0, 4).join('$') === 'scrypt$32768$8$3'
-  // Unknown users pay the same derivation cost as known users.
-  const salt = valid ? Buffer.from(parts[4], 'base64url') : Buffer.alloc(16)
-  const expected = valid ? Buffer.from(parts[5], 'base64url') : Buffer.alloc(32)
-  const actual = await derive(password, salt, 32, HASH_OPTIONS)
-  return expected.length === actual.length && timingSafeEqual(actual, expected) && valid
 }
 
 export function createAuthStore(path, { now = Date.now } = {}) {
@@ -87,21 +64,27 @@ export function createAuthStore(path, { now = Date.now } = {}) {
       if (db.prepare('SELECT count FROM auth_attempts WHERE key=?').get(key).count > limit)
         throw new AuthError(429, '尝试次数过多，请 15 分钟后重试。')
     },
-    async register(account, password, progress = {}) {
+    // A nickname is the whole identity: entering one loads that band, and a
+    // nickname nobody has claimed yet is created with the guest progress sent
+    // along. There is no password, so nothing here can verify one.
+    enter(account, progress = {}) {
       const username = normalizeAccount(account)
       if (!username) throw new AuthError(400, ACCOUNT_HINT)
-      if (!validPassword(password)) throw new AuthError(400, PASSWORD_HINT)
       if (!validProgress(progress))
         throw new AuthError(400, '进度格式错误或内容过大，原存档仍保留在本机。')
-      const progressJSON = JSON.stringify(progress)
-      if (db.prepare('SELECT id FROM accounts WHERE username=?').get(username))
-        throw new AuthError(409, '这个账号已被注册，请换一个账号或直接登录。')
-      return expensive(async () => {
-        const hash = await hashPassword(password)
+      this.consumeAttempt(`account:${username}`, 30)
+      // The cap stays even without a slow hash: it is the only backstop when a
+      // client hammers the endpoint with fresh nicknames.
+      return expensive(() => {
+        const existing = db
+          .prepare('SELECT id, username FROM accounts WHERE username=?')
+          .get(username)
+        if (existing) return createSession({ id: existing.id, username: existing.username })
+        const progressJSON = JSON.stringify(progress)
         const user = { id: `account_${randomUUID()}`, username }
         db.exec('BEGIN IMMEDIATE')
         try {
-          db.prepare('INSERT INTO accounts VALUES(?,?,?,?)').run(user.id, username, hash, now())
+          db.prepare('INSERT INTO accounts VALUES(?,?,?,?)').run(user.id, username, '', now())
           db.prepare('INSERT INTO account_progress VALUES(?,?,1,?)').run(
             user.id,
             progressJSON,
@@ -112,8 +95,10 @@ export function createAuthStore(path, { now = Date.now } = {}) {
           return session
         } catch (error) {
           db.exec('ROLLBACK')
-          if (db.prepare('SELECT id FROM accounts WHERE username=?').get(username))
-            throw new AuthError(409, '这个账号已被注册，请换一个账号或直接登录。')
+          const taken = db
+            .prepare('SELECT id, username FROM accounts WHERE username=?')
+            .get(username)
+          if (taken) return createSession({ id: taken.id, username: taken.username })
           throw error
         }
       })
@@ -151,17 +136,11 @@ export function createAuthStore(path, { now = Date.now } = {}) {
         throw new AuthError(409, '云端进度已更新，本机进度已保留，请重新载入云端进度。')
       return { data, revision: revision + 1 }
     },
-    async login(account, password) {
-      const username = normalizeAccount(account)
-      if (!username || !validPassword(password)) throw new AuthError(401, '账号或密码错误。')
-      this.consumeAttempt(`account:${username}`, 10)
-      return expensive(async () => {
-        const row = db.prepare('SELECT * FROM accounts WHERE username=?').get(username)
-        if (!(await verifyPassword(password, row?.password_hash)))
-          throw new AuthError(401, '账号或密码错误。')
-        db.prepare('DELETE FROM auth_attempts WHERE key=?').run(`account:${username}`)
-        return createSession({ id: row.id, username: row.username })
-      })
+    login(account, progress = {}) {
+      return this.enter(account, progress)
+    },
+    register(account, progress = {}) {
+      return this.enter(account, progress)
     },
     user(token) {
       if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null

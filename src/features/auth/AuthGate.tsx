@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, type FormEvent } from 'react'
 import { flushSync } from 'react-dom'
-import {
-  activateAccount,
-  ACCOUNT_SAVE_EVENT,
-  exportGuestProgress,
-  installAccountSave,
-  resetGuestProgress,
-} from '@/utils/accountStorage'
+import { activateAccount, ACCOUNT_SAVE_EVENT, exportGuestProgress } from '@/utils/accountStorage'
 import { BAND_CHARACTERS } from '@/features/farm/characterRoster.mjs'
-import { ACCOUNT_HINT, PASSWORD_HINT, normalizeAccount, validPassword } from './validation.mjs'
+import { ACCOUNT_HINT, normalizeAccount } from './validation.mjs'
 import { AccountContext, AUTH_FORM_EVENT } from './context'
 import { createProgressSync, loadAccountProgress, type SyncStatus } from './cloud'
 import {
@@ -31,11 +25,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [gameKey, setGameKey] = useState('guest')
   const [checking, setChecking] = useState(true)
   const [formOpen, setFormOpen] = useState(false)
-  const [mode, setMode] = useState<'login' | 'register'>('login')
   const [account, setAccount] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmation, setConfirmation] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -162,20 +152,15 @@ export function AuthGate({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', hiding)
     }
   }, [userId, gameKey])
-  const openAccount = useCallback((next: 'login' | 'register') => {
+  const openAccount = useCallback((_next?: 'login' | 'register') => {
     previousFocus.current = document.activeElement as HTMLElement
     window.dispatchEvent(new Event(AUTH_FORM_EVENT))
-    setMode(next)
     setError('')
-    setPassword('')
-    setConfirmation('')
     setFormOpen(true)
   }, [])
   const closeForm = () => {
     if (mutating.current) return
     setFormOpen(false)
-    setPassword('')
-    setConfirmation('')
   }
   useEffect(() => {
     if (formOpen) dialog.current?.querySelector<HTMLInputElement>('input')?.focus()
@@ -185,15 +170,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     event.preventDefault()
     if (mutating.current) return
     if (!normalizeAccount(account)) {
-      setError('账号格式不对')
-      return
-    }
-    if (!validPassword(password)) {
-      setError('密码至少 8 位')
-      return
-    }
-    if (mode === 'register' && confirmation !== password) {
-      setError('两次密码不一致')
+      setError('昵称格式不对')
       return
     }
     mutating.current = true
@@ -204,29 +181,16 @@ export function AuthGate({ children }: { children: ReactNode }) {
     const controller = new AbortController()
     pending.current = controller
     try {
-      const progress = mode === 'register' ? exportGuestProgress() : undefined
-      const next = await accountRequest(
-        mode,
-        { account, password, ...(progress ? { progress } : {}) },
-        controller.signal,
-      )
+      // The nickname is the identity: the server adopts this guest progress
+      // when the name is new and returns the existing save when it is taken.
+      const progress = exportGuestProgress()
+      const next = await accountRequest('login', { account, progress }, controller.signal)
       if (!mounted.current || controller.signal.aborted || !next) return
-      if (progress) {
-        installAccountSave(next.id, { data: progress, revision: 1, dirty: false })
-        try {
-          resetGuestProgress(progress)
-        } catch {
-          setNotice('已保存，备份未更新')
-        }
-      } else {
-        await loadAccountProgress(next.id, controller.signal)
-        if (!mounted.current || controller.signal.aborted) return
-      }
-      setPassword('')
-      setConfirmation('')
+      await loadAccountProgress(next.id, controller.signal)
+      if (!mounted.current || controller.signal.aborted) return
       setFormOpen(false)
-      accept(next, mode === 'register')
-      setNotice(mode === 'register' ? '注册成功，进度已存' : '已恢复账号进度')
+      accept(next)
+      setNotice('已进入，进度已同步')
       announceAccountChange()
     } catch (cause) {
       if (mounted.current && !controller.signal.aborted)
@@ -332,9 +296,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
               </>
             ) : (
               <>
-                <button onClick={() => openAccount('login')}>登录</button>
-                <button aria-label="注册账号保存进度" onClick={() => openAccount('register')}>
-                  注册
+                <button aria-label="输入昵称登录并同步进度" onClick={() => openAccount()}>
+                  登录
                 </button>
               </>
             )}
@@ -400,28 +363,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
                 <img key={character.id} src={character.image} alt="" />
               ))}
             </div>
-            <h2>{mode === 'register' ? '保存你的乐队进度' : '欢迎回到乐队'}</h2>
-            <div className="account-tabs" aria-label="账号操作">
-              {(['login', 'register'] as const).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  disabled={busy}
-                  aria-pressed={mode === item}
-                  onClick={() => {
-                    setMode(item)
-                    setPassword('')
-                    setConfirmation('')
-                    setShowPassword(false)
-                    setError('')
-                  }}
-                >
-                  {item === 'login' ? '登录' : '注册账号'}
-                </button>
-              ))}
-            </div>
+            <h2>输入昵称，进入乐队</h2>
             <form onSubmit={(event) => void submit(event)}>
-              <label htmlFor="account-name">账号</label>
+              <label htmlFor="account-name">昵称</label>
               <input
                 id="account-name"
                 autoComplete="username"
@@ -435,49 +379,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
                 aria-describedby="account-hint"
               />
               <p id="account-hint" className="account-hint">
-                {ACCOUNT_HINT}
+                {ACCOUNT_HINT} · 不设密码，换设备输入同一昵称即可继续
               </p>
-              <label htmlFor="account-password">密码</label>
-              <div className="account-password">
-                <input
-                  id="account-password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                  minLength={8}
-                  maxLength={128}
-                  value={password}
-                  disabled={busy}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                  aria-describedby="password-hint"
-                />
-                <button
-                  type="button"
-                  disabled={busy}
-                  aria-label={showPassword ? '隐藏密码' : '显示密码'}
-                  onClick={() => setShowPassword((value) => !value)}
-                >
-                  {showPassword ? '隐藏' : '显示'}
-                </button>
-              </div>
-              <p id="password-hint" className="account-hint">
-                {PASSWORD_HINT}
-              </p>
-              {mode === 'register' && (
-                <>
-                  <label htmlFor="account-confirmation">确认密码</label>
-                  <input
-                    id="account-confirmation"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="new-password"
-                    maxLength={128}
-                    value={confirmation}
-                    disabled={busy}
-                    onChange={(event) => setConfirmation(event.target.value)}
-                    required
-                  />
-                </>
-              )}
               {notice && (
                 <p role="status" className="account-notice">
                   {notice}
@@ -492,11 +395,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
                 className="account-primary"
                 type="submit"
                 disabled={busy}
-                aria-label={
-                  busy ? undefined : mode === 'login' ? '登录并进入乐队' : '注册并保存进度'
-                }
+                aria-label={busy ? undefined : '用这个昵称进入乐队并同步进度'}
               >
-                {busy ? '正在连接…' : mode === 'login' ? '登录' : '注册'}
+                {busy ? '正在连接…' : '进入乐队'}
               </button>
             </form>
             {checking && <p className="account-hint">检查登录中…</p>}

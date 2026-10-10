@@ -16,7 +16,8 @@ const data = {
 }
 beforeEach(async () => {
   store = createAuthStore(':memory:')
-  registered = await store.register('guest_band', 'Aa1!test', data)
+  // A nickname is the identity: entering one adopts this guest progress.
+  registered = await store.enter('guest_band', data)
   auth = createAuthHandler(store)
 })
 afterEach(() => store.close())
@@ -47,13 +48,13 @@ async function request(method, body, headers = {}, authenticate) {
   await handleProgressRequest(req, res, store, authenticate ?? (() => auth.authenticate(req)))
   return result
 }
-it('saves guest progress during registration and restores it using the authenticated account only', async () => {
+it('saves the guest progress under a new nickname and restores it using the authenticated account only', async () => {
   const saved = await request('GET')
   expect(saved.body).toEqual({ data, revision: 1 })
   expect(saved.headers['Cache-Control']).toBe('no-store')
   expect((await request('GET', undefined, { cookie: '' })).status).toBe(401)
   expect((await request('GET', undefined, { 'x-echo-user': 'different_account' })).status).toBe(401)
-  const another = await store.register('another_band', 'Aa1!test')
+  const another = await store.enter('another_band')
   expect(store.progress(another.user.id).data).toEqual({})
   const next = { ...data, 'farm-career-v1': '{"runs":3}' }
   expect(
@@ -92,7 +93,7 @@ it('rejects revoked sessions, including revocation while the body was uploading'
       )
     ).status,
   ).toBe(401)
-  const next = await store.login('guest_band', 'Aa1!test')
+  const next = await store.enter('guest_band')
   expect((await request('POST', { data, revision: 1 })).status).toBe(401)
   expect(store.user(next.token)).toEqual(registered.user)
   expect(store.progress(registered.user.id)).toEqual({ data, revision: 1 })
@@ -117,20 +118,30 @@ it('rejects cross-site requests, unapproved save keys and oversized payloads wit
   expect((await request('POST', 'x'.repeat(PROGRESS_LIMIT + 1025))).status).toBe(413)
   expect(store.progress(registered.user.id)).toEqual({ data, revision: 1 })
 })
-it('keeps account progress across database reopen and leaves invalid registration atomic', async () => {
+// A malformed payload is refused before any async work, so it throws in place.
+function rejection(run) {
+  try {
+    run()
+    return null
+  } catch (error) {
+    return error
+  }
+}
+it('keeps account progress across database reopen and leaves an invalid claim atomic', async () => {
   const root = mkdtempSync(join(tmpdir(), 'echo-progress-'))
   let persistent = createAuthStore(join(root, 'game.db'))
   try {
-    const account = await persistent.register('persistent_band', 'Aa1!test', data)
+    const account = await persistent.enter('persistent_band', data)
     persistent.close()
     persistent = createAuthStore(join(root, 'game.db'))
     expect(persistent.progress(account.user.id)).toEqual({ data, revision: 1 })
-    await expect(
-      persistent.register('invalid_band', 'Aa1!test', { password: 'no' }),
-    ).rejects.toMatchObject({ status: 400 })
-    expect((await persistent.register('invalid_band', 'Aa1!test', data)).user.username).toBe(
-      'invalid_band',
-    )
+    // A rejected enter leaves nothing behind: the nickname stays claimable.
+    expect(
+      rejection(() => persistent.enter('invalid_band', { 'farm-career-v1': 2 })),
+    ).toMatchObject({ status: 400 })
+    const claimed = await persistent.enter('invalid_band', data)
+    expect(claimed.user.username).toBe('invalid_band')
+    expect(persistent.progress(claimed.user.id)).toEqual({ data, revision: 1 })
   } finally {
     persistent.close()
     rmSync(root, { recursive: true, force: true })

@@ -2,6 +2,7 @@ import { Readable } from 'node:stream'
 import { beforeEach, afterEach, it, expect } from 'vitest'
 import { createAuthStore } from './auth-store.mjs'
 import { createAuthHandler, sessionToken, AUTH_BODY_LIMIT } from './auth.mjs'
+import { ACCOUNT_HINT } from '../src/features/auth/validation.mjs'
 let store, handler
 beforeEach(() => {
   store = createAuthStore(':memory:')
@@ -31,9 +32,11 @@ async function request(path, { method = 'POST', body = '{}', headers = {}, socke
   await handler.handle(req, res, new URL(path, 'http://127.0.0.1'))
   return result
 }
+const enter = (path, account, progress = {}, headers) =>
+  request(path, { body: JSON.stringify({ account, progress }), ...(headers && { headers }) })
 it('sets bounded HttpOnly secure cookies and never returns hashes or session tokens in JSON', async () => {
-  const result = await request('/api/auth/register', {
-    body: JSON.stringify({ account: 'cookie_player', password: 'Aa1!<> &+/%' }),
+  const result = await enter('/api/auth/register', 'cookie_player', {
+    'farm-career-v1': '{"runs":1}',
   })
   expect(result.status).toBe(200)
   expect(result.headers['Set-Cookie']).toMatch(
@@ -48,27 +51,56 @@ it.each([
   { 'content-type': 'text/plain' },
   { 'sec-fetch-site': 'cross-site' },
 ])('rejects cross-site and simple writes %j', async (headers) => {
-  expect((await request('/api/auth/register', { headers })).status).toBe(403)
+  expect((await enter('/api/auth/register', 'csrf_player', {}, headers)).status).toBe(403)
 })
-it('rejects malformed and oversized inputs before hashing, and rejects duplicate cookies', async () => {
+it('rejects malformed and oversized inputs and rejects duplicate cookies', async () => {
   expect((await request('/api/auth/login', { body: '{' })).status).toBe(400)
-  expect(
-    (
-      await request('/api/auth/register', {
-        body: JSON.stringify({ account: 'user', password: 'Ab1!' }),
-      })
-    ).status,
-  ).toBe(400)
+  expect((await enter('/api/auth/register', 'ab')).status).toBe(400)
   expect((await request('/api/auth/login', { body: 'x'.repeat(AUTH_BODY_LIMIT + 1) })).status).toBe(
     413,
   )
   expect(sessionToken({ headers: { cookie: 'echo_session=one; echo_session=two' } })).toBeNull()
 })
+it.each(['ab', 'bad name', '用户名', 'x'.repeat(33)])(
+  'rejects the malformed nickname %j with the hint on both routes',
+  async (account) => {
+    for (const path of ['/api/auth/register', '/api/auth/login']) {
+      const result = await enter(path, account)
+      expect(result.status).toBe(400)
+      expect(result.data.error).toContain(ACCOUNT_HINT)
+    }
+  },
+)
+it('claims the nickname on both routes and keeps the save of the first visit', async () => {
+  const created = await enter('/api/auth/register', 'nick_player', {
+    'farm-career-v1': '{"runs":2}',
+  })
+  expect(created.status).toBe(200)
+  expect(created.data.user.username).toBe('nick_player')
+  // Login means the same thing now: it returns the existing band instead of
+  // overwriting it with the progress this device brought along.
+  const again = await enter('/api/auth/login', 'NICK_PLAYER', {
+    'farm-career-v1': '{"runs":99}',
+  })
+  expect(again.status).toBe(200)
+  expect(again.data.user).toEqual(created.data.user)
+  expect(store.progress(created.data.user.id)).toEqual({
+    data: { 'farm-career-v1': '{"runs":2}' },
+    revision: 1,
+  })
+})
+it('ignores a password field left over from older clients', async () => {
+  const result = await request('/api/auth/register', {
+    body: JSON.stringify({ account: 'legacy_client', password: 'Aa1!<> &+/%', progress: {} }),
+  })
+  expect(result.status).toBe(200)
+  expect(result.data.user.username).toBe('legacy_client')
+})
 it('checks the write origin: same origin and headerless clients pass, foreign origins do not', async () => {
   const host = 'game.example:3001'
   const register = (account, headers) =>
     request('/api/auth/register', {
-      body: JSON.stringify({ account, password: 'Aa1!<> &+/%' }),
+      body: JSON.stringify({ account, progress: {} }),
       headers,
     })
   expect((await register('origin_player', { host, origin: `http://${host}` })).status).toBe(200)
@@ -85,7 +117,7 @@ it('adds Secure from the actual request protocol, not a plain-HTTP default', asy
   handler = createAuthHandler(store)
   const register = (account, options) =>
     request('/api/auth/register', {
-      body: JSON.stringify({ account, password: 'Aa1!<> &+/%' }),
+      body: JSON.stringify({ account, progress: {} }),
       ...options,
     })
   const plain = await register('plain_player', { headers: { host: 'game.example:3001' } })
@@ -99,8 +131,8 @@ it('adds Secure from the actual request protocol, not a plain-HTTP default', asy
   expect(encrypted.headers['Set-Cookie']).toContain('Secure')
 })
 it('blocks old account logout after the browser switched accounts', async () => {
-  const old = await store.register('old_account', 'Aa1!<> &+/%')
-  const next = await store.register('new_account', 'Aa1!<> &+/%')
+  const old = await store.enter('old_account')
+  const next = await store.enter('new_account')
   const result = await request('/api/auth/logout', {
     headers: { cookie: `echo_session=${next.token}`, 'x-echo-user': old.user.id },
   })
@@ -108,7 +140,7 @@ it('blocks old account logout after the browser switched accounts', async () => 
   expect(result.headers['Set-Cookie']).toBeUndefined()
   expect(store.user(next.token)).toEqual(next.user)
 })
-it('limits registration attempts persistently without trusting forwarded IPs', async () => {
+it('limits entering attempts persistently without trusting forwarded IPs', async () => {
   for (let index = 0; index < 60; index++)
     expect(
       (await request('/api/auth/register', { headers: { 'x-forwarded-for': String(index) } }))
@@ -122,8 +154,11 @@ it('keeps a separate login quota so exhausted registrations cannot lock out a sh
   for (let index = 0; index < 60; index++)
     await request('/api/auth/register', { body: JSON.stringify({ account: 'x' }) })
   expect((await request('/api/auth/register', { body: '{}' })).status).toBe(429)
-  const login = await request('/api/auth/login', {
-    body: JSON.stringify({ account: 'shared_ip_player', password: 'Aa1!<> &+/%' }),
+  // Any nickname can enter, so this is a successful claim rather than a 401.
+  const login = await enter('/api/auth/login', 'shared_ip_player', {
+    'farm-career-v1': '{"runs":5}',
   })
-  expect(login.status).toBe(401)
+  expect(login.status).toBe(200)
+  expect(login.data.user.username).toBe('shared_ip_player')
+  expect(store.progress(login.data.user.id).data).toEqual({ 'farm-career-v1': '{"runs":5}' })
 })
