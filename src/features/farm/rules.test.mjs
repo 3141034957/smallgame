@@ -20,6 +20,7 @@ import {
   activeCombos,
   chooseTalent,
   clampPoint,
+  farmMoveStep,
   createFarm,
   evolved,
   farmModifier,
@@ -145,9 +146,13 @@ function run(focus = 'drum', routeDay = day, characterId, preferStats = false) {
       state = chooseTalent(state, id)
       if (evolved(state.gear).includes(focus)) terminalAt ??= tick
     }
+    // Record with the step the server will validate against: a stride card
+    // makes the step fractional, and frames recorded at MOVE_STEP would then
+    // be rejected on replay.
     const point = clampPoint(
       state.position,
       evade(state, [50 + 30 * Math.sin(tick / 50), 50 + 25 * Math.cos(tick / 75)]),
+      farmMoveStep(state),
     )
     const surge = state.charge === 100
     if (surge) surges.push(tick)
@@ -163,7 +168,7 @@ function run(focus = 'drum', routeDay = day, characterId, preferStats = false) {
       choices.push({ tick: state.tick, id })
       state = chooseTalent(state, id)
     }
-    const point = clampPoint(state.position, chase(state))
+    const point = clampPoint(state.position, chase(state), farmMoveStep(state))
     frames.push(point)
     // A run that outlives the chase has nothing left to walk into.
     const walked = stepFarm(state, point, false)

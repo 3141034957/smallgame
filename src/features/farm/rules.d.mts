@@ -162,6 +162,8 @@ export type Crop = {
   spawnAt?: number
   xpStage?: number
   slowUntil?: number
+  echoUntil?: number
+  echoNext?: number
 }
 export type Loot = {
   id: number

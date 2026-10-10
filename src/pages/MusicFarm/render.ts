@@ -367,6 +367,22 @@ function cropSprite(
     ctx.ellipse(0, 0, monster.size * 0.48, monster.size * 0.48, 0, 0, Math.PI * 2)
     ctx.stroke()
   }
+  // Drum echo: a dotted ring plus a note, so bleeding monsters read at a glance
+  // without an effect per tick.
+  if (crop.echoUntil) {
+    ctx.strokeStyle = '#9b7fd4'
+    ctx.lineWidth = 1.6
+    ctx.setLineDash([3, 4])
+    ctx.lineDashOffset = -now / 90
+    ctx.beginPath()
+    ctx.ellipse(0, 0, monster.size * 0.56, monster.size * 0.56, 0, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.font = '700 10px system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillStyle = '#6f56a3'
+    ctx.fillText('♪', 0, -monster.size * 0.56 - 2)
+  }
   if (art) ctx.drawImage(art, -monster.size / 2, -monster.size / 2, monster.size, monster.size)
   else ctx.drawImage(assets.crops[crop.kind], -32, -32, 64, 64)
   if (crop.boss) {
