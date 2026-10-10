@@ -4,6 +4,7 @@ import {
   type FarmQuest,
   type FarmQuestLog,
 } from '@/features/farm/quests'
+import { GlyphIcon } from './icons'
 
 const clock = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`
@@ -25,7 +26,7 @@ export function QuestList({
         const done = farmQuestDone(quest, log)
         return (
           <li key={quest.id} className={done ? 'is-done' : ''}>
-            <span aria-hidden="true">{done ? '✓' : quest.icon}</span>
+            <span aria-hidden="true">{done ? '✓' : <GlyphIcon glyph={quest.icon} />}</span>
             <div>
               <strong>{quest.name}</strong>
               <small>{quest.desc}</small>

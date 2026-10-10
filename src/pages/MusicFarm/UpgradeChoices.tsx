@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { Icon, talentIcon } from './icons'
 import {
   evolved,
   MAX_EQUIPPED,
@@ -27,6 +28,10 @@ type Props = {
 }
 
 export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, onSelect }: Props) {
+  const cardIcon = (id: string) => {
+    const name = talentIcon(id)
+    return name ? <Icon name={name} /> : null
+  }
   const forms = evolved(gear)
   const base = (state ?? { gear }) as ComboState
   const carried = (kind: 'weapon' | 'chip') =>
@@ -51,7 +56,7 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
                 <i className="farm-choice-key" aria-hidden="true">
                   {index + 1}
                 </i>
-                <span className="farm-choice-icon">{item.icon}</span>
+                <span className="farm-choice-icon">{cardIcon(item.id)}</span>
                 <small>恢复卡 · {item.tag}</small>
                 <b>
                   {item.name}
@@ -74,7 +79,7 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
                 <i className="farm-choice-key" aria-hidden="true">
                   {index + 1}
                 </i>
-                <span className="farm-choice-icon">{item.icon}</span>
+                <span className="farm-choice-icon">{cardIcon(item.id)}</span>
                 <small>乐队成长 · {item.tag}</small>
                 <b>{item.name}</b>
                 <p>{item.description}</p>
@@ -107,7 +112,7 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
               <i className="farm-choice-key" aria-hidden="true">
                 {index + 1}
               </i>
-              <span className="farm-choice-icon">{item.icon}</span>
+              <span className="farm-choice-icon">{cardIcon(item.id)}</span>
               <small>
                 {item.kind === 'chip' ? '乐队装备' : item.characterId ? '乐队成员' : '辅助乐器'} ·{' '}
                 {item.tag}

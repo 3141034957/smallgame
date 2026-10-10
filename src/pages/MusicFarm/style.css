@@ -546,6 +546,10 @@
   color: var(--talent-color);
   margin-bottom: 14px;
 }
+.farm-choice-icon .farm-icon {
+  width: 40px;
+  height: 40px;
+}
 .farm-choices > button > small {
   font-size: 8px;
   color: #9a9b88;
@@ -920,6 +924,10 @@
     font-size: 28px;
     border-radius: 12px;
     margin: 0;
+  }
+  .farm-choice-icon .farm-icon {
+    width: 30px;
+    height: 30px;
   }
   /* Phones have no number keys, and the badge sat on top of the name. */
   .farm-choice-key {
