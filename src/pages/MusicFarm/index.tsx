@@ -890,7 +890,9 @@ export default function MusicFarm() {
       <div className="farm-shell" inert={!!panel || upgrade}>
         <header className="farm-header">
           <a className="farm-brand" href="#/farm">
-            <span>♬</span>
+            <span className="farm-brand-mark">
+              <Icon name="brand" />
+            </span>
             <div>
               <h1>
                 <span className="farm-brand-full">怪潮乐队历险记</span>

@@ -25,6 +25,7 @@ const ICON_SOURCES = {
   fire: '/assets/icons/fire.webp',
   star: '/assets/icons/star.webp',
   coin: '/assets/icons/coin.webp',
+  brand: '/assets/icons/brand.webp',
   'weapon-drum': '/assets/icons/weapon-drum.webp',
   'weapon-orbit': '/assets/icons/weapon-orbit.webp',
   'weapon-power': '/assets/icons/weapon-power.webp',

@@ -47,6 +47,16 @@
   font-size: 24px;
   font-weight: 900;
 }
+/* The brand mark is artwork now, so it rides without the green plate. */
+.farm-brand > span.farm-brand-mark {
+  width: 52px;
+  height: 52px;
+  background: none;
+}
+.farm-brand-mark .farm-icon {
+  width: 44px;
+  height: 44px;
+}
 .farm-brand > span {
   width: 46px;
   height: 46px;
@@ -1135,6 +1145,14 @@
   height: 38px;
   font-size: 27px;
   border-radius: 12px;
+}
+.farm-brand > span.farm-brand-mark {
+  width: 42px;
+  height: 42px;
+}
+.farm-brand-mark .farm-icon {
+  width: 36px;
+  height: 36px;
 }
 .farm-brand small {
   font-size: 6px;
