@@ -969,24 +969,25 @@ export default function MusicFarm() {
                 <button aria-label="查看生存排行榜" onClick={() => openPanel('board')}>
                   <Icon name="board" />
                 </button>
-                <button
-                  aria-label={muted ? '开启声音' : '静音'}
-                  aria-pressed={muted}
-                  onClick={() => {
-                    setMuted(!muted)
-                    audio.current?.setMuted(!muted)
-                    if (muted || audioError) void prepare(!muted)
-                  }}
-                >
-                  <span className={`farm-sound-toggle${muted ? ' is-muted' : ''}`}>
-                    <Icon name="sound" />
-                  </span>
-                </button>
                 <button aria-label="查看进化配方" onClick={() => openPanel('help')}>
                   <Icon name="help" />
                 </button>
               </>
             )}
+            {/* Muting stays available in every phase, including a running round. */}
+            <button
+              aria-label={muted ? '开启声音' : '静音'}
+              aria-pressed={muted}
+              onClick={() => {
+                setMuted(!muted)
+                audio.current?.setMuted(!muted)
+                if (muted || audioError) void prepare(!muted)
+              }}
+            >
+              <span className={`farm-sound-toggle${muted ? ' is-muted' : ''}`}>
+                <Icon name="sound" />
+              </span>
+            </button>
           </nav>
         </header>
         <div className={`farm-layout ${phase === 'result' ? 'is-result' : ''}`}>
