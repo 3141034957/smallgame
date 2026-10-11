@@ -163,10 +163,10 @@ export function FarmBoard({
       {!compact && round && !authenticated && (
         <div className="farm-board-guest">
           <p>进度已存本机</p>
-          <button aria-label="注册并保存本局进度" onClick={() => account?.openAccount('register')}>
+          <button aria-label="注册并保存本局进度" onClick={() => account?.openAccount()}>
             注册
           </button>
-          <button aria-label="已有账号，登录恢复" onClick={() => account?.openAccount('login')}>
+          <button aria-label="已有账号，登录恢复" onClick={() => account?.openAccount()}>
             登录
           </button>
           <small>上榜需登录</small>
