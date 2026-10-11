@@ -7,6 +7,7 @@ import {
   FULL_ENCORE_DAMAGE,
   MAX_GEAR_LEVEL,
   RECIPES,
+  RESONANCE_STORM_AREA,
   RESONANCE_STORM_DAMAGE,
   SCHOOLS,
   TALENTS,
@@ -132,7 +133,10 @@ describe('music roguelite schools', () => {
 
   it('scales the numbers a combo names, and nothing else', () => {
     const modifiers = comboModifiers(gearWith('drum', 'synth'))
-    expect(modifiers.blast).toBeCloseTo(1 + RESONANCE_STORM_DAMAGE, 10)
+    // The drum deals no instant damage, so the combo only widens its spread and
+    // still scales the synth fan.
+    expect(modifiers.blast).toBe(1)
+    expect(modifiers.blastArea).toBeCloseTo(1 + RESONANCE_STORM_AREA, 10)
     expect(modifiers.fan).toBeCloseTo(1 + RESONANCE_STORM_DAMAGE, 10)
     // 无关的一律保持 1：组合技只放大它自己承诺的那一路伤害。
     expect(modifiers.rain).toBe(1)
