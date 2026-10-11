@@ -573,20 +573,38 @@ describe('music roguelite farming', () => {
   })
 
   it('changes the bass column beam into a wide black hole that pulls remote loot', () => {
+    // 光柱只啃 |dx| ≤ 8 + power×3 那一列，纵向再远都够得着；黑洞改成按半径吞的圆，
+    // 横向够得更宽，纵向反而收短。血给到 200 是为了让每一次伤害都量得出来。
     const ordinary = arena({ power: MAX_GEAR_LEVEL, magnet: MAX_GEAR_LEVEL - 1 }, [
-      crop(0, 50, 8, 20),
-      crop(1, 76, 50, 20),
+      crop(0, 50, 8, 200),
+      crop(1, 76, 50, 200),
+      crop(2, 24, 50, 200),
     ])
     ordinary.loot = [{ id: 100, x: 5, y: 5, xp: 7, coins: 8 }]
     const terminal = structuredClone(ordinary)
     terminal.gear.magnet = MAX_GEAR_LEVEL
     const normal = stepFarm(ordinary, ordinary.position)
     const ultimate = stepFarm(terminal, terminal.position)
-    expect(normal.events.some((event) => event.kind === 'beam')).toBe(true)
-    expect(normal.state.crops.map((item) => item.hp)).toEqual([0, 20])
-    expect(ultimate.events.some((event) => event.kind === 'blackhole')).toBe(true)
+    const taken = (result, index) => 200 - result.state.crops[index].hp
+    const total = (result) => result.state.crops.reduce((sum, item) => sum + (200 - item.hp), 0)
+    const beam = normal.events.find((event) => event.kind === 'beam')
+    expect(beam).toBeTruthy()
+    expect(beam.radius).toBe(8 + MAX_GEAR_LEVEL * 3)
+    // 进化前：列里那只吃满 5 + power×4，两只出列的侧面怪一下都挨不到。
+    expect(taken(normal, 0)).toBe(5 + MAX_GEAR_LEVEL * 4)
+    expect([taken(normal, 1), taken(normal, 2)]).toEqual([0, 0])
+    const hole = ultimate.events.find((event) => event.kind === 'blackhole')
+    expect(hole).toBeTruthy()
     expect(ultimate.events.some((event) => event.kind === 'beam')).toBe(false)
-    expect(ultimate.state.crops.map((item) => item.hp)).toEqual([20, 11])
+    // 进化后：黑洞按半径吞，半径比列更宽。
+    expect(hole.radius).toBe(32 * comboModifiers(terminal.gear).blastArea)
+    expect(hole.radius).toBeGreaterThan(beam.radius)
+    // 单次伤害走的是和光柱同一条 power×4 曲线，不再退化成旧的 4 + power（9 点）。
+    expect(taken(ultimate, 0)).toBe(0)
+    expect(taken(ultimate, 1)).toBe(4 + MAX_GEAR_LEVEL * 4)
+    expect(taken(ultimate, 2)).toBe(4 + MAX_GEAR_LEVEL * 4)
+    // 进化不是弱化：一口吞下两只，总输出不低于只啃到一只的光柱。
+    expect(total(ultimate)).toBeGreaterThanOrEqual(total(normal))
     expect(ultimate.state.loot[0].x).toBeGreaterThan(normal.state.loot[0].x + 20)
   })
 
