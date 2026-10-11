@@ -112,6 +112,8 @@ export default function MusicFarm() {
   dayRef.current = day
   const model = useRef(initial)
   const account = useAccount()
+  const accountRef = useRef(account)
+  accountRef.current = account
   const [view, setView] = useState(model.current)
   const [inputMode, setInputMode] = useState<'touch' | 'mouse'>(() =>
     window.matchMedia?.('(pointer: coarse)').matches ? 'touch' : 'mouse',
@@ -851,10 +853,12 @@ export default function MusicFarm() {
     page.current?.scrollIntoView({ block: 'start' })
     page.current?.querySelector<HTMLElement>('.farm-result h2')?.focus({ preventScroll: true })
     // A guest is welcome to play, but only a nickname puts the score on the
-    // board — so the first finished run asks for one. Signed-in players never
-    // see the prompt.
-    if (!account?.user) account?.openAccount()
-  }, [phase, account])
+    // board — so a finished run asks for one. Signed-in players never see the
+    // prompt. Read the account through a ref: the context object is new on
+    // every render, and depending on it would reopen the form the moment the
+    // player closes it.
+    if (!accountRef.current?.user) accountRef.current?.openAccount()
+  }, [phase])
   const upgrade = phase === 'play' && view.offered.length > 0
   // Past the replay budget the server would reject the upload anyway, so the
   // run stays on the device and says so instead of failing with a vague error.
