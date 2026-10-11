@@ -102,8 +102,8 @@ const TALENT_DEFINITIONS = [
     kind: 'weapon',
     partner: 'range',
     color: '#edaa8e',
-    description: '击败怪物，鼓点引爆周围怪群；被波及的怪持续掉血。',
-    tag: '连锁爆破',
+    description: '鼓点与击杀都把余音传给周围的怪，持续掉血。',
+    tag: '余音扩散',
   },
   {
     id: 'orbit',
@@ -136,7 +136,7 @@ const TALENT_DEFINITIONS = [
     name: '共鸣音箱',
     icon: '◉',
     color: '#9ebf86',
-    description: '鼓的爆破伤害更高，连锁更狠，配鼓手进化',
+    description: '鼓的余音传得更远，配鼓手进化',
     tag: '爆破强化',
   },
   {
@@ -412,7 +412,7 @@ export const RECIPES = [
     chip: 'range',
     name: '雷霆鼓组',
     icon: '🥁',
-    description: '爆破范围大幅扩张，连锁伤害翻倍',
+    description: '扩散范围大幅扩张，余音每跳伤害翻倍',
   },
   {
     weapon: 'orbit',
@@ -928,7 +928,7 @@ export function stepFarm(previous, point, useSurge = false) {
       midi: PITCHES[crop.id % PITCHES.length],
       chain,
     })
-    if (gear.drum) drumBlast(crop.x, crop.y, true)
+    if (gear.drum) drumEcho(crop.x, crop.y)
     if (crop.boss)
       for (const drop of state.loot) {
         drop.x = state.position[0]
@@ -975,25 +975,20 @@ export function stepFarm(previous, point, useSurge = false) {
       harvest(crop, false)
     }
   }
-  // One drum beat, used both by a harvest and by the kit's own rhythm below.
-  const drumBlast = (x, y, chain) => {
-    const radius =
-      (7 + gear.drum * 2 + (boomFlow ? 3 : 0) + (forms.includes('drum') ? 12 : 0)) *
-      areaBonus *
-      combo.blastArea
-    events.push({ id: state.nextId++, kind: 'blast', x, y, radius, lane: 0 })
+  // The drum lands no damage of its own: a beat reaches out and marks whatever
+  // it touches with the echo, and the echo is the drum's whole output. The
+  // (still undecided) blast numbers will add a hit back on top of this.
+  const blastRadius = () =>
+    (7 + gear.drum * 2 + (boomFlow ? 3 : 0) + (forms.includes('drum') ? 12 : 0)) *
+    areaBonus *
+    combo.blastArea
+  // Used by the kit's own rhythm and by every kill: kills spread the bleeding
+  // instead of chaining damage. The echo cannot stack, so this cannot snowball.
+  const drumEcho = (x, y) => {
+    const radius = blastRadius()
+    events.push({ id: state.nextId++, kind: 'echo', x, y, radius, lane: 0 })
     for (const other of state.crops)
-      if (other.hp > 0 && distance(other.x, other.y, x, y) <= radius) {
-        damage(
-          other,
-          ((2 + gear.drum * 2 + (boomFlow ? 1 : 0)) * (forms.includes('drum') ? 2 : 1) +
-            powerBonus) *
-            (1 + gear.range * 0.12) *
-            combo.blast,
-          chain,
-        )
-        markEcho(other)
-      }
+      if (other.hp > 0 && distance(other.x, other.y, x, y) <= radius) markEcho(other)
   }
   for (const crop of state.crops)
     if (!crop.boss && crop.hp <= 0 && state.tick >= crop.regrow) {
@@ -1160,7 +1155,7 @@ export function stepFarm(previous, point, useSurge = false) {
         target = crop
       }
     }
-    if (target && nearest <= (30 + gear.range * 6) * areaBonus) drumBlast(target.x, target.y, false)
+    if (target && nearest <= (30 + gear.range * 6) * areaBonus) drumEcho(target.x, target.y)
   }
   // Seeking rain keeps its own rhythm now that nothing else can trigger it:
   // the same cadence the basic wave had, so haste chips and a surge still

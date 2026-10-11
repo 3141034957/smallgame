@@ -10,7 +10,7 @@ const SCHOOL_DEFINITIONS = [
   {
     id: 'drum',
     name: '鼓组流',
-    style: '连锁爆破',
+    style: '余音扩散',
     tagline: '击杀引爆周围怪群，清场最快，但怕散兵',
   },
   { id: 'orbit', name: '吉他流', style: '环绕音刃', tagline: '音刃绕身护体，输出平稳还能挡下弹幕' },
@@ -100,7 +100,7 @@ export const COMBOS = [
     icon: '🌀',
     requires: ['drum', 'synth'],
     requirement: '鼓组流 + 合成器流都进化',
-    effect: `连锁爆破与扇形音浪伤害 +${percent(RESONANCE_STORM_DAMAGE)}、范围 +${percent(RESONANCE_STORM_AREA)}`,
+    effect: `扇形音浪伤害 +${percent(RESONANCE_STORM_DAMAGE)}、音浪与余音扩散范围 +${percent(RESONANCE_STORM_AREA)}`,
     bonus: {
       blast: RESONANCE_STORM_DAMAGE,
       blastArea: RESONANCE_STORM_AREA,

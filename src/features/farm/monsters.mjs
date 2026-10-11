@@ -1,5 +1,5 @@
 // Appearance timing and art are shared by the battle, help and server replay.
-export const FARM_RULESET = 'v11-drum-echo'
+export const FARM_RULESET = 'v12-echo-only'
 export const FARM_SCORE_PREFIX = `farm:${FARM_RULESET}:`
 export const farmBestKey = (day) => `farm-best-${FARM_RULESET}:${day}`
 export const MONSTERS = [

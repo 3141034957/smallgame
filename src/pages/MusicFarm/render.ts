@@ -665,7 +665,15 @@ function groundEffect(
     ctx.textAlign = 'center'
     ctx.fillText('♬', x, y + 5)
   } else if (['pulse', 'surge', 'echo', 'slam'].includes(event.kind)) {
-    const color = event.kind === 'slam' ? '#e45e87' : event.kind === 'surge' ? '#efc561' : '#94b0d7'
+    // The echo spread reads in the same purple as the ring it leaves behind.
+    const color =
+      event.kind === 'slam'
+        ? '#e45e87'
+        : event.kind === 'surge'
+          ? '#efc561'
+          : event.kind === 'echo'
+            ? '#9b7fd4'
+            : '#94b0d7'
     const expanding = radius * (0.18 + easeOut(Math.min(1, progress * 1.5)) * 0.82)
     ctx.globalAlpha = (1 - progress) * (event.kind === 'pulse' ? 0.5 : 0.8)
     ctx.strokeStyle = color

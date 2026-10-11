@@ -655,11 +655,13 @@ export default function MusicFarm() {
           }
           let blasts = 0,
             harvestEffects = 0,
-            hits = 0
+            hits = 0,
+            echoes = 0
           for (const event of result.events) {
             if (
               event.kind === 'collect' ||
               (event.kind === 'blast' && ++blasts > 24) ||
+              (event.kind === 'echo' && ++echoes > 12) ||
               (event.kind === 'harvest' && ++harvestEffects > 32) ||
               (event.kind === 'hit' && ++hits > 16)
             )
