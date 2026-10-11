@@ -10,6 +10,33 @@ export const farmTooLongToSubmit = (round: FarmRound | null) =>
   !!round && round.frames.length > FARM_MAX_SUBMIT_FRAMES
 const clock = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`
+// Two minutes before the budget the HUD starts counting down: late enough to
+// stay out of the way, early enough to still cash the run in.
+export const FARM_SUBMIT_WARN_FRAMES = 18 * 60 * FPS
+export type FarmSubmitStatus = {
+  warning: boolean
+  expired: boolean
+  seconds: number
+  label: string
+}
+// Icon-and-number copy for the HUD: the full sentence lives in `aria-label`.
+export const farmSubmitStatus = (tick: number): FarmSubmitStatus => {
+  const seconds = Math.max(0, Math.ceil((FARM_MAX_SUBMIT_FRAMES - tick) / FPS))
+  if (tick > FARM_MAX_SUBMIT_FRAMES)
+    return {
+      warning: true,
+      expired: true,
+      seconds: 0,
+      label: `已超 ${FARM_MAX_SUBMIT_FRAMES / FPS / 60} 分钟`,
+    }
+  if (tick < FARM_SUBMIT_WARN_FRAMES) return { warning: false, expired: false, seconds, label: '' }
+  return { warning: true, expired: false, seconds, label: `成绩有效 ${clock(seconds)}` }
+}
+// The one-shot toast that announces the countdown; the HUD keeps the number.
+export const farmSubmitNotice = (tick: number) => {
+  const status = farmSubmitStatus(tick)
+  return status.expired ? FARM_TOO_LONG_MESSAGE : `${status.label} · 可结算`
+}
 const digits = (value: number) => Math.round(value).toLocaleString()
 // One-line brag text for the result page. Everything comes from the verified
 // round, so a copied result always matches what the leaderboard accepted.

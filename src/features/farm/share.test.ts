@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   FARM_MAX_SUBMIT_FRAMES,
+  FARM_SUBMIT_WARN_FRAMES,
   FARM_TOO_LONG_MESSAGE,
   farmShareText,
+  farmSubmitNotice,
+  farmSubmitStatus,
   farmTooLongToSubmit,
 } from './share'
+import { FPS } from './rules.mjs'
 import { MAX_GEAR_LEVEL, TALENTS } from './rules.mjs'
 import type { FarmRound } from './rules.mjs'
 
@@ -59,6 +63,30 @@ describe('result share text', () => {
     // The player is told why, instead of "成绩未通过校验".
     expect(FARM_TOO_LONG_MESSAGE).toContain('未上榜')
     expect(FARM_TOO_LONG_MESSAGE.length).toBeLessThan(20)
+  })
+  it('counts the ranking budget down in the HUD before it runs out', () => {
+    // Quiet for most of the run: 10 minutes in there is nothing to say.
+    expect(farmSubmitStatus(10 * 60 * FPS)).toEqual({
+      warning: false,
+      expired: false,
+      seconds: 600,
+      label: '',
+    })
+    // Two minutes out the countdown starts, and the copy stays short enough
+    // for the compact HUD row while the sentence lives in `aria-label`.
+    const warn = farmSubmitStatus(FARM_SUBMIT_WARN_FRAMES)
+    expect(warn.warning).toBe(true)
+    expect(warn.expired).toBe(false)
+    expect(warn.label).toBe('成绩有效 2:00')
+    expect(warn.label.length).toBeLessThan(15)
+    expect(farmSubmitNotice(FARM_SUBMIT_WARN_FRAMES)).toBe('成绩有效 2:00 · 可结算')
+    // The last frame of the budget is still rankable; one more is not.
+    expect(farmSubmitStatus(FARM_MAX_SUBMIT_FRAMES).expired).toBe(false)
+    expect(farmSubmitStatus(FARM_MAX_SUBMIT_FRAMES).label).toBe('成绩有效 0:00')
+    const gone = farmSubmitStatus(FARM_MAX_SUBMIT_FRAMES + 1)
+    expect(gone).toEqual({ warning: true, expired: true, seconds: 0, label: '已超 20 分钟' })
+    // Past the budget the toast says why the run is not ranked.
+    expect(farmSubmitNotice(FARM_MAX_SUBMIT_FRAMES + 1)).toBe(FARM_TOO_LONG_MESSAGE)
   })
   it('omits empty counters and works before the first run', () => {
     const text = farmShareText(round({ elites: 0, blocks: 0 }), '2026-10-04')

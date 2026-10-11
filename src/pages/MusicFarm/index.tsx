@@ -75,7 +75,14 @@ import {
 } from '@/features/farm/timeline'
 import { activeSchoolCombos, FARM_HELP_SEEN_KEY } from '@/features/farm/help'
 import { loadFarmSettings, saveFarmSettings, type FarmSettings } from '@/features/farm/settings'
-import { FARM_TOO_LONG_MESSAGE, farmShareText, farmTooLongToSubmit } from '@/features/farm/share'
+import {
+  FARM_MAX_SUBMIT_FRAMES,
+  farmSubmitNotice,
+  farmSubmitStatus,
+  FARM_TOO_LONG_MESSAGE,
+  farmShareText,
+  farmTooLongToSubmit,
+} from '@/features/farm/share'
 import { RunTimeline } from './RunTimeline'
 import { BadgeWall } from './BadgeWall'
 import { QuestList } from './QuestList'
@@ -206,6 +213,9 @@ export default function MusicFarm() {
   const audioSerial = useRef(0)
   const celebrationUntil = useRef(0)
   const noticeUntil = useRef(0)
+  // 0 quiet / 1 counting down / 2 past the budget: the rank warning is a
+  // one-shot toast, so it fires once per stage instead of every frame.
+  const submitMark = useRef(0)
   // A dialog owns the back gesture: without a placeholder history entry the
   // mobile back button leaves the page and the running round is lost.
   const dialogHistory = useRef(false)
@@ -262,6 +272,7 @@ export default function MusicFarm() {
     displayPosition.current = [...model.current.position]
     controls.current?.reset()
     logs.current = { frames: [], choices: [], surges: [] }
+    submitMark.current = 0
     effects.current = []
     surge.current = false
     keys.current.clear()
@@ -317,6 +328,53 @@ export default function MusicFarm() {
   }
   const restartRef = useRef(restart)
   restartRef.current = restart
+  // Stopping on purpose and dying go through the same door: the round is
+  // closed, scored and handed to the leaderboard by this one path, so a
+  // voluntary "cash in" is ranked exactly like a death.
+  const settleRun = () => {
+    if (phaseRef.current !== 'play') return
+    // `finishFarm` only closes a run that is over, so the band stops playing:
+    // the score, the seconds and the replay are the ones actually played.
+    const state: FarmState = { ...model.current, hp: 0 }
+    model.current = state
+    const finished = finishFarm(
+      state,
+      logs.current.frames,
+      logs.current.choices,
+      logs.current.surges,
+    )
+    setRound(finished)
+    phaseRef.current = 'result'
+    setPhase('result')
+    audio.current?.stop()
+    audioSerial.current++
+    setView(state)
+    setTimeline(samples.current)
+    if (finished) {
+      const reward = awardFarmCoins(runId.current, finished.coins)
+      setProfile(reward.profile)
+      setRewardError(reward.error ?? '')
+      const claim = claimFarmAchievements(finished)
+      setBadges(claim.log)
+      setFreshBadges(claim.fresh)
+      setBadgeError(claim.error ?? '')
+      const totals = recordFarmCareer(finished)
+      setCareer(totals.career)
+      setCareerRecords(totals.records)
+      const goals = applyFarmQuests(day, finished, runId.current)
+      setQuests(goals.log)
+      setFreshQuests(goals.completed)
+      setGoalError(goals.error ?? '')
+      if (goals.completed.length) setProfile(loadFarmProfile())
+      bestRecorded.current = true
+      setBest((previous) => Math.max(previous, finished.score))
+    }
+    dropDialogHistory(true)
+    panelRef.current = null
+    setPanel(null)
+  }
+  const settleRef = useRef(settleRun)
+  settleRef.current = settleRun
   const claimReward = () => {
     if (!round) return
     // Retry both payouts: a quota failure can hide either one.
@@ -686,41 +744,19 @@ export default function MusicFarm() {
             state = model.current
           }
           if (state.hp <= 0) {
-            const finished = finishFarm(
-              state,
-              logs.current.frames,
-              logs.current.choices,
-              logs.current.surges,
-            )
-            setRound(finished)
-            phaseRef.current = 'result'
-            setPhase('result')
-            audio.current?.stop()
-            setView(state)
-            setTimeline(samples.current)
-            if (finished) {
-              const reward = awardFarmCoins(runId.current, finished.coins)
-              setProfile(reward.profile)
-              setRewardError(reward.error ?? '')
-              const claim = claimFarmAchievements(finished)
-              setBadges(claim.log)
-              setFreshBadges(claim.fresh)
-              setBadgeError(claim.error ?? '')
-              const totals = recordFarmCareer(finished)
-              setCareer(totals.career)
-              setCareerRecords(totals.records)
-              const goals = applyFarmQuests(day, finished, runId.current)
-              setQuests(goals.log)
-              setFreshQuests(goals.completed)
-              setGoalError(goals.error ?? '')
-              if (goals.completed.length) setProfile(loadFarmProfile())
-            }
-            if (finished) {
-              bestRecorded.current = true
-              setBest((previous) => Math.max(previous, finished.score))
-            }
+            settleRef.current()
             break
           }
+        }
+        // The rank budget is invisible until it matters: two minutes out the
+        // toast says the score can still be banked, and once it is gone it
+        // says so, instead of leaving it to the result page.
+        const rank = farmSubmitStatus(state.tick)
+        const mark = rank.expired ? 2 : rank.warning ? 1 : 0
+        if (mark > submitMark.current) {
+          submitMark.current = mark
+          setNotice(farmSubmitNotice(state.tick))
+          noticeUntil.current = now + 3600
         }
         if (state.offered.length) {
           elapsed = 0
@@ -871,6 +907,9 @@ export default function MusicFarm() {
   // Past the replay budget the server would reject the upload anyway, so the
   // run stays on the device and says so instead of failing with a vague error.
   const submitBlocked = farmTooLongToSubmit(round)
+  // Live version of the same budget, read from the tick the HUD already
+  // republishes — no extra state, so nothing new runs every frame.
+  const submitStatus = farmSubmitStatus(view.tick)
   const previousThreshold = farmXpThreshold(view.level)
   const requiredXp = farmUpgradeXp(view.level)
   const currentXp = Math.max(0, Math.min(requiredXp, view.xp - previousThreshold))
@@ -1078,6 +1117,17 @@ export default function MusicFarm() {
                     <small>生存</small>
                     {formatFarmTime(view.tick)}
                   </b>
+                  {submitStatus.warning && (
+                    <small
+                      aria-label={
+                        submitStatus.expired
+                          ? `本局已超过 ${FARM_MAX_SUBMIT_FRAMES / FPS / 60} 分钟，成绩不再上榜（本机保留）`
+                          : `成绩还能上榜 ${submitStatus.seconds} 秒，可在暂停面板结算上榜`
+                      }
+                    >
+                      {submitStatus.label}
+                    </small>
+                  )}
                 </div>
               </div>
             </div>
@@ -1410,6 +1460,20 @@ export default function MusicFarm() {
                     <button className="farm-primary" onClick={closePanel}>
                       继续战斗
                     </button>
+                    {/* The only way to bank a long run: it ends the round and
+                        submits it, instead of throwing it away like restart. */}
+                    <button
+                      className="farm-text-button"
+                      aria-label={
+                        submitStatus.expired
+                          ? `结束本局，${FARM_TOO_LONG_MESSAGE}`
+                          : '结束本局并结算成绩，提交到生存排行榜'
+                      }
+                      onClick={settleRun}
+                    >
+                      {submitStatus.expired ? '结束本局' : '结算上榜'}
+                    </button>
+                    {submitStatus.expired && <p role="alert">{FARM_TOO_LONG_MESSAGE}</p>}
                     <button
                       className="farm-text-button"
                       aria-label={settings.effects ? '关闭特效，改为省电' : '开启特效'}
