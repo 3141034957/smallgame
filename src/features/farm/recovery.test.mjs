@@ -121,7 +121,9 @@ describe('unlimited player levels and recovery cards', () => {
 
   it('replays real randomly dealt healing choices and rejects substituted or extra choices', () => {
     // Only a member's instrument can open a run now, so the run and its
-    // replay are both played as the drummer.
+    // replay are both played as the drummer. The drum no longer lands a single
+    // point of instant damage, so the route has to dodge: walking into the
+    // horde used to end it before a healing card was ever dealt.
     let state = createFarm('2026-10-04', {}, 'bear-drums')
     const frames = [],
       choices = []
@@ -131,8 +133,26 @@ describe('unlimited player levels and recovery cards', () => {
         choices.push({ tick: state.tick, id })
         state = chooseTalent(state, id)
       }
-      const target = state.crops.find((enemy) => enemy.hp > 0)
-      const point = clampPoint(state.position, target ? [target.x, target.y] : state.position)
+      let closest = null,
+        nearest = 26
+      for (const enemy of state.crops) {
+        if (enemy.hp <= 0) continue
+        const distance = Math.hypot(
+          (enemy.x - state.position[0]) * 0.84,
+          enemy.y - state.position[1],
+        )
+        if (distance < nearest) {
+          nearest = distance
+          closest = enemy
+        }
+      }
+      const target = closest
+        ? [
+            state.position[0] + (state.position[0] - closest.x) * 2,
+            state.position[1] + (state.position[1] - closest.y) * 2,
+          ]
+        : [50 + 30 * Math.sin(tick / 50), 50 + 25 * Math.cos(tick / 75)]
+      const point = clampPoint(state.position, target)
       frames.push(point)
       state = stepFarm(state, point).state
     }

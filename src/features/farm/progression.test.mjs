@@ -154,11 +154,15 @@ describe('farm experience progression', () => {
     const runs = days.flatMap((day) =>
       RECIPES.map(({ weapon }) => simulateFarm(day, weapon, true, 180)),
     )
+    // 鼓改成「只有余音」之后，单拎出来打不死怪，也就撑不满半分钟：它是副手乐器，
+    // 生存窗口只针对真正有瞬发伤害的乐器。
+    const solo = (run) => run.focus !== 'drum'
     for (const run of runs) {
       // The opening is meant to be survived by moving: the first choice now
       // lands later than it used to, but well inside the first half minute.
       expect(run.upgrades[0], `${run.modifier}/${run.focus}: first choice`).toBeLessThan(35)
-      expect(run.seconds).toBeGreaterThan(30)
+      if (solo(run))
+        expect(run.seconds, `${run.modifier}/${run.focus}: survival`).toBeGreaterThan(30)
       // A finished form is the mid-game reward, not something the opening
       // minute hands out.
       if (run.evolutions.length) expect(run.evolutions[0].seconds).toBeLessThan(150)
@@ -166,17 +170,25 @@ describe('farm experience progression', () => {
       // and has to survive by moving rather than by out-levelling the horde.
       // The slowest opening of the 36 runs is the guitar on 2026-10-02, which
       // banks its first choice at 29.4s and sits on level 2 at the half minute.
-      expect(run.snapshots[30]).toBeGreaterThanOrEqual(2)
-      expect(run.snapshots[30]).toBeLessThanOrEqual(10)
+      // A drum-only run is gone before the half minute, so it has no snapshot.
+      if (run.snapshots[30]) {
+        expect(run.snapshots[30]).toBeGreaterThanOrEqual(2)
+        expect(run.snapshots[30]).toBeLessThanOrEqual(10)
+      }
       if (run.snapshots[60]) expect(run.snapshots[60]).toBeGreaterThan(run.snapshots[30])
       if (run.snapshots[120]) expect(run.snapshots[120]).toBeGreaterThan(run.snapshots[60])
       if (run.snapshots[180]) expect(run.snapshots[180]).toBeGreaterThan(run.snapshots[120])
     }
     expect(runs.filter((run) => run.seconds >= 120).length).toBeGreaterThanOrEqual(24)
+    // 余音仍然是实打实的输出：鼓撑不久，但它一路都在收怪。
+    for (const run of runs.filter((item) => item.focus === 'drum'))
+      expect(run.harvested, `${run.modifier}/drum: echo harvests`).toBeGreaterThan(0)
     // Every instrument has to finish its form on most days. The sampler and
     // the bass column are the fragile ones: they still fall short on the days
-    // that stack extra monsters, which is the next thing to even out.
-    for (const { weapon } of RECIPES) {
+    // that stack extra monsters, which is the next thing to even out. The drum
+    // finishes on none: with no direct damage it never banks the experience a
+    // form costs, so it only evolves as a support behind another instrument.
+    for (const { weapon } of RECIPES.filter((item) => item.weapon !== 'drum')) {
       const finished = runs.filter((run) => run.focus === weapon && run.evolutions.length).length
       expect(finished, `${weapon}: evolution on too few days`).toBeGreaterThanOrEqual(3)
     }

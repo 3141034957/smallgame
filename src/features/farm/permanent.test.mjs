@@ -31,6 +31,9 @@ const throughKind = (kind, nth = 1) =>
   PERMANENT_UPGRADES.filter((item) => item.kind === kind)[nth - 1].order + 1
 const kindCount = (kind) => PERMANENT_UPGRADES.filter((item) => item.kind === kind).length
 const full = () => prefix(PERMANENT_TOTAL_LEVELS)
+// 鼓现在一点瞬发伤害都没有，它的输出只有余音，所以固定伤害只能在真正会命中的
+// 乐器上量：鼓的「无瞬发伤害」由 combat.test.mjs 里的鼓点用例守住。
+const HITTING_RECIPES = RECIPES.filter((item) => item.weapon !== 'drum')
 function quiet(levels = {}) {
   return {
     ...createFarm(day, levels),
@@ -254,7 +257,7 @@ describe('permanent growth rules', () => {
     expect(stepFarm(quiet(), point)).toBeNull()
   })
 
-  it.each(RECIPES.map((item) => [item.weapon, item.chip]))(
+  it.each(HITTING_RECIPES.map((item) => [item.weapon, item.chip]))(
     'adds the flat damage step to every hit of %s without multiplying it',
     (weapon, chip) => {
       const play = (levels) => {
@@ -302,7 +305,8 @@ describe('permanent growth rules', () => {
   it('adds experience on top of the drop and widens attraction by a flat radius', () => {
     const attack = (levels) => {
       const state = quiet(levels)
-      state.gear.drum = 5
+      // 鼓收不掉这只怪了（它只有余音），所以用追踪箭当收割手段：经验照样加在掉落上。
+      state.gear.echo = 1
       state.crops = [{ id: 1, x: 50, y: 76, hp: 1, maxHp: 1, kind: 0, regrow: -1, boss: false }]
       return stepFarm(state, state.position).state
     }
