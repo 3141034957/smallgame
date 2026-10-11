@@ -2,7 +2,10 @@ import type { CSSProperties } from 'react'
 import { Icon } from './icons'
 import { talentIcon } from './iconSources'
 import {
+  DRUM_ECHO_KILLS_PER_DAMAGE,
+  drumEchoStats,
   evolved,
+  FPS,
   MAX_EQUIPPED,
   MAX_GEAR_LEVEL,
   RECIPES,
@@ -24,7 +27,7 @@ type Props = {
   hp?: number
   maxHp?: number
   // The live run, when the caller has it: combos can look at more than gear.
-  state?: ComboState
+  state?: ComboState & { drumEchoKills?: number }
   onSelect: (id: UpgradeId) => void
 }
 
@@ -94,6 +97,20 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
           const nextGear = { ...gear, [gearId]: gear[gearId] + 1 }
           const willEvolve =
             evolved(nextGear).includes(recipe.weapon) && !forms.includes(recipe.weapon)
+          const beforeEcho = drumEchoStats({ ...base, gear })
+          const afterEcho = drumEchoStats({ ...base, gear: nextGear })
+          const benefit =
+            id === 'drum'
+              ? beforeEcho.interval !== afterEcho.interval && gear.drum > 0
+                ? `间隔 ${beforeEcho.interval / FPS}→${afterEcho.interval / FPS}s`
+                : `每跳 ${beforeEcho.damage}→${afterEcho.damage}`
+              : id === 'range'
+                ? `${willEvolve ? `每跳 ${beforeEcho.damage}→${afterEcho.damage} · ` : ''}扩散 +${willEvolve ? 14 : 2} · 爆发 +2`
+                : item.description
+          const unlocksEchoGrowth = id === 'drum' && nextGear.drum === MAX_GEAR_LEVEL
+          const description = unlocksEchoGrowth
+            ? `${benefit} · ${DRUM_ECHO_KILLS_PER_DAMAGE}击杀 +1`
+            : benefit
           const school = schoolOfTalent(gearId)
           const view = school
             ? schoolViews(nextGear).find((entry) => entry.school.id === school.id)
@@ -136,7 +153,15 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
                   <span className="farm-school-layer">{view.layerLabel}</span>
                 </span>
               )}
-              <p>{item.description}</p>
+              <p
+                aria-label={
+                  unlocksEchoGrowth
+                    ? `余音每跳伤害 ${beforeEcho.damage} 提升至 ${afterEcho.damage}；满级后每 ${DRUM_ECHO_KILLS_PER_DAMAGE} 次余音最后一击，最终每跳伤害增加 1`
+                    : undefined
+                }
+              >
+                {description}
+              </p>
               {/* Desktop stacks these lines; phones fold them into the card's
                   last row so one card still reads as one row. */}
               <div className="farm-choice-note">

@@ -17,10 +17,30 @@ const DRUM_BOSS = MONSTERS.find((monster) => monster.id === 'drum-boss')
 const BASS_BOSS = MONSTERS.find((monster) => monster.id === 'bass-boss')
 export const FPS = 16
 export const MOVE_STEP = 3
-// 余音：被鼓点波及的怪一直掉血到死，没有持续时间。ECHO_INTERVAL 是每两跳之间
-// 隔多少帧，掉多少只跟鼓等级走，重复命中不叠加伤害。
-// 具体数值还在试玩阶段，调这个常量和 echoDamage() 即可。
+// 余音永久持续，不叠加也不重置节奏。保留一级鼓的旧基础间隔供外部兼容；
+// 各等级的实际伤害、间隔与满级收割成长统一由 drumEchoStats 提供。
 export const ECHO_INTERVAL = FPS
+export const DRUM_ECHO_KILLS_PER_DAMAGE = 100
+const DRUM_ECHO_DAMAGE = [0, 1, 1, 2, 2, 3]
+const DRUM_ECHO_INTERVAL = [ECHO_INTERVAL, 16, 12, 12, 8, 8]
+export function drumEchoStats(source) {
+  const gear = source.gear ?? source
+  const level = Math.max(0, Math.min(5, Math.floor(gear.drum ?? 0)))
+  const kills = Number.isFinite(source.drumEchoKills)
+    ? Math.max(0, Math.floor(source.drumEchoKills))
+    : 0
+  const bonus = level === 5 ? Math.floor(kills / DRUM_ECHO_KILLS_PER_DAMAGE) : 0
+  return {
+    damage: DRUM_ECHO_DAMAGE[level] * (level === 5 && gear.range >= 5 ? 2 : 1) + bonus,
+    interval: DRUM_ECHO_INTERVAL[level],
+    kills,
+    bonus,
+    remaining:
+      level === 5
+        ? DRUM_ECHO_KILLS_PER_DAMAGE - (kills % DRUM_ECHO_KILLS_PER_DAMAGE)
+        : DRUM_ECHO_KILLS_PER_DAMAGE,
+  }
+}
 // Every band member and piece of gear climbs to this level; reaching it on a
 // matching pair unlocks that instrument's final form.
 export const MAX_GEAR_LEVEL = 5
@@ -101,7 +121,7 @@ const TALENT_DEFINITIONS = [
     kind: 'weapon',
     partner: 'range',
     color: '#edaa8e',
-    description: '鼓点与击杀都把余音传给周围的怪，持续掉血。',
+    description: '全图索敌，余音持续扣血',
     tag: '余音扩散',
   },
   {
@@ -135,8 +155,8 @@ const TALENT_DEFINITIONS = [
     name: '共鸣音箱',
     icon: '◉',
     color: '#9ebf86',
-    description: '鼓的余音传得更远，配鼓手进化',
-    tag: '爆破强化',
+    description: '扩散与爆发范围每级+2',
+    tag: '余音范围',
   },
   {
     id: 'tempo',
@@ -411,7 +431,7 @@ export const RECIPES = [
     chip: 'range',
     name: '雷霆鼓组',
     icon: '🥁',
-    description: '扩散范围大幅扩张，余音每跳伤害翻倍',
+    description: '基础余音翻倍，收割成长保留',
   },
   {
     weapon: 'orbit',
@@ -610,6 +630,7 @@ export function createFarm(day, permanent, starter) {
     score: 0,
     coins: 0,
     harvested: 0,
+    drumEchoKills: 0,
     bosses: 0,
     elites: 0,
     blocks: 0,
@@ -817,6 +838,7 @@ export function stepFarm(previous, point, useSurge = false) {
   const state = {
     ...previous,
     position: [...point],
+    drumEchoKills: previous.drumEchoKills ?? 0,
     aim:
       point[0] !== previous.position[0] || point[1] !== previous.position[1]
         ? [point[0] - previous.position[0], point[1] - previous.position[1]]
@@ -958,35 +980,33 @@ export function stepFarm(previous, point, useSurge = false) {
       if (crop.hp > 0 && distance(crop.x, crop.y, point[0], point[1]) <= radius)
         damage(crop, amount)
   }
-  // 余音（drum echo）：持续掉血走自己的管线——不吃暴击、不吃局内倍率、不加
-  // 永久伤害，掉多少就是多少。被同一波爆破反复命中也只续时间，不叠加。
-  const echoDamage = () => gear.drum * (forms.includes('drum') ? 2 : 1)
+  // 余音独立扣血，不吃暴击、局内倍率和永久伤害。等级决定基础伤害与节奏，
+  // 满级余音末击累积额外伤害；重复鼓点只传播标记，不续时间、不叠伤。
   const markEcho = (crop) => {
     // The echo never wears off: it keeps bleeding until the monster dies.
+    if (crop.echo) return
     crop.echo = true
-    // The first tick lands one beat later; a monster already bleeding keeps its
-    // own rhythm instead of being pushed back by every new beat.
-    if (state.tick >= (crop.echoNext ?? -1)) crop.echoNext = state.tick + ECHO_INTERVAL
+    crop.echoInterval = drumEchoStats(state).interval
+    crop.echoNext = state.tick + crop.echoInterval
   }
   const drainEcho = (crop) => {
     if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) return
     // No event: the bleeding monster keeps the marker until the echo ends, so
     // every tick does not need its own effect.
-    crop.hp = Math.round((crop.hp - echoDamage()) * 100) / 100
+    crop.hp = Math.round((crop.hp - drumEchoStats(state).damage) * 100) / 100
     if (crop.hp <= 0) {
+      if (gear.drum >= MAX_GEAR_LEVEL) state.drumEchoKills++
       crop.hp = 0.001
       harvest(crop, false)
     }
   }
-  // The drum lands no damage of its own: a beat reaches out and marks whatever
-  // it touches with the echo, and the echo is the drum's whole output. The
-  // (still undecided) blast numbers will add a hit back on top of this.
+  // A drum beat marks its target and nearby monsters without instant damage.
   const blastRadius = () =>
-    (7 + gear.drum * 2 + (boomFlow ? 3 : 0) + (forms.includes('drum') ? 12 : 0)) *
+    (7 + gear.drum * 2 + gear.range * 2 + (boomFlow ? 3 : 0) + (forms.includes('drum') ? 12 : 0)) *
     areaBonus *
     combo.blastArea
   // Used by the kit's own rhythm and by every kill: kills spread the bleeding
-  // instead of chaining damage. The echo cannot stack, so this cannot snowball.
+  // instead of chaining instant damage. Repeated marks never stack the echo.
   const drumEcho = (x, y) => {
     const radius = blastRadius()
     events.push({ id: state.nextId++, kind: 'echo', x, y, radius, lane: 0 })
@@ -1155,7 +1175,7 @@ export function stepFarm(previous, point, useSurge = false) {
   // The kit beats on its own instead of waiting for a first kill: the beat
   // lands on the nearest monster and blows up around it, so the drummer can
   // open a run without the basic wave that used to start every harvest.
-  if (gear.drum && state.tick % Math.max(6, 20 - gear.drum * 3 - hasteBonus) === 0) {
+  if (gear.drum && state.tick % Math.max(4, 20 - gear.drum * 3 - hasteBonus) === 0) {
     let target = null,
       nearest = Infinity
     for (const crop of state.crops) {
@@ -1166,7 +1186,7 @@ export function stepFarm(previous, point, useSurge = false) {
         target = crop
       }
     }
-    if (target && nearest <= (30 + gear.range * 6) * areaBonus) drumEcho(target.x, target.y)
+    if (target) drumEcho(target.x, target.y)
   }
   // Seeking rain keeps its own rhythm now that nothing else can trigger it:
   // the same cadence the basic wave had, so haste chips and a surge still
@@ -1202,7 +1222,9 @@ export function stepFarm(previous, point, useSurge = false) {
   // Bass column: haste chips shorten the wait between two columns.
   if (gear.power && state.tick % Math.max(4, 10 - hasteBonus) === 0) {
     if (forms.includes('power')) {
-      pulse(32, 4 + gear.power, 'blackhole')
+      // The black hole is the evolved column, not a weaker one: it keeps the
+      // same damage scaling as the plain beam and still takes the power chips.
+      pulse(32 * combo.blastArea, 4 + gear.power * 4 + powerBonus, 'blackhole')
       for (const drop of state.loot) {
         drop.x += (point[0] - drop.x) * 0.55
         drop.y += (point[1] - drop.y) * 0.55
@@ -1638,9 +1660,17 @@ export function stepFarm(previous, point, useSurge = false) {
     if (enemy.hp <= 0) continue
     // 余音按自己的节拍掉血，跟这只怪这帧移到哪里无关。
     if (enemy.echo) {
+      const interval = drumEchoStats(state).interval
+      const previousInterval = enemy.echoInterval ?? ECHO_INTERVAL
+      if (interval < previousInterval)
+        enemy.echoNext = Math.min(
+          enemy.echoNext ?? state.tick,
+          (enemy.echoNext ?? state.tick) - previousInterval + interval,
+        )
+      enemy.echoInterval = interval
       if (state.tick >= (enemy.echoNext ?? 0)) {
         drainEcho(enemy)
-        enemy.echoNext = state.tick + ECHO_INTERVAL
+        enemy.echoNext = state.tick + interval
       }
       if (enemy.hp <= 0) continue
     }
@@ -1925,6 +1955,7 @@ export function finishFarm(state, frames, choices, surges) {
     score: state.score,
     maxCombo: state.maxCombo,
     harvested: state.harvested,
+    drumEchoKills: state.drumEchoKills ?? 0,
     bosses: state.bosses,
     elites: state.elites,
     blocks: state.blocks,

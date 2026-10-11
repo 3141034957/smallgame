@@ -289,6 +289,7 @@ export default function MusicFarm() {
     field.current?.focus({ preventScroll: true })
   }
   const restart = () => {
+    setConfirmRestart(false)
     audio.current?.stop()
     audioSerial.current++
     initializeBattle()
@@ -926,9 +927,11 @@ export default function MusicFarm() {
                   <Icon name="pause" />
                 </button>
                 <button
+                  className={confirmRestart ? 'is-armed' : undefined}
                   aria-label={confirmRestart ? '确认重新开始本局' : '重新开始本局'}
                   onClick={() => {
-                    // Restarting throws the whole run away, so it takes two taps.
+                    // Restarting throws the run away, so it takes two taps: the
+                    // armed state is shown by the highlight, not by a label.
                     if (confirmRestart) {
                       setConfirmRestart(false)
                       restart()
@@ -938,7 +941,6 @@ export default function MusicFarm() {
                   }}
                 >
                   <Icon name="refresh" />
-                  <span>{confirmRestart ? '确认重开' : '重开'}</span>
                 </button>
               </>
             ) : (

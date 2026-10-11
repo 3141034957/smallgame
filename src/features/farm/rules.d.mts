@@ -2,6 +2,15 @@ export type Lane = 0 | 1 | 2 | 3
 import type { PermanentLevels } from './permanent.mjs'
 export { todayRoute, validDay } from './calendar.mjs'
 export const FPS: number
+export const ECHO_INTERVAL: number
+export const DRUM_ECHO_KILLS_PER_DAMAGE: number
+export function drumEchoStats(source: Gear | { gear: Gear; drumEchoKills?: number }): {
+  damage: number
+  interval: number
+  kills: number
+  bonus: number
+  remaining: number
+}
 export type FarmModifier = {
   id: string
   name: string
@@ -164,6 +173,7 @@ export type Crop = {
   slowUntil?: number
   echo?: boolean
   echoNext?: number
+  echoInterval?: number
 }
 export type Loot = {
   id: number
@@ -265,6 +275,7 @@ export type FarmState = {
   score: number
   coins: number
   harvested: number
+  drumEchoKills: number
   bosses: number
   elites: number
   blocks: number
@@ -297,6 +308,7 @@ export type FarmState = {
 }
 export type Choice = { tick: number; id: UpgradeId }
 export type FarmRound = {
+  drumEchoKills?: number
   permanent?: PermanentLevels
   // finishFarm 会盖上当前规则集版本，服务端据此拒绝旧版本的成绩。
   ruleset?: string

@@ -2,15 +2,11 @@ import { describe, it, expect } from 'vitest'
 import {
   createFarm,
   stepFarm,
-  clampPoint,
-  evolved,
-  ECHO_INTERVAL,
   FPS,
   HEAL_COOLDOWN,
   HEAL_TTL,
   MAX_GEAR_LEVEL,
   MAX_STAT_LEVEL,
-  MOVE_STEP,
   SHIELD_COOLDOWN,
   SHIELD_LIMIT,
 } from './rules.mjs'
@@ -475,228 +471,89 @@ describe('survivor combat', () => {
   })
 })
 
-// 余音：鼓点够到的怪身上留一圈持续掉血的余音，这是鼓唯一的输出。场景里只放一只
-// 目标怪，它站在鼓点射程内（所以起拍就被挂上），之后玩家一路退到射程外，场上再
-// 没有怪能触发鼓点，它的掉血就只剩余音。
-const kit = (drum, range = 0) => ({ drum, range })
-// 鼓点只打射程内最近的怪，能波及旁边那只只看爆破半径。
-const kitReach = (gear) => 30 + gear.range * 6
-const blastRadius = (gear) => 7 + gear.drum * 2 + (evolved(gear).includes('drum') ? 12 : 0)
-const field = (gear, tick) => {
-  const s = arena([], tick)
-  s.nextBass = Infinity
-  Object.assign(s.gear, gear)
-  return s
+// 用静止目标隔离余音节奏；普通伤害、移动和出生保护另有战斗覆盖。
+const echoArena = (drum = 3, hp = 400) => {
+  const state = arena([], 0)
+  state.nextBass = Infinity
+  state.hurtUntil = Infinity
+  state.gear.drum = drum
+  state.crops = [{ ...enemy(1, 0, 70, 50), hp, maxHp: hp, attackUntil: Infinity }]
+  return state
 }
-const echoField = (gear, { tick = 99, hp = 400 } = {}) => {
-  const s = field(gear, tick)
-  s.crops = [{ ...enemy(3, 0, 50, 50 + kitReach(gear) - 5), hp, maxHp: hp }]
-  return s
-}
-// 见证怪站在爆破半径的边缘上，但它只在起拍之后才进场：这样它身上起初没有余音，
-// 只有目标被余音收掉时那一圈连锁才够得着它。
-const witness = (gear) => {
-  const far = kitReach(gear) - 5 + blastRadius(gear) - 1
-  return { ...enemy(4, 0, 50, 50 + far), hp: 400, maxHp: 400 }
-}
-// 把玩家维持在离目标 gap 远的地方：远到鼓点打不到，怪身上就只剩余音在掉血。
-const hold = (state, index, gap) => {
-  const crop = state.crops[index]
-  const dx = state.position[0] - crop.x,
-    dy = state.position[1] - crop.y
-  const length = Math.max(0.01, Math.hypot(dx, dy))
-  const shift = Math.max(-MOVE_STEP, Math.min(MOVE_STEP, gap - length))
-  return clampPoint(state.position, [
-    state.position[0] + (dx / length) * shift,
-    state.position[1] + (dy / length) * shift,
-  ])
-}
-// stepFarm 每次只走一帧，余音的节奏只能靠逐帧记录血量来验证。第一帧不动（留在场
-// 地中央让鼓点起拍），之后按 gap 把玩家拉开。每帧记的是「这一帧打完之后的样
-// 子」，条目按被推进的那一帧编号：bled(trace, t) 就是第 t 帧造成的掉血。
-const advance = (state, index, frames, gap) => {
-  let running = state
-  const snap = (tick, events) => ({
-    tick,
-    hp: running.crops[index].hp,
-    // 余音没有到期帧：挂上就是 true，直到这只怪死掉/槽位被回收才变回 false。
-    echo: running.crops[index].echo === true,
-    echoNext: running.crops[index].echoNext ?? 0,
-    marks: running.crops.map((crop) => crop.echo === true),
-    events,
-  })
-  const trace = [snap(state.tick - 1, [])]
+const advanceEcho = (state, frames) => {
+  const hits = []
   for (let frame = 0; frame < frames; frame++) {
-    const result = stepFarm(running, frame ? hold(running, index, gap) : running.position)
-    if (!result) break
-    running = result.state
-    trace.push(snap(running.tick - 1, result.events))
+    const hp = state.crops[0].hp
+    const tick = state.tick
+    const result = stepFarm(state, state.position)
+    state = result.state
+    if (state.crops[0].hp < hp) hits.push({ tick, damage: hp - state.crops[0].hp })
   }
-  return { state: running, trace }
+  return { state, hits }
 }
-const at = (trace, tick) => trace.find((entry) => entry.tick === tick)
-const bled = (trace, tick) => at(trace, tick - 1).hp - at(trace, tick).hp
-// 相对起拍帧的偏移：余音每 ECHO_INTERVAL 帧跳一次，掉血的帧应当正好落在这上面。
-const bledAt = (trace, start) =>
-  trace
-    .filter((entry) => entry.tick > start && bled(trace, entry.tick) > 0)
-    .map((entry) => entry.tick - start)
-// 每个永久强化都是固定数值的一小步，这里只取加伤害的那几步。
-const damageSteps = Object.freeze(
-  Object.fromEntries(
-    PERMANENT_UPGRADES.filter((step) => step.kind === 'damage')
-      .slice(0, 3)
-      .map((step) => [step.id, 1]),
-  ),
-)
 
 describe('drum echo', () => {
-  it('lands no damage of its own: a beat only marks, it never hits', () => {
-    // 满级鼓 + 音箱：一次鼓点把三只怪全挂上，但一帧之内一滴血都不许掉。
-    const start = 96
-    const gear = kit(MAX_GEAR_LEVEL, MAX_GEAR_LEVEL)
-    const s = field(gear, start)
-    s.crops = [
-      { ...enemy(1, 0, 50, 60), hp: 100, maxHp: 100 },
-      { ...enemy(2, 0, 50, 68), hp: 100, maxHp: 100 },
-      { ...enemy(3, 0, 50, 76), hp: 100, maxHp: 100 },
-    ]
-    const struck = step(s)
-    // 挂上余音的那一帧血量纹丝不动。
-    expect(struck.state.crops.map((crop) => crop.hp)).toEqual([100, 100, 100])
-    // 事件里只有那一圈紫环：既没有命中，也没有爆破。
-    expect(struck.events.filter((event) => event.kind === 'echo')).toHaveLength(1)
-    expect(struck.events.every((event) => event.kind === 'echo')).toBe(true)
-    expect(struck.events.some((event) => event.kind === 'hit' || event.kind === 'blast')).toBe(
-      false,
+  it('marks without immediate damage and evolves only the base tick damage', () => {
+    const state = echoArena(MAX_GEAR_LEVEL)
+    state.gear.range = MAX_GEAR_LEVEL
+    const result = stepFarm(state, state.position)
+    expect(result.state.crops[0].hp).toBe(400)
+    expect(result.state.crops[0].echo).toBe(true)
+    expect(result.events.map((event) => event.kind)).toEqual(['echo'])
+    expect(advanceEcho(result.state, 8).hits).toEqual([{ tick: 8, damage: 6 }])
+  })
+
+  it('uses the level-three twelve-frame rhythm without stacking or postponing repeated beats', () => {
+    const { hits } = advanceEcho(echoArena(), 61)
+    expect(hits).toEqual([12, 24, 36, 48, 60].map((tick) => ({ tick, damage: 2 })))
+  })
+
+  it('bleeds until death and stops damaging the dead target', () => {
+    const { state, hits } = advanceEcho(echoArena(3, 10), 61)
+    expect(hits).toEqual([12, 24, 36, 48, 60].map((tick) => ({ tick, damage: 2 })))
+    expect(state.crops[0].hp).toBe(0)
+    expect(state.harvested).toBe(1)
+    expect(state.score).toBeGreaterThan(0)
+    expect(stepFarm(state, state.position).state.crops[0].hp).toBe(0)
+  })
+
+  it('keeps bleeding after ten seconds without an expiry', () => {
+    const { state, hits } = advanceEcho(echoArena(), FPS * 10 + 1)
+    expect(hits.at(-1)).toEqual({ tick: 156, damage: 2 })
+    expect(state.crops[0].echo).toBe(true)
+  })
+
+  it('keeps critical, permanent and run damage outside the echo pipeline', () => {
+    const plain = echoArena()
+    const boosted = echoArena()
+    boosted.permanent = Object.fromEntries(
+      PERMANENT_UPGRADES.filter((item) => item.kind === 'damage')
+        .slice(0, 3)
+        .map((item) => [item.id, 1]),
     )
-    // 三只怪都被挂上，而且只被挂上：余音之外鼓什么也没做。
-    expect(struck.state.crops.every((crop) => crop.echo === true)).toBe(true)
-    // 退到射程外之前鼓点还会响几拍；但每一次掉血都正好是一跳的鼓等级 ×2。只要
-    // 出现过一次不是整跳的掉血，就说明鼓打了瞬发伤害。
-    const { state, trace } = advance(struck.state, 0, FPS * 5, kitReach(gear) + 20)
-    const ticks = bledAt(trace, start)
-    expect(ticks.length).toBeGreaterThanOrEqual(4)
-    for (const offset of ticks) expect(bled(trace, start + offset)).toBe(MAX_GEAR_LEVEL * 2)
-    expect(100 - state.crops[0].hp).toBe(MAX_GEAR_LEVEL * 2 * ticks.length)
+    boosted.growth.power = MAX_STAT_LEVEL
+    boosted.gear.lucky = MAX_GEAR_LEVEL
+    expect(advanceEcho(boosted, 61).hits).toEqual(advanceEcho(plain, 61).hits)
   })
-  it('marks the monster the beat reaches and bleeds exactly one drum level per beat', () => {
-    const start = 99
-    const gear = kit(3)
-    const struck = step(echoField(gear, { tick: start })).state
-    // 起拍这一帧就把余音挂上了：标记是布尔值，下一次掉血的帧按当时的 tick 记。
-    expect(struck.crops[0].echo).toBe(true)
-    expect(struck.crops[0].echoNext).toBe(start + ECHO_INTERVAL)
-    const { trace } = advance(struck, 0, ECHO_INTERVAL, kitReach(gear) + 20)
-    expect(bled(trace, start + ECHO_INTERVAL)).toBe(3)
-    // 余音不吃暴击也不吃倍率，掉血就是掉血：它连事件都不发，视觉只看怪身上的标记。
-    expect(at(trace, start + ECHO_INTERVAL).events).toHaveLength(0)
-    // 进化后的鼓每跳掉两倍；满级鼓每 6 帧才响一次，起拍帧要落在它的节拍上。
-    const loudGear = kit(MAX_GEAR_LEVEL, MAX_GEAR_LEVEL)
-    const loudStart = 96
-    const loud = step(echoField(loudGear, { tick: loudStart })).state
-    expect(loud.crops[0].echo).toBe(true)
-    const loudTrace = advance(loud, 0, ECHO_INTERVAL, kitReach(loudGear) + 20).trace
-    expect(bled(loudTrace, loudStart + ECHO_INTERVAL)).toBe(MAX_GEAR_LEVEL * 2)
+
+  it('spreads echo when the bleed deals the killing blow, without instant chain damage', () => {
+    const state = echoArena(3, 2)
+    state.crops[0].echo = true
+    state.crops[0].echoNext = 1
+    state.crops[0].echoInterval = 12
+    state.crops.push({ ...enemy(2, 0, 80, 50), attackUntil: Infinity })
+    state.tick = 1 // No kit beat: any spread here must come from the killing tick.
+    const result = stepFarm(state, state.position)
+    expect(result.state.crops[0].hp).toBe(0)
+    expect(result.state.crops[1].echo).toBe(true)
+    expect(result.state.crops[1].hp).toBe(100)
+    expect(result.events.filter((event) => event.kind === 'harvest')).toHaveLength(1)
+    expect(result.state.drumEchoKills).toBe(0)
   })
-  it('bleeds on its own beat until the monster dies, and harvests it', () => {
-    const start = 99
-    const gear = kit(3)
-    // 15 点血：余音每跳 3 点，第五跳正好把这只怪收掉。
-    const struck = step(echoField(gear, { tick: start, hp: 15 })).state
-    const { trace, state } = advance(struck, 0, ECHO_INTERVAL * 6, kitReach(gear) + 20)
-    // 没有时限，也没有提前收尾：五跳一跳不落，每跳都是 3 点。
-    expect(bledAt(trace, start)).toEqual([16, 32, 48, 64, 80])
-    for (const offset of [16, 32, 48, 64, 80]) expect(bled(trace, start + offset)).toBe(3)
-    // 最后一跳收掉它：血量归零并触发 harvest，标记一直挂到死为止。
-    const kill = at(trace, start + 80)
-    expect(kill.hp).toBe(0)
-    expect(kill.echo).toBe(true)
-    expect(kill.events.filter((event) => event.kind === 'harvest')).toHaveLength(1)
-    expect(state.harvested).toBe(1)
-    expect(state.score).toBeGreaterThan(0)
-    // 收完之后不再掉血：死掉的怪不会继续被余音啃。
-    expect(at(trace, start + 95).hp).toBe(0)
-  })
-  it('has no time limit: it still bleeds long after the beat that marked it', () => {
-    const start = 99
-    const gear = kit(3)
-    // 血厚到撑得住：余音每跳 3 点，10 秒也掉不完，用来证明它根本不会停。
-    const struck = step(echoField(gear, { tick: start, hp: 400 })).state
-    const { trace } = advance(struck, 0, FPS * 10, kitReach(gear) + 20)
-    const ticks = bledAt(trace, start)
-    // 第八秒之后还在跳，而且挂上的标记始终没被摘掉。
-    expect(ticks.length).toBeGreaterThanOrEqual(9)
-    expect(ticks.at(-1)).toBeGreaterThan(FPS * 8)
-    for (const offset of ticks) expect(bled(trace, start + offset)).toBe(3)
-    expect(at(trace, start + FPS * 9).echo).toBe(true)
-  })
-  it('never stacks: repeated beats leave the bleed per tick unchanged', () => {
-    const start = 99
-    const gear = kit(3)
-    // 只有一只怪待在射程里：鼓点每 11 帧响一次，余音每 16 帧跳一次。
-    const solo = field(gear, start)
-    solo.crops = [{ ...enemy(3, 0, 50, 72), hp: 400, maxHp: 400 }]
-    const close = advance(solo, 0, 23, 22)
-    // 第二拍只是把标记再挂一次，掉血的节拍不被推迟——否则密集鼓点会让它永远不掉血。
-    expect(at(close.trace, start + 11).echo).toBe(true)
-    expect(at(close.trace, start + 11).echoNext).toBe(start + ECHO_INTERVAL)
-    expect(at(close.trace, start + 22).echo).toBe(true)
-    // 之后把玩家拉开，场上再没有怪够得着，剩下的掉血只可能是余音。
-    const far = advance(close.state, 0, 60, kitReach(gear) + 20)
-    const trace = [...close.trace, ...far.trace.slice(1)]
-    // 鼓点本身不掉血，所以每一次掉血都是余音的一跳：每 16 帧一跳、每跳都是 3 点。
-    // 反复挂上不叠加：多挨几拍也不会让某一跳变成 6 点或 9 点。
-    expect(bledAt(trace, start)).toEqual([16, 32, 48, 64, 80])
-    for (const offset of [16, 32, 48, 64, 80]) expect(bled(trace, start + offset)).toBe(3)
-  })
-  it('keeps the echo out of the damage pipeline: no crit, no run multiplier', () => {
-    const start = 99
-    const gear = kit(3)
-    const gap = kitReach(gear) + 20
-    const frames = FPS * 5
-    const plain = advance(echoField(gear, { tick: start }), 0, frames, gap).trace
-    const boosted = echoField(gear, { tick: start })
-    // 超频卡、永久伤害与暴击（lucky）一起堆满。
-    boosted.permanent = damageSteps
-    boosted.growth = { ...boosted.growth, power: MAX_STAT_LEVEL }
-    Object.assign(boosted.gear, { lucky: MAX_GEAR_LEVEL })
-    const loud = advance(boosted, 0, frames, gap).trace
-    // 鼓点这一下本身不造成任何伤害：倍率堆满，挂上余音那帧的血量也是一动不动。
-    expect(bled(plain, start)).toBe(0)
-    expect(bled(loud, start)).toBe(0)
-    // 余音不吃：每一跳的数值一个不差，一秒后才开始掉。
-    for (const offset of [ECHO_INTERVAL, 32, 48, 64])
-      expect(bled(loud, start + offset)).toBe(bled(plain, start + offset))
-    expect([bled(plain, start + ECHO_INTERVAL), bled(loud, start + ECHO_INTERVAL)]).toEqual([3, 3])
-  })
-  it('harvests and chains again when an echo tick lands the kill', () => {
-    const start = 99
-    const gear = kit(3)
-    // 3 点血：挂上余音那一帧鼓点不掉血，正好由第一跳余音（3 点）收掉。
-    const struck = step(echoField(gear, { tick: start, hp: 3 })).state
-    // 见证怪在起拍之后才进场，所以它身上此刻还没有余音。
-    struck.crops = [...struck.crops, witness(gear)]
-    const { trace, state } = advance(struck, 0, 20, kitReach(gear) + 20)
-    // 掉血还没跳的时候既没收怪，也没给旁边的见证怪挂余音。
-    expect(at(trace, start + ECHO_INTERVAL - 1).hp).toBeGreaterThan(0)
-    expect(at(trace, start + ECHO_INTERVAL - 1).marks[1]).toBe(false)
-    const kill = at(trace, start + ECHO_INTERVAL)
-    expect(kill.hp).toBe(0)
-    expect(kill.events.filter((event) => event.kind === 'harvest')).toHaveLength(1)
-    // 收掉它的连锁照样扩散出去，并给周围的怪挂上新一轮余音。
-    expect(kill.marks[1]).toBe(true)
-    expect(state.harvested).toBe(1)
-    expect(state.score).toBeGreaterThan(0)
-    expect(state.loot.some((drop) => drop.coins > 0 && drop.xp > 0)).toBe(true)
-  })
-  it('leaves no echo behind when the band carries no drum', () => {
-    const start = 99
-    const s = field(kit(0, MAX_GEAR_LEVEL), start)
-    s.crops = [{ ...enemy(3, 0, 50, 72), hp: 400, maxHp: 400 }]
-    const { trace, state } = advance(s, 0, FPS * 5, 22)
-    expect(trace.every((entry) => entry.marks.every((mark) => !mark))).toBe(true)
-    expect(trace.some((entry) => entry.events.some((event) => event.kind === 'echo'))).toBe(false)
-    expect(state.crops[0].hp).toBe(400)
+
+  it('leaves no echo when the band carries no drum', () => {
+    const { state, hits } = advanceEcho(echoArena(0), FPS * 5)
+    expect(hits).toEqual([])
+    expect(state.crops[0].echo).toBeUndefined()
   })
 })

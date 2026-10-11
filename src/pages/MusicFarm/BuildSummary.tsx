@@ -1,6 +1,11 @@
 import type { CSSProperties } from 'react'
 import { farmBuildSummary, farmBuiltLevels } from '@/features/farm/build'
-import { MAX_GEAR_LEVEL } from '@/features/farm/rules.mjs'
+import {
+  DRUM_ECHO_KILLS_PER_DAMAGE,
+  drumEchoStats,
+  FPS,
+  MAX_GEAR_LEVEL,
+} from '@/features/farm/rules.mjs'
 import type { Gear } from '@/features/farm/rules.mjs'
 import {
   activeSchoolCombos,
@@ -10,10 +15,17 @@ import {
   type ComboState,
 } from '@/features/farm/help'
 
-export function BuildSummary({ gear, state }: { gear: Gear; state?: ComboState }) {
+export function BuildSummary({
+  gear,
+  state,
+}: {
+  gear: Gear
+  state?: ComboState & { drumEchoKills?: number }
+}) {
   const summary = farmBuildSummary(gear).filter((item) => item.weaponLevel || item.chipLevel)
   if (!summary.length) return null
   const base = state ?? gear
+  const echo = drumEchoStats(base)
   const views = new Map(startedSchoolViews(base).map((view) => [view.weapon, view]))
   const combos = activeSchoolCombos(base)
   const hints = schoolComboHints(base).slice(0, 2)
@@ -34,6 +46,14 @@ export function BuildSummary({ gear, state }: { gear: Gear; state?: ComboState }
                 <small>
                   Lv.{item.weaponLevel} ＋ Lv.{item.chipLevel}
                 </small>
+                {item.weapon === 'drum' && item.weaponLevel >= MAX_GEAR_LEVEL && (
+                  <small
+                    aria-label={`余音每跳伤害 ${echo.damage}，间隔 ${echo.interval / FPS} 秒，击杀成长加 ${echo.bonus}，下一次成长进度 ${echo.kills % DRUM_ECHO_KILLS_PER_DAMAGE}/${DRUM_ECHO_KILLS_PER_DAMAGE}`}
+                  >
+                    每跳 {echo.damage} · {echo.interval / FPS}s · 成长 +{echo.bonus} ·{' '}
+                    {echo.kills % DRUM_ECHO_KILLS_PER_DAMAGE}/{DRUM_ECHO_KILLS_PER_DAMAGE}
+                  </small>
+                )}
                 {view && (
                   <span
                     className={`farm-school-tag${view.evolved ? ' is-evolved' : ''}`}

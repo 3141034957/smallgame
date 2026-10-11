@@ -21,6 +21,7 @@ import {
   activeCombos,
   chooseTalent,
   clampPoint,
+  comboModifiers,
   createFarm,
   evolved,
   farmModifier,
@@ -509,9 +510,19 @@ describe('music roguelite farming', () => {
   })
 
   it('spreads the drum echo over a wider area once the speaker tops out, without marking a crop twice', () => {
+    // 共鸣音箱的唯一作用就是加宽余音的扩散半径：鼓等级不变时，半径差正好是
+    // 音箱等级差 ×2（再乘跨流派倍率）。
+    const blastOf = (range) => {
+      const state = arena({ drum: MAX_GEAR_LEVEL, range }, [crop(0, 50, 50)])
+      return stepFarm(state, state.position).events.find((event) => event.kind === 'echo').radius
+    }
+    const perLevel = blastOf(1) - blastOf(0)
+    expect(perLevel).toBe(2 * comboModifiers({ drum: MAX_GEAR_LEVEL }).blastArea)
+    expect(blastOf(MAX_GEAR_LEVEL - 1) - blastOf(0)).toBe((MAX_GEAR_LEVEL - 1) * perLevel)
+    // 第二只站在 33.6 远：音箱差一级（半径 25）还够不着，满级加上进化（半径 39）才圈进来。
     const ordinary = arena({ drum: MAX_GEAR_LEVEL, range: MAX_GEAR_LEVEL - 1 }, [
       crop(0, 50, 50),
-      crop(1, 79, 50, 6),
+      crop(1, 90, 50, 6),
     ])
     const terminal = structuredClone(ordinary)
     terminal.gear.range = MAX_GEAR_LEVEL

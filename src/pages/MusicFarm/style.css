@@ -93,6 +93,13 @@
   justify-content: center;
   gap: 3px;
 }
+/* Restart is destructive, so the second tap is announced by the look of the
+   button rather than by a label that would not fit the round icon. */
+.farm-header nav button.is-armed {
+  border-color: #e27f35;
+  background: #fdeacf;
+  box-shadow: 0 0 0 3px #e27f3533;
+}
 
 /* 图片图标（webp 透明底），文字语义由按钮文字或 aria-label 承担。 */
 .farm-icon {

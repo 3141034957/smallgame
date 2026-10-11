@@ -25,14 +25,9 @@ export function simulateFarm(
   permanent = {},
   movement = dodge ? 'dodge' : 'wander',
 ) {
-  let state = createFarm(day, permanent)
-  // A run is always played as a band member and opens holding that member's
-  // instrument, so a check starts the run already holding the one it wants
-  // instead of dealing a random opening hand.
-  if (startHolding) {
-    state.gear[focus] = 1
-    state.level = 1
-  }
+  // Use the same free opening instrument and level-zero XP curve as the
+  // client and replay; carrying a starter is not an earned player level.
+  let state = createFarm(day, permanent, startHolding ? focus : undefined)
   const upgrades = [],
     snapshots = {},
     evolutions = []
@@ -127,6 +122,7 @@ export function simulateFarm(
     level: state.level,
     xp: state.xp,
     harvested: state.harvested,
+    drumEchoKills: state.drumEchoKills,
     coins: state.coins,
     upgrades,
     evolutions,
