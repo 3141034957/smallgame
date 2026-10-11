@@ -46,6 +46,7 @@ export function createFarmStore(databasePath) {
           stars: row.stars,
           seconds: row.seconds ?? 0,
           characterId: normalizeCharacterId(row.character_id),
+          ruleset: row.song_id?.split(':')[1] ?? '',
           isYou: row.player_id === playerId,
         }
       : null
@@ -93,7 +94,9 @@ export function createFarmStore(databasePath) {
         .get(songId, difficulty).total
       return { data: rows.map((row) => toEntry(row, playerId)), own: toEntry(own, playerId), total }
     },
-    boardAcrossDays(songPrefix, difficulty, playerId = null) {
+    // Every ruleset keeps its own daily rows, but the all-time board spans all
+    // of them: a score from an older ruleset is still a score somebody played.
+    boardAcrossDays(difficulty, playerId = null) {
       // Keep existing daily records and select each player's best full record.
       const allTimeRanking = `WITH personal AS (
         SELECT *, ROW_NUMBER() OVER (PARTITION BY player_id
@@ -102,7 +105,7 @@ export function createFarmStore(databasePath) {
       ) SELECT *, ROW_NUMBER() OVER (
         ORDER BY score DESC, accuracy DESC, max_combo DESC, updated_at ASC, player_id ASC
       ) AS rank FROM personal WHERE best = 1`
-      const pattern = `${songPrefix}????-??-??`
+      const pattern = 'farm:*'
       const rows = db
         .prepare(`SELECT * FROM (${allTimeRanking}) ORDER BY rank LIMIT 50`)
         .all(pattern, difficulty)

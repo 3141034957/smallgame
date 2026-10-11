@@ -74,7 +74,7 @@ export async function handleFarmRequest(
   }
   try {
     if (req.method === 'GET' && url.pathname === '/api/farm/leaderboard') {
-      send(200, store.boardAcrossDays(FARM_PREFIX, 'farm', authenticate()?.id ?? null))
+      send(200, store.boardAcrossDays('farm', authenticate()?.id ?? null))
     } else if (req.method === 'POST' && url.pathname === '/api/farm/score') {
       const user = authenticate()
       if (!user) {
@@ -126,7 +126,7 @@ export async function handleFarmRequest(
       }
       store.submit(record)
       send(200, {
-        ...store.boardAcrossDays(FARM_PREFIX, 'farm', record.playerId),
+        ...store.boardAcrossDays('farm', record.playerId),
         acceptedScore: record.score,
       })
     } else if (url.pathname === '/api/farm/score')
