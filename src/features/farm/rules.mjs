@@ -185,7 +185,7 @@ const TALENT_DEFINITIONS = [
     name: '安可徽章',
     icon: '★',
     color: '#dbbb6b',
-    description: '金币与经验更多，并带来暴击，配主唱进化',
+    description: '金币经验 +，暴击（余音不暴击），配主唱进化',
     tag: '暴击与收益',
   },
   {
@@ -257,7 +257,7 @@ const TALENT_DEFINITIONS = [
     name: '触发器',
     icon: '◓',
     color: '#a585c4',
-    description: '布设类攻击更快更密、伤害更高，配节拍鳄进化',
+    description: '布设类攻击更快更密、范围更大，配节拍鳄进化',
     tag: '地雷强化',
   },
   {
@@ -275,7 +275,7 @@ const TALENT_DEFINITIONS = [
     name: '唱针',
     icon: '◔',
     color: '#7c9cb0',
-    description: '所有攻击伤害 +，回响弹更痛，配打碟机进化',
+    description: '命中伤害 +（不含余音），回响弹更痛，配打碟机进化',
     tag: '音刃强化',
   },
   {
@@ -364,8 +364,8 @@ const STAT_CARD_DEFINITIONS = [
     name: '力量',
     icon: '♫',
     color: '#cfa46b',
-    description: `所有乐器与音浪爆发的伤害 +${STAT_CARD_DAMAGE * 100}%。`,
-    tag: '全部伤害',
+    description: `命中伤害 +${STAT_CARD_DAMAGE * 100}%（不含余音）。`,
+    tag: '命中伤害',
     max: MAX_STAT_LEVEL,
     step: STAT_CARD_DAMAGE * 100,
   },

@@ -24,7 +24,7 @@ const STEP_PRICE = 2000
 // means. The chain interleaves the quotas instead of stacking them in blocks.
 export const PERMANENT_KINDS = [
   { kind: 'vitality', branch: 'survival', icon: '♡', quota: 55, amount: 1, label: '生命 +1' },
-  { kind: 'damage', branch: 'power', icon: '♫', quota: 25, amount: 1, label: '伤害 +1' },
+  { kind: 'damage', branch: 'power', icon: '♫', quota: 25, amount: 1, label: '命中伤害 +1' },
   { kind: 'attraction', branch: 'movement', icon: '✦', quota: 30, amount: 2, label: '拾取 +2' },
   { kind: 'speed', branch: 'movement', icon: '➜', quota: 27, amount: 1, label: '移速 +1' },
   { kind: 'xp', branch: 'power', icon: '♬', quota: 32, amount: 1, label: '经验 +1' },
