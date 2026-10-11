@@ -1333,6 +1333,17 @@
   width: calc(100% - 40px);
   margin: auto;
   box-shadow: 0 10px 30px #6f88532e;
+  /* The overlay never grows past one screen: the card is capped at the
+     overlay height and the leaderboard inside absorbs the difference. */
+  max-height: 100%;
+  min-height: 0;
+}
+/* Only the leaderboard shrinks; the title and the buttons keep their size. */
+.farm-start-card > * {
+  flex: none;
+}
+.farm-start-card > .farm-board.is-compact {
+  flex: 1 1 auto;
 }
 .farm-ready-icon {
   width: 64px;
@@ -1548,6 +1559,22 @@
   }
   .farm-result {
     padding: 24px 16px;
+  }
+}
+/* Short phones hide the two shop pills rather than growing the start card:
+   the header still reaches the same pages. */
+@media (max-height: 700px) {
+  .farm-shop-pill {
+    display: none;
+  }
+  .farm-start-card {
+    padding: 15px 18px 14px;
+  }
+  .farm-ready h2 {
+    margin: 9px 0 6px;
+  }
+  .farm-ready p:not(.farm-start-gear) {
+    margin-bottom: 14px;
   }
 }
 @media (max-height: 620px) {
@@ -2802,5 +2829,78 @@
     clip-path: inset(50%);
     white-space: nowrap;
     border: 0;
+  }
+}
+
+/* ---- Result page on a phone ----
+   The recap ran 2-3 screens tall. The four tallest blocks go away (the
+   timeline chart, today's goals, the full leaderboard, the achievement
+   strip) and the wallet row folds into one line, so the score, the build
+   and the buttons stay on one screen. */
+@media (max-width: 680px) {
+  .farm-result > .farm-recap,
+  .farm-result > .farm-quests,
+  .farm-result > .farm-board,
+  .farm-result > .farm-fresh-badges {
+    display: none;
+  }
+  .farm-result {
+    padding: 16px 16px;
+  }
+  .farm-result h2 {
+    margin: 10px 0;
+  }
+  .farm-result > .farm-primary {
+    margin-top: 12px;
+    margin-bottom: 12px;
+  }
+  /* A five-piece band would push the card back past the fold: the list keeps
+     every instrument and scrolls inside its own box instead. */
+  .farm-result > .farm-build ul {
+    max-height: min(14dvh, 96px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .farm-result .farm-wallet-reward {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px 8px;
+    margin-top: 12px;
+    padding: 9px 12px;
+  }
+  .farm-result .farm-wallet-reward small {
+    margin-top: 0;
+  }
+  .farm-result .farm-result-shop {
+    flex: 1 1 auto;
+    width: auto;
+    margin: 0;
+    padding: 9px 10px;
+  }
+}
+/* Below ~700px of viewport the band summary goes too: the header still opens
+   the same pages, and the score stays readable. */
+@media (max-width: 680px) and (max-height: 700px) {
+  .farm-result > .farm-build {
+    display: none;
+  }
+  .farm-result {
+    padding: 14px 16px;
+  }
+  .farm-result h2 {
+    font-size: 19px;
+    margin: 8px 0;
+  }
+  .farm-stars {
+    font-size: 21px;
+  }
+  .farm-final-score {
+    font-size: 36px;
+  }
+  .farm-result > .farm-primary {
+    margin-top: 10px;
+    margin-bottom: 10px;
   }
 }
