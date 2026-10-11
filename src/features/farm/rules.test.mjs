@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { BAND_CHARACTERS, LEGACY_CHARACTER_IDS } from './characterRoster.mjs'
 import {
+  ECHO_INTERVAL,
+  ECHO_SECONDS,
   FARM_MODIFIERS,
   FPS,
   MAX_BOSSES,
@@ -190,8 +192,17 @@ describe('music roguelite farming', () => {
     // the opening patch is only harvested by the member's own attack.
     expect(first.events.some((event) => event.kind === 'pulse')).toBe(false)
     expect(first.state.harvested).toBe(0)
+    // 鼓手开场：鼓点已经在响，但鼓不再造成任何瞬发伤害——起手这一帧只是把余音挂
+    // 到身边的怪身上，收获得等第一跳余音（一秒后）落下来。
     const opening = createFarm(day, {}, 'bear-drums')
-    expect(stepFarm(opening, opening.position).state.harvested).toBeGreaterThan(0)
+    const beat = stepFarm(opening, opening.position)
+    expect(beat.state.harvested).toBe(0)
+    expect(beat.events.some((event) => event.kind === 'echo')).toBe(true)
+    expect(beat.state.crops.some((crop) => crop.echoUntil > 0)).toBe(true)
+    let drummer = beat.state
+    for (let tick = 1; tick <= ECHO_INTERVAL && !drummer.harvested; tick++)
+      drummer = stepFarm(drummer, drummer.position).state
+    expect(drummer.harvested).toBeGreaterThan(0)
     state = first.state
     for (let tick = 1; !state.offered.length && tick < FPS * 5; tick++) {
       // Nothing attacks without an instrument, so the first level of
@@ -422,10 +433,13 @@ describe('music roguelite farming', () => {
     // Attribute cards are dealt into the spare slot, so only some days offer
     // one at all: the day has to be one that spends more than one level on the
     // attribute line before the run ends.
-    const routeDay = '2026-10-20'
+    const routeDay = '2026-10-04'
+    // 鼓已经没有瞬发伤害，单拎出来的鼓手撑不到第二张属性卡；换一条真能打死的路线
+    // （吉他 + 这一天会连发两张属性卡），判定仍然是「属性卡发得出来、重放同分」。
+    const route = memberFor('orbit')
     // Only the cards that do not keep the runner alive: a toughened farmer
     // outlives the walk into the horde that a replay needs to end on.
-    const { state, frames, choices, surges } = run('drum', routeDay, 'bear-drums', [
+    const { state, frames, choices, surges } = run('orbit', routeDay, route, [
       'overdrive',
       'footwork',
       'vigor',
@@ -438,7 +452,7 @@ describe('music roguelite farming', () => {
     // The toughened builds survive the closing walk, so only a run that ended
     // can be verified against the server's replay.
     if (state.hp > 0) return
-    expect(replayFarm(routeDay, frames, choices, surges, {}, 'bear-drums')).toMatchObject({
+    expect(replayFarm(routeDay, frames, choices, surges, {}, route)).toMatchObject({
       score: state.score,
       xp: state.xp,
       coins: state.coins,
@@ -495,7 +509,7 @@ describe('music roguelite farming', () => {
     }
   })
 
-  it('turns drum harvests into wider damaging chain blasts without counting a crop twice', () => {
+  it('spreads the drum echo over a wider area once the speaker tops out, without marking a crop twice', () => {
     const ordinary = arena({ drum: MAX_GEAR_LEVEL, range: MAX_GEAR_LEVEL - 1 }, [
       crop(0, 50, 50),
       crop(1, 79, 50, 6),
@@ -504,22 +518,34 @@ describe('music roguelite farming', () => {
     terminal.gear.range = MAX_GEAR_LEVEL
     const normal = stepFarm(ordinary, ordinary.position)
     const ultimate = stepFarm(terminal, terminal.position)
-    // Nothing but the kit reaches out now: the second crop is out of the
-    // blast until the top-level speaker widens it, so it keeps all its health.
+    // 鼓点这一下不造成任何伤害：两只怪都还是满血/原血。
     expect(normal.state.crops[1].hp).toBe(6)
-    expect(ultimate.state.crops[1].hp).toBe(0)
-    expect(ultimate.events.find((event) => event.kind === 'blast').radius).toBeGreaterThan(
-      normal.events.find((event) => event.kind === 'blast').radius,
+    expect(ultimate.state.crops[1].hp).toBe(6)
+    // 余音挂不挂得上只看爆破半径：音箱没满级时第二只够不着，满级后进化把它也圈进来。
+    expect(normal.state.crops[1].echoUntil ?? 0).toBe(0)
+    expect(ultimate.state.crops[1].echoUntil).toBe(ECHO_SECONDS * FPS)
+    expect(normal.state.crops[0].echoUntil).toBe(ECHO_SECONDS * FPS)
+    expect(ultimate.events.find((event) => event.kind === 'echo').radius).toBeGreaterThan(
+      normal.events.find((event) => event.kind === 'echo').radius,
     )
     const dense = arena({ drum: MAX_GEAR_LEVEL, range: MAX_GEAR_LEVEL }, [
       crop(0, 50, 50),
       crop(1, 51, 50),
       crop(2, 52, 50),
     ])
-    const chain = stepFarm(dense, dense.position)
-    expect(chain.state.harvested).toBe(3)
-    expect(chain.events.filter((event) => event.kind === 'harvest')).toHaveLength(3)
-    expect(chain.events.some((event) => event.chain)).toBe(true)
+    const marked = stepFarm(dense, dense.position)
+    // 一拍就把三只全挂上，但一只都没收：hit 与 harvest 事件一个都没有。
+    expect(marked.state.crops.every((item) => item.echoUntil === ECHO_SECONDS * FPS)).toBe(true)
+    expect(marked.state.harvested).toBe(0)
+    expect(marked.events.some((event) => event.kind === 'hit' || event.kind === 'harvest')).toBe(
+      false,
+    )
+    // 余音每跳鼓等级 ×2 = 10 点：第一跳收掉第一只，而每收掉一只，它那一圈连锁就把
+    // 还活着的那几只的余音节拍顺延一跳。三只因此在四秒内被逐个收掉，一只也不多收。
+    let chain = marked.state
+    for (let tick = 1; tick <= FPS * ECHO_SECONDS && chain.harvested < 3; tick++)
+      chain = stepFarm(chain, chain.position).state
+    expect(chain.harvested).toBe(3)
     expect(dense.crops.every((item) => item.hp === 1)).toBe(true)
   })
 
@@ -775,9 +801,12 @@ describe('music roguelite farming', () => {
       expect(round.terminalAt).toBeLessThan(FPS * 150)
       expect(round.state.tick).toBeGreaterThan(FPS * 20)
       expect(round.choices).toHaveLength(round.state.level)
-      // The drum route banks 36 levels before the closing walk: fewer than the
-      // old reward table did, but still far more than a run needs for a recipe.
-      if (focus === 'drum') expect(round.choices.length).toBeGreaterThan(30)
+      // The drum route used to bank 30-odd levels before the closing walk. Its
+      // only output is the echo now, so it banks just the picks its recipe
+      // costs — drum 5 + speaker 5, opening on the member's own drum — and
+      // dies right after the final form.
+      if (focus === 'drum')
+        expect(round.choices.length).toBeGreaterThanOrEqual(MAX_GEAR_LEVEL * 2 - 1)
       const replay = replayFarm(routeDay, round.frames, round.choices, round.surges, {}, member)
       expect(replay).toMatchObject({
         score: round.state.score,
