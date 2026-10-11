@@ -988,7 +988,12 @@ export function stepFarm(previous, point, useSurge = false) {
     const radius = blastRadius()
     events.push({ id: state.nextId++, kind: 'echo', x, y, radius, lane: 0 })
     for (const other of state.crops)
-      if (other.hp > 0 && distance(other.x, other.y, x, y) <= radius) markEcho(other)
+      if (
+        other.hp > 0 &&
+        state.tick >= (other.spawnAt ?? 0) &&
+        distance(other.x, other.y, x, y) <= radius
+      )
+        markEcho(other)
   }
   for (const crop of state.crops)
     if (!crop.boss && crop.hp <= 0 && state.tick >= crop.regrow) {
@@ -1058,6 +1063,9 @@ export function stepFarm(previous, point, useSurge = false) {
       slot.dashDx = undefined
       slot.dashDy = undefined
       slot.slowUntil = -1
+      // A reused slot must not inherit the echo of whatever died in it.
+      slot.echoUntil = 0
+      slot.echoNext = 0
       placeAtEdge(state, slot, true)
     } else if (state.crops.filter((crop) => !crop.boss).length < 100) {
       const elite = {

@@ -102,7 +102,8 @@ export const COMBOS = [
     requirement: '鼓组流 + 合成器流都进化',
     effect: `扇形音浪伤害 +${percent(RESONANCE_STORM_DAMAGE)}、音浪与余音扩散范围 +${percent(RESONANCE_STORM_AREA)}`,
     bonus: {
-      blast: RESONANCE_STORM_DAMAGE,
+      // No `blast`: the drum deals no instant damage, so only the spread area
+      // and the synth fan still gain from this combo.
       blastArea: RESONANCE_STORM_AREA,
       fan: RESONANCE_STORM_DAMAGE,
       fanArea: RESONANCE_STORM_AREA,
