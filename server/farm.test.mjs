@@ -3,7 +3,6 @@ import { Readable } from 'node:stream'
 import { createFarmStore } from './farm-store.mjs'
 import { AuthError } from './auth-store.mjs'
 import {
-  FARM_PREFIX,
   FARM_SCORE_LIMIT,
   farmKey,
   handleFarmRequest,
@@ -418,11 +417,7 @@ describe('replay-verified all-time farm leaderboard', () => {
     try {
       const record = verifyFarm(input)
       store.submit({ ...record, characterId: 'burger-dog' })
-      const board = store.boardAcrossDays(
-        farmKey(day).slice(0, -day.length),
-        'farm',
-        input.playerId,
-      )
+      const board = store.boardAcrossDays('farm', input.playerId)
       expect(board.own).toMatchObject({
         characterId: 'crocodile-beat',
         score: round.score,
@@ -509,10 +504,10 @@ describe('replay-verified all-time farm leaderboard', () => {
         },
         50,
       )
+      // Only a different game or a different difficulty stays out of the farm
+      // all-time board: an older farm ruleset is a farm score like any other,
+      // and `farm-store.test.mjs` covers merging those versions.
       for (const [songId, difficulty] of [
-        [`farm:v8-recovery:${day}`, 'farm'],
-        [`farm:v3:${day}`, 'farm'],
-        [`farm:v4:endless:${day}`, 'farm'],
         [`wave:v1:${day}`, 'wave'],
         [farmKey(day), 'melody'],
       ]) {
@@ -619,7 +614,7 @@ describe('replay-verified all-time farm leaderboard', () => {
       expect(blocked.status).toBe(429)
       expect(blocked.headers['Retry-After']).toBe('900')
       expect(keys).toEqual(Array(3).fill(`score:${input.playerId}`))
-      expect(store.boardAcrossDays(FARM_PREFIX, 'farm').total).toBe(0)
+      expect(store.boardAcrossDays('farm').total).toBe(0)
     } finally {
       store.close()
     }
@@ -655,7 +650,7 @@ describe('replay-verified all-time farm leaderboard', () => {
       )
       expect(long.status).toBe(400)
       expect(long.data.error).toContain('上限')
-      expect(store.boardAcrossDays(FARM_PREFIX, 'farm').total).toBe(0)
+      expect(store.boardAcrossDays('farm').total).toBe(0)
     } finally {
       store.close()
     }

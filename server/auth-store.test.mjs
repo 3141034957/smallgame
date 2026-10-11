@@ -140,7 +140,7 @@ it('survives restarts, expires at seven days and leaves existing scores intact',
   const renewed = await store.enter('persist', otherProgress)
   expect(store.user(renewed.token)).toEqual(result.user)
   expect(store.progress(result.user.id)).toEqual({ data: progress, revision: 1 })
-  expect(farm.boardAcrossDays('farm:', 'farm').data).toEqual([])
+  expect(farm.boardAcrossDays('farm').data).toEqual([])
   farm.close()
 })
 it('purges expired sessions on startup so the table cannot grow forever', async () => {

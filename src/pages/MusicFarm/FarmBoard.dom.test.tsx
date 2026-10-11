@@ -117,7 +117,8 @@ it('lets guests register after a finished run without submitting an anonymous sc
   const register = screen.getByRole('button', { name: '注册并保存本局进度' })
   expect(register.textContent).toBe('注册')
   fireEvent.click(register)
-  expect(openAccount).toHaveBeenCalledWith('register')
+  // The merged form takes no mode: one nickname field is the only way in.
+  expect(openAccount).toHaveBeenCalledWith()
   await waitFor(() => expect(farmRequest).toHaveBeenCalled())
   expect(vi.mocked(farmRequest).mock.calls.some(([path]) => path === 'score')).toBe(false)
 })

@@ -76,7 +76,7 @@ function Game() {
       >
         完成游客局
       </button>
-      <button onClick={() => account?.openAccount('login')}>结算后进入乐队</button>
+      <button onClick={() => account?.openAccount()}>结算后进入乐队</button>
     </div>
   )
 }

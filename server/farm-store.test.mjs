@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { createFarmStore } from './farm-store.mjs'
-import { FARM_PREFIX, farmKey } from './farm.mjs'
+import { farmKey } from './farm.mjs'
 
 it('keeps the score write and the rename in one transaction, scoped to the submitted song', () => {
   const directory = mkdtempSync(join(tmpdir(), 'farm-tx-'))
@@ -58,7 +58,7 @@ it('migrates the deployed schema and preserves existing farm scores and avatars'
       .run('farm_legacy_player', farmKey('2026-10-04'), 'farm', '老乐手', 5000, 3000, 40, 2, 1)
     legacy.close()
     store = createFarmStore(path)
-    expect(store.boardAcrossDays(FARM_PREFIX, 'farm', 'farm_legacy_player').own).toMatchObject({
+    expect(store.boardAcrossDays('farm', 'farm_legacy_player').own).toMatchObject({
       name: '老乐手',
       score: 5000,
       seconds: 0,
@@ -80,7 +80,7 @@ it('migrates the deployed schema and preserves existing farm scores and avatars'
       },
       2,
     )
-    expect(store.boardAcrossDays(FARM_PREFIX, 'farm').data[0]).toMatchObject({
+    expect(store.boardAcrossDays('farm').data[0]).toMatchObject({
       name: '新昵称',
       score: 5000,
       seconds: 0,
@@ -102,6 +102,66 @@ it('migrates the deployed schema and preserves existing farm scores and avatars'
     expect(invalid.stderr).toContain('日期无效')
   } finally {
     store?.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+it('merges every ruleset into the all-time board and keeps one row per player', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'farm-rulesets-'))
+  const store = createFarmStore(join(directory, 'game.db'))
+  try {
+    const base = {
+      difficulty: 'farm',
+      name: '乐手',
+      accuracy: 100,
+      maxCombo: 1,
+      stars: 0,
+      seconds: 10,
+      characterId: 'bear-drums',
+    }
+    // Two rulesets on two days: both belong on the all-time board, while each
+    // version keeps its own daily rows.
+    store.submit(
+      { ...base, playerId: 'v9_player', songId: 'farm:v9-boss-interval:2026-10-01', score: 700 },
+      100,
+    )
+    store.submit(
+      { ...base, playerId: 'v12_player', songId: 'farm:v12-echo-only:2026-10-02', score: 600 },
+      200,
+    )
+    // One player on two versions and two days: only the best row survives.
+    store.submit(
+      { ...base, playerId: 'both_player', songId: 'farm:v9-boss-interval:2026-10-01', score: 500 },
+      300,
+    )
+    store.submit(
+      { ...base, playerId: 'both_player', songId: 'farm:v12-echo-only:2026-10-01', score: 900 },
+      400,
+    )
+    store.submit(
+      { ...base, playerId: 'both_player', songId: 'farm:v12-echo-only:2026-10-02', score: 800 },
+      500,
+    )
+    const board = store.boardAcrossDays('farm', 'both_player')
+    expect(board.total).toBe(3)
+    expect(board.data.map((entry) => entry.score)).toEqual([900, 700, 600])
+    expect(board.data.map((entry) => entry.ruleset)).toEqual([
+      'v12-echo-only',
+      'v9-boss-interval',
+      'v12-echo-only',
+    ])
+    expect(board.own).toMatchObject({
+      score: 900,
+      rank: 1,
+      ruleset: 'v12-echo-only',
+      isYou: true,
+    })
+    // A daily board still belongs to one version only.
+    expect(store.board('farm:v9-boss-interval:2026-10-01', 'farm').total).toBe(2)
+    expect(store.board('farm:v12-echo-only:2026-10-01', 'farm').total).toBe(1)
+    expect(store.board('farm:v12-echo-only:2026-10-02', 'farm').total).toBe(2)
+  } finally {
+    store.close()
     rmSync(directory, { recursive: true, force: true })
   }
 })
