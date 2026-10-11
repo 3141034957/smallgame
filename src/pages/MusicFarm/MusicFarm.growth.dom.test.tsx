@@ -56,21 +56,25 @@ it('uses purchases made on the ready screen at start, then keeps the running sna
   expect(screen.getByRole('progressbar', { name: '生命值' }).getAttribute('aria-valuemax')).toBe(
     maxHp(first),
   )
+  // A run offers no shortcuts to the chain: only pause and a two-tap restart.
+  expect(screen.queryByRole('button', { name: '打开永久强化' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '重新开始本局' }))
+  fireEvent.click(screen.getByRole('button', { name: '确认重新开始本局' }))
+  // The chain keeps going: step 2 is experience, so the bar stays where step 1
+  // put it. Growth only ever lands on the next run.
   fireEvent.click(screen.getByRole('button', { name: '打开永久强化' }))
   fireEvent.click(buyStep(2, second))
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: '返回游戏' })))
+  fireEvent.click(screen.getByRole('button', { name: '返回游戏' }))
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '开始无限模式' })))
   expect(screen.getByRole('progressbar', { name: '生命值' }).getAttribute('aria-valuemax')).toBe(
     maxHp(first),
   )
+  fireEvent.click(screen.getByRole('button', { name: '重新开始本局' }))
+  fireEvent.click(screen.getByRole('button', { name: '确认重新开始本局' }))
   fireEvent.click(screen.getByRole('button', { name: '打开永久强化' }))
   fireEvent.click(screen.getByRole('button', { name: '免费重置强化' }))
   fireEvent.click(screen.getByRole('button', { name: '确认重置' }))
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: '返回游戏' })))
-  expect(screen.getByRole('progressbar', { name: '生命值' }).getAttribute('aria-valuemax')).toBe(
-    maxHp(first),
-  )
-  fireEvent.click(screen.getByRole('button', { name: '暂停游戏' }))
-  fireEvent.click(screen.getByRole('button', { name: '重新开始' }))
+  fireEvent.click(screen.getByRole('button', { name: '返回游戏' }))
   await act(async () => fireEvent.click(screen.getByRole('button', { name: '开始无限模式' })))
   expect(screen.getByRole('progressbar', { name: '生命值' }).getAttribute('aria-valuemax')).toBe(
     '100',

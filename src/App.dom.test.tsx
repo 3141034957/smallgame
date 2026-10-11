@@ -85,7 +85,8 @@ it('closes the open dialog on the back gesture instead of dropping the run', asy
   )
   await screen.findByRole('button', { name: '退出登录' })
   fireEvent.click(screen.getByRole('button', { name: '开始无限模式' }))
-  fireEvent.click(screen.getByRole('button', { name: '查看进化配方' }))
+  // A run hides the header shortcuts: pause is the dialog entry point now.
+  fireEvent.click(screen.getByRole('button', { name: '暂停游戏' }))
   expect(screen.getByRole('dialog')).toBeTruthy()
   // The dialog owns the back gesture through a placeholder history entry.
   expect(window.history.state).toMatchObject({ farmDialog: true })
