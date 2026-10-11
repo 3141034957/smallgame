@@ -1,6 +1,7 @@
 import { accountStorage } from '@/utils/accountStorage'
 import { routeSeed } from './calendar.mjs'
-import { awardFarmCoins } from './characters'
+import { awardFarmCoins, loadFarmProfile } from './characters'
+import { PERMANENT_CHAIN, permanentNextStep, permanentPrice } from './permanent.mjs'
 import { evolved, type FarmRound } from './rules.mjs'
 
 export type FarmQuest = {
@@ -10,11 +11,16 @@ export type FarmQuest = {
   desc: string
   kind: 'best' | 'total'
   target: number
+  // Share of the next chain step's price this goal pays out; harder goals
+  // take a bigger slice, so a day of goals stays worth chasing deep into the
+  // 40,200,000-coin chain instead of turning into pocket change.
+  share: number
   reward: number
   metric: (round: FarmRound) => number
 }
+type FarmQuestTemplate = Omit<FarmQuest, 'reward'>
 
-const TEMPLATES: FarmQuest[] = [
+const TEMPLATES: FarmQuestTemplate[] = [
   {
     id: 'harvest',
     name: '今日热身',
@@ -22,7 +28,7 @@ const TEMPLATES: FarmQuest[] = [
     desc: '单局击败 400 只怪物',
     kind: 'best',
     target: 400,
-    reward: 200,
+    share: 0.09,
     metric: (round) => round.harvested,
   },
   {
@@ -32,7 +38,7 @@ const TEMPLATES: FarmQuest[] = [
     desc: '今日累计击破 6 只巨兽',
     kind: 'total',
     target: 6,
-    reward: 400,
+    share: 0.16,
     metric: (round) => round.bosses,
   },
   {
@@ -42,7 +48,7 @@ const TEMPLATES: FarmQuest[] = [
     desc: '单局生存 3 分钟',
     kind: 'best',
     target: 180,
-    reward: 300,
+    share: 0.12,
     metric: (round) => round.seconds,
   },
   {
@@ -52,7 +58,7 @@ const TEMPLATES: FarmQuest[] = [
     desc: '单局凑齐 2 组终极形态',
     kind: 'best',
     target: 2,
-    reward: 500,
+    share: 0.2,
     metric: (round) => evolved(round.gear).length,
   },
   {
@@ -62,7 +68,7 @@ const TEMPLATES: FarmQuest[] = [
     desc: '单局最高连击 80',
     kind: 'best',
     target: 80,
-    reward: 250,
+    share: 0.1,
     metric: (round) => round.maxCombo,
   },
   {
@@ -72,7 +78,7 @@ const TEMPLATES: FarmQuest[] = [
     desc: '单局 80,000 分',
     kind: 'best',
     target: 80000,
-    reward: 350,
+    share: 0.14,
     metric: (round) => round.score,
   },
 ]
@@ -87,16 +93,44 @@ export type FarmQuestLog = {
 }
 export type FarmQuestResult = { log: FarmQuestLog; completed: string[]; error?: string }
 
+// A finished chain has no next step to quote, so payouts track the priciest one.
+const TOP_STEP_PRICE = PERMANENT_CHAIN[PERMANENT_CHAIN.length - 1]?.price ?? 2000
+
+// What the player's next chain step costs: step N is 2,000 × N. Unreadable
+// progress reads as an empty chain and quotes the first step.
+export function farmQuestStepPrice(levels?: unknown): number {
+  const id = permanentNextStep(levels)
+  const price = id ? permanentPrice(id, 0) : null
+  return price && price > 0 ? price : TOP_STEP_PRICE
+}
+
+// Whole coins, never zero: a damaged read must not swallow the payout.
+export function farmQuestReward(share: number, stepPrice: number): number {
+  const coins = Math.round(stepPrice * share)
+  return Number.isFinite(coins) && coins > 0 ? coins : 1
+}
+
+// Without an explicit chain the day prices itself off the wallet the player
+// actually has, so the reward shown matches the one that gets paid.
+function storedLevels(): unknown {
+  try {
+    return loadFarmProfile().growth?.levels
+  } catch {
+    return undefined
+  }
+}
+
 // Three goals per day, drawn from the day seed so everyone chases the same list.
-export function farmQuests(day: string): FarmQuest[] {
+export function farmQuests(day: string, levels?: unknown): FarmQuest[] {
   let seed = routeSeed(day, 'farm-quest') >>> 0
   const pool = [...TEMPLATES],
-    picked: FarmQuest[] = []
+    picked: FarmQuestTemplate[] = []
   while (picked.length < 3 && pool.length) {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
     picked.push(pool.splice(seed % pool.length, 1)[0])
   }
-  return picked
+  const stepPrice = farmQuestStepPrice(levels ?? storedLevels())
+  return picked.map((quest) => ({ ...quest, reward: farmQuestReward(quest.share, stepPrice) }))
 }
 
 const empty = (day: string): FarmQuestLog => ({ day, best: {}, total: {}, claimed: [] })

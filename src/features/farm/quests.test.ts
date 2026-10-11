@@ -5,9 +5,12 @@ import {
   farmQuestDone,
   farmQuests,
   farmQuestProgress,
+  farmQuestReward,
+  farmQuestStepPrice,
   loadFarmQuests,
   FARM_QUEST_KEY,
 } from './quests'
+import { PERMANENT_CHAIN } from './permanent.mjs'
 import { FARM_PROFILE_KEY } from './characters'
 import { loadFarmProfile } from './characters'
 import { TALENTS } from './rules.mjs'
@@ -146,7 +149,8 @@ describe('daily survivor quests', () => {
     const second = applyFarmQuests(day, finished, 'run-2')
     expect(second.log.total.hunt).toBe(6)
     expect(second.completed).toContain('hunt')
-    expect(loadFarmProfile().coins).toBe(400)
+    // Step 1 costs 2,000 and the giant hunt takes 16% of it.
+    expect(loadFarmProfile().coins).toBe(320)
   })
   it('counts an unidentified run once and keeps named runs apart', () => {
     const first = applyFarmQuests(day, round({ bosses: 3 }))
@@ -174,7 +178,7 @@ describe('daily survivor quests', () => {
     const retry = applyFarmQuests(day, finished, 'run-1')
     expect(retry.log.total.hunt).toBe(6)
     expect(retry.completed).toEqual(['hunt'])
-    expect(loadFarmProfile().coins).toBe(400)
+    expect(loadFarmProfile().coins).toBe(320)
   })
   it('reconciles a paid quest when persisting its claimed status failed', () => {
     let writes = 0
@@ -185,12 +189,12 @@ describe('daily survivor quests', () => {
     })
     const finished = round({ bosses: 6 })
     expect(applyFarmQuests(day, finished, 'run-1').error).toBeTruthy()
-    expect(loadFarmProfile().coins).toBe(400)
+    expect(loadFarmProfile().coins).toBe(320)
     const retry = applyFarmQuests(day, finished, 'run-1')
     expect(retry.log.total.hunt).toBe(6)
     expect(retry.log.claimed).toContain('hunt')
     expect(retry.completed).toEqual([])
-    expect(loadFarmProfile().coins).toBe(400)
+    expect(loadFarmProfile().coins).toBe(320)
   })
   it('does not pay rewards if progress cannot be saved or the day mismatches', () => {
     vi.stubGlobal('localStorage', {
@@ -202,5 +206,72 @@ describe('daily survivor quests', () => {
     expect(applyFarmQuests(day, round({ bosses: 6 }), 'run-1').error).toBeTruthy()
     expect(loadFarmProfile().coins).toBe(0)
     expect(applyFarmQuests('2026-10-05', round({ bosses: 6 }), 'run-1').completed).toEqual([])
+  })
+
+  const chainLevels = (count: number) =>
+    Object.fromEntries(PERMANENT_CHAIN.map((item, index) => [item.id, index < count ? 1 : 0]))
+
+  it('prices every goal off the next chain step', () => {
+    expect(farmQuestStepPrice()).toBe(2000)
+    expect(farmQuestStepPrice(chainLevels(100))).toBe(202000)
+    const step = farmQuestStepPrice(chainLevels(100))
+    for (const quest of farmQuests(day, chainLevels(100))) {
+      expect(Number.isSafeInteger(quest.reward)).toBe(true)
+      expect(quest.reward).toBe(Math.round(step * quest.share))
+    }
+    // Same board deeper into the chain: every payout grows with the price.
+    const fresh = farmQuests(day, chainLevels(0))
+    const deep = farmQuests(day, chainLevels(100))
+    expect(deep.map((quest) => quest.id)).toEqual(fresh.map((quest) => quest.id))
+    for (const [index, quest] of fresh.entries())
+      expect(deep[index].reward).toBeGreaterThan(quest.reward)
+  })
+  it('keeps a full day of goals worth 30–60% of the next step', () => {
+    for (const count of [0, 1, 20, 100, 199]) {
+      const step = farmQuestStepPrice(chainLevels(count))
+      for (let i = 1; i <= 12; i += 1) {
+        const list = farmQuests(`2026-12-${String(i).padStart(2, '0')}`, chainLevels(count))
+        const share = list.reduce((sum, quest) => sum + quest.reward, 0) / step
+        expect(share).toBeGreaterThanOrEqual(0.3)
+        expect(share).toBeLessThanOrEqual(0.6)
+      }
+    }
+  })
+  it('pays harder goals a bigger slice of the same step', () => {
+    const seen = new Map<string, number>()
+    for (let i = 1; i <= 30; i += 1)
+      for (const quest of farmQuests(`2027-01-${String(i).padStart(2, '0')}`, chainLevels(0)))
+        seen.set(quest.id, quest.reward / farmQuestStepPrice(chainLevels(0)))
+    expect(seen.size).toBe(6)
+    expect(seen.get('band')!).toBeGreaterThan(seen.get('hunt')!)
+    expect(seen.get('hunt')!).toBeGreaterThan(seen.get('score')!)
+    expect(seen.get('score')!).toBeGreaterThan(seen.get('long')!)
+    expect(seen.get('long')!).toBeGreaterThan(seen.get('combo')!)
+    expect(seen.get('combo')!).toBeGreaterThan(seen.get('harvest')!)
+  })
+  it('reads the step price from the profile and survives a damaged one', () => {
+    data.set(
+      FARM_PROFILE_KEY,
+      JSON.stringify({
+        coins: 0,
+        owned: ['bear-drums'],
+        selected: 'bear-drums',
+        rewardedRuns: [],
+        growth: { levels: chainLevels(100), spent: 0 },
+      }),
+    )
+    const quests = farmQuests(day)
+    expect(quests[0].reward).toBe(Math.round(202000 * quests[0].share))
+    data.set(FARM_PROFILE_KEY, '{broken')
+    for (const quest of farmQuests(day)) expect(quest.reward).toBeGreaterThan(0)
+  })
+  it('falls back to the priciest step when the chain is finished or unreadable', () => {
+    const all = chainLevels(PERMANENT_CHAIN.length)
+    expect(farmQuestStepPrice(all)).toBe(PERMANENT_CHAIN[PERMANENT_CHAIN.length - 1].price)
+    expect(farmQuestStepPrice({ bogus: 1 })).toBe(2000)
+    expect(farmQuestStepPrice(null)).toBe(2000)
+    for (const quest of farmQuests(day, all)) expect(quest.reward).toBeGreaterThan(0)
+    expect(farmQuestReward(0.16, 0)).toBe(1)
+    expect(farmQuestReward(0.16, Number.NaN)).toBe(1)
   })
 })
