@@ -14,6 +14,11 @@ const SOURCES: Record<string, string> = {
   synth: '/assets/effects/synth.webp',
 }
 export const WEAPON_EFFECT_IDS = Object.keys(SOURCES)
+// Every instrument has a second, louder artwork for its evolved form.
+const EVOLVED = new Set(WEAPON_EFFECT_IDS)
+export function weaponEffectSource(id: string, evolved: boolean) {
+  return evolved && EVOLVED.has(id) ? `/assets/effects/${id}-evolved.webp` : SOURCES[id]
+}
 
 // Decode and downsample once, never scale ten originals every frame.
 export function loadWeaponEffects(owner: Document): WeaponSprites {
@@ -21,22 +26,24 @@ export function loadWeaponEffects(owner: Document): WeaponSprites {
   if (existing) return existing
   const sprites: WeaponSprites = new Map()
   cache.set(owner, sprites)
-  for (const [id, source] of Object.entries(SOURCES)) {
-    const image = owner.createElement('img')
-    image.onload = () => {
-      const canvas = owner.createElement('canvas')
-      canvas.width = canvas.height = 96
-      const context = canvas.getContext('2d')
-      if (!context) return
-      const scale = 96 / Math.max(image.naturalWidth, image.naturalHeight)
-      const width = image.naturalWidth * scale,
-        height = image.naturalHeight * scale
-      context.drawImage(image, (96 - width) / 2, (96 - height) / 2, width, height)
-      sprites.set(id, canvas)
+  for (const id of WEAPON_EFFECT_IDS) {
+    for (const evolved of [false, true]) {
+      const image = owner.createElement('img')
+      image.onload = () => {
+        const canvas = owner.createElement('canvas')
+        canvas.width = canvas.height = 96
+        const context = canvas.getContext('2d')
+        if (!context) return
+        const scale = 96 / Math.max(image.naturalWidth, image.naturalHeight)
+        const width = image.naturalWidth * scale,
+          height = image.naturalHeight * scale
+        context.drawImage(image, (96 - width) / 2, (96 - height) / 2, width, height)
+        sprites.set(evolved ? `${id}-evolved` : id, canvas)
+      }
+      // Missing art must never stop the frame: the renderer keeps its shapes.
+      image.onerror = () => {}
+      image.src = weaponEffectSource(id, evolved)
     }
-    // Missing art must never stop the frame: the renderer keeps its shapes.
-    image.onerror = () => {}
-    image.src = source
   }
   return sprites
 }

@@ -371,7 +371,7 @@ function cropSprite(
   }
   // Drum echo: a dotted ring plus a note, so bleeding monsters read at a glance
   // without an effect per tick.
-  if (crop.echoUntil) {
+  if (crop.echo) {
     ctx.strokeStyle = '#9b7fd4'
     ctx.lineWidth = 1.6
     ctx.setLineDash([3, 4])
@@ -602,23 +602,28 @@ function assetsFor(ctx: CanvasRenderingContext2D): Assets {
   return assets
 }
 
+/** Evolved instruments get their louder artwork; fall back to the base one. */
+function effectArt(assets: Assets, id: string, evolved: boolean) {
+  return (evolved ? assets.effects.get(`${id}-evolved`) : undefined) ?? assets.effects.get(id)
+}
 function groundEffect(
   ctx: CanvasRenderingContext2D,
   event: FarmEvent,
   progress: number,
   now: number,
   assets: Assets,
+  forms: readonly string[],
 ) {
   const x = X(event.x),
     y = Y(event.y),
     radius = Y(event.radius ?? 15)
   ctx.save()
-  if (event.kind === 'shock' && assets.effects.get('bell')) {
+  if (event.kind === 'shock' && effectArt(assets, 'bell', forms.includes('bell'))) {
     // Keyboard: the ring artwork is the shockwave itself.
     const expanding = radius * (0.35 + easeOut(Math.min(1, progress * 1.3)) * 0.75)
     ctx.globalAlpha = (1 - progress) * 0.9
     ctx.drawImage(
-      assets.effects.get('bell')!,
+      effectArt(assets, 'bell', forms.includes('bell'))!,
       x - expanding,
       y - expanding,
       expanding * 2,
@@ -682,11 +687,17 @@ function groundEffect(
     ctx.font = 'bold 15px system-ui'
     ctx.textAlign = 'center'
     ctx.fillText('♬', x, y + 5)
-  } else if (event.kind === 'echo' && assets.effects.get('drum')) {
+  } else if (event.kind === 'echo' && effectArt(assets, 'drum', forms.includes('drum'))) {
     // Drum: the beat is a stamp of the echo artwork inside its spread ring.
     const reach = Y(event.radius ?? 12) * (0.5 + Math.min(1, progress * 1.6) * 0.5)
     ctx.globalAlpha = (1 - progress) * 0.95
-    ctx.drawImage(assets.effects.get('drum')!, x - reach, y - reach, reach * 2, reach * 2)
+    ctx.drawImage(
+      effectArt(assets, 'drum', forms.includes('drum'))!,
+      x - reach,
+      y - reach,
+      reach * 2,
+      reach * 2,
+    )
     ctx.globalAlpha = (1 - progress) * 0.5
     ctx.strokeStyle = '#9b7fd4'
     ctx.lineWidth = 1.6
@@ -731,7 +742,7 @@ function groundEffect(
     ctx.lineTo(x, y + Y(120))
     ctx.stroke()
     // The bass column artwork sits where the beam leaves the player.
-    const column = assets.effects.get('power')
+    const column = effectArt(assets, 'power', forms.includes('power'))
     if (column) {
       ctx.globalAlpha = (1 - progress) * 0.9
       ctx.drawImage(column, x - 22, y - 22, 44, 44)
@@ -772,7 +783,7 @@ function groundEffect(
       ctx.arc(0, 0, reach * (0.32 * i), -0.52, 0.52)
       ctx.stroke()
     }
-    const brass = assets.effects.get('sax')
+    const brass = effectArt(assets, 'sax', forms.includes('sax'))
     if (brass) {
       ctx.globalAlpha = (1 - progress) * 0.95
       ctx.drawImage(brass, -reach * 0.45, -reach * 0.45, reach * 0.9, reach * 0.9)
@@ -798,7 +809,7 @@ function groundEffect(
     ctx.lineWidth = 1.5
     ctx.stroke()
     // The synth's fan carries its own artwork on top of the prism rays.
-    const wave = assets.effects.get('synth')
+    const wave = effectArt(assets, 'synth', forms.includes('synth'))
     if (wave) {
       ctx.globalAlpha = (1 - progress) * 0.9
       ctx.drawImage(wave, -reach * 0.5, -reach * 0.5, reach, reach)
@@ -1065,7 +1076,7 @@ export function drawFarm(
             ? 700
             : 900
     const progress = (now - born) / duration
-    if (progress < 1) groundEffect(ctx, event, progress, now, assets)
+    if (progress < 1) groundEffect(ctx, event, progress, now, assets, forms)
   }
   const hitIds = new Set<number>()
   for (const { event, born } of activeEffects)
@@ -1162,7 +1173,8 @@ export function drawFarm(
     // A homing dart keeps a soft halo on its tip until it locks on.
     if (arrow.homing) ellipse(ctx, 9, 0, 8, 8, '#9ac6b455')
     // The dart itself is artwork: the flute's sentinel or the singer's seeker.
-    const dart = assets.effects.get(arrow.homing ? 'echo' : 'whistle')
+    const dartId = arrow.homing ? 'echo' : 'whistle'
+    const dart = effectArt(assets, dartId, forms.includes(dartId))
     if (dart) ctx.drawImage(dart, -15, -15, 30, 30)
     else {
       ctx.lineCap = 'round'
@@ -1225,7 +1237,7 @@ export function drawFarm(
     ctx.beginPath()
     ctx.arc(X(mine.x), Y(mine.y), 6 + armed * 3, 0, Math.PI * 2)
     ctx.stroke()
-    const burst = assets.effects.get('sampler')
+    const burst = effectArt(assets, 'sampler', forms.includes('sampler'))
     if (burst) ctx.drawImage(burst, X(mine.x) - 11, Y(mine.y) - 11, 22, 22)
     else {
       ctx.fillStyle = '#6f4f9e'
@@ -1282,7 +1294,7 @@ export function drawFarm(
     ctx.stroke()
     ctx.restore()
     for (const [x, y] of orbit) {
-      const blade = assets.effects.get('orbit')
+      const blade = effectArt(assets, 'orbit', terminalOrbit)
       if (blade) ctx.drawImage(blade, X(x) - 24, Y(y) - 24, 48, 48)
       else ctx.drawImage(assets.notes[terminalOrbit ? 1 : 0], X(x) - 24, Y(y) - 24, 48, 48)
     }
@@ -1315,7 +1327,7 @@ export function drawFarm(
       ctx.save()
       ctx.translate(bx, by)
       ctx.rotate(angle)
-      const disc = assets.effects.get('deck')
+      const disc = effectArt(assets, 'deck', terminalDeck)
       if (disc) ctx.drawImage(disc, -15, -15, 30, 30)
       else {
         ctx.fillStyle = terminalDeck ? '#cfe3ee' : '#e6eff5'
