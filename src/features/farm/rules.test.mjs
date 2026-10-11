@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { BAND_CHARACTERS, LEGACY_CHARACTER_IDS } from './characterRoster.mjs'
 import {
   ECHO_INTERVAL,
-  ECHO_SECONDS,
   FARM_MODIFIERS,
   FPS,
   MAX_BOSSES,
@@ -198,7 +197,7 @@ describe('music roguelite farming', () => {
     const beat = stepFarm(opening, opening.position)
     expect(beat.state.harvested).toBe(0)
     expect(beat.events.some((event) => event.kind === 'echo')).toBe(true)
-    expect(beat.state.crops.some((crop) => crop.echoUntil > 0)).toBe(true)
+    expect(beat.state.crops.some((crop) => crop.echo === true)).toBe(true)
     let drummer = beat.state
     for (let tick = 1; tick <= ECHO_INTERVAL && !drummer.harvested; tick++)
       drummer = stepFarm(drummer, drummer.position).state
@@ -522,9 +521,10 @@ describe('music roguelite farming', () => {
     expect(normal.state.crops[1].hp).toBe(6)
     expect(ultimate.state.crops[1].hp).toBe(6)
     // 余音挂不挂得上只看爆破半径：音箱没满级时第二只够不着，满级后进化把它也圈进来。
-    expect(normal.state.crops[1].echoUntil ?? 0).toBe(0)
-    expect(ultimate.state.crops[1].echoUntil).toBe(ECHO_SECONDS * FPS)
-    expect(normal.state.crops[0].echoUntil).toBe(ECHO_SECONDS * FPS)
+    // 余音是布尔标记：挂不上就是 undefined，挂上了就是 true。
+    expect(normal.state.crops[1].echo ?? false).toBe(false)
+    expect(ultimate.state.crops[1].echo).toBe(true)
+    expect(normal.state.crops[0].echo).toBe(true)
     expect(ultimate.events.find((event) => event.kind === 'echo').radius).toBeGreaterThan(
       normal.events.find((event) => event.kind === 'echo').radius,
     )
@@ -535,15 +535,15 @@ describe('music roguelite farming', () => {
     ])
     const marked = stepFarm(dense, dense.position)
     // 一拍就把三只全挂上，但一只都没收：hit 与 harvest 事件一个都没有。
-    expect(marked.state.crops.every((item) => item.echoUntil === ECHO_SECONDS * FPS)).toBe(true)
+    expect(marked.state.crops.every((item) => item.echo === true)).toBe(true)
     expect(marked.state.harvested).toBe(0)
     expect(marked.events.some((event) => event.kind === 'hit' || event.kind === 'harvest')).toBe(
       false,
     )
-    // 余音每跳鼓等级 ×2 = 10 点：第一跳收掉第一只，而每收掉一只，它那一圈连锁就把
-    // 还活着的那几只的余音节拍顺延一跳。三只因此在四秒内被逐个收掉，一只也不多收。
+    // 余音每跳鼓等级 ×2 = 10 点：每只都是 1 点血，所以第一跳就把三只一起收掉，
+    // 一只也不多收。余音没有时限，这里只给它十秒的上限兜底。
     let chain = marked.state
-    for (let tick = 1; tick <= FPS * ECHO_SECONDS && chain.harvested < 3; tick++)
+    for (let tick = 1; tick <= FPS * 10 && chain.harvested < 3; tick++)
       chain = stepFarm(chain, chain.position).state
     expect(chain.harvested).toBe(3)
     expect(dense.crops.every((item) => item.hp === 1)).toBe(true)
