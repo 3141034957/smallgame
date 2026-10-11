@@ -20,7 +20,6 @@ import {
   activeCombos,
   chooseTalent,
   clampPoint,
-  farmMoveStep,
   createFarm,
   evolved,
   farmModifier,
