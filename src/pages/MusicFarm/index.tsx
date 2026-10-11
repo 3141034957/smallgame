@@ -115,6 +115,7 @@ export default function MusicFarm() {
   const accountRef = useRef(account)
   accountRef.current = account
   const [view, setView] = useState(model.current)
+  const [confirmRestart, setConfirmRestart] = useState(false)
   const [inputMode, setInputMode] = useState<'touch' | 'mouse'>(() =>
     window.matchMedia?.('(pointer: coarse)').matches ? 'touch' : 'mouse',
   )
@@ -849,6 +850,12 @@ export default function MusicFarm() {
     previousFocus.current?.focus({ preventScroll: true })
   }, [panel])
   useEffect(() => {
+    if (!confirmRestart) return
+    // An unanswered confirmation should not linger into the next run.
+    const timer = window.setTimeout(() => setConfirmRestart(false), 4000)
+    return () => window.clearTimeout(timer)
+  }, [confirmRestart])
+  useEffect(() => {
     if (phase !== 'result') return
     page.current?.scrollIntoView({ block: 'start' })
     page.current?.querySelector<HTMLElement>('.farm-result h2')?.focus({ preventScroll: true })
@@ -913,48 +920,73 @@ export default function MusicFarm() {
             </div>
           </a>
           <nav>
-            <button
-              className="farm-shop-open"
-              aria-label="打开角色商店"
-              onClick={() => {
-                setProfile(loadFarmProfile())
-                openPanel('shop')
-              }}
-            >
-              <Icon name="shop" />
-            </button>
-            <button
-              className="farm-growth-open"
-              aria-label="打开永久强化"
-              onClick={() => {
-                setProfile(loadFarmProfile())
-                openPanel('growth')
-              }}
-            >
-              <Icon name="upgrade" /> <span>升级</span>
-            </button>
-            <button aria-label="查看成就墙" onClick={() => openPanel('badges')}>
-              <Icon name="badges" />
-            </button>
-            <button aria-label="查看生存排行榜" onClick={() => openPanel('board')}>
-              <Icon name="board" />
-            </button>
-            <button
-              aria-label={muted ? '开启声音' : '静音'}
-              aria-pressed={muted}
-              onClick={() => {
-                setMuted(!muted)
-                audio.current?.setMuted(!muted)
-                if (muted || audioError) void prepare(!muted)
-              }}
-            >
-              <span className={`farm-sound-toggle${muted ? ' is-muted' : ''}`}>
-                <Icon name="sound" />
-              </span>
-            </button>
-            <button aria-label="查看进化配方" onClick={() => openPanel('help')}>
-              <Icon name="help" />
-            </button>
+            {phase === 'play' ? (
+              <>
+                <button aria-label="暂停游戏" onClick={() => openPanel('pause')}>
+                  <Icon name="pause" />
+                </button>
+                <button
+                  aria-label={confirmRestart ? '确认重新开始本局' : '重新开始本局'}
+                  onClick={() => {
+                    // Restarting throws the whole run away, so it takes two taps.
+                    if (confirmRestart) {
+                      setConfirmRestart(false)
+                      restart()
+                      return
+                    }
+                    setConfirmRestart(true)
+                  }}
+                >
+                  <Icon name="refresh" />
+                  <span>{confirmRestart ? '确认重开' : '重开'}</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="farm-shop-open"
+                  aria-label="打开角色商店"
+                  onClick={() => {
+                    setProfile(loadFarmProfile())
+                    openPanel('shop')
+                  }}
+                >
+                  <Icon name="shop" />
+                </button>
+                <button
+                  className="farm-growth-open"
+                  aria-label="打开永久强化"
+                  onClick={() => {
+                    setProfile(loadFarmProfile())
+                    openPanel('growth')
+                  }}
+                >
+                  <Icon name="upgrade" /> <span>升级</span>
+                </button>
+                <button aria-label="查看成就墙" onClick={() => openPanel('badges')}>
+                  <Icon name="badges" />
+                </button>
+                <button aria-label="查看生存排行榜" onClick={() => openPanel('board')}>
+                  <Icon name="board" />
+                </button>
+                <button
+                  aria-label={muted ? '开启声音' : '静音'}
+                  aria-pressed={muted}
+                  onClick={() => {
+                    setMuted(!muted)
+                    audio.current?.setMuted(!muted)
+                    if (muted || audioError) void prepare(!muted)
+                  }}
+                >
+                  <span className={`farm-sound-toggle${muted ? ' is-muted' : ''}`}>
+                    <Icon name="sound" />
+                  </span>
+                </button>
+                <button aria-label="查看进化配方" onClick={() => openPanel('help')}>
+                  <Icon name="help" />
+                </button>
+              </>
+            )}
           </nav>
         </header>
         <div className={`farm-layout ${phase === 'result' ? 'is-result' : ''}`}>
@@ -1043,11 +1075,6 @@ export default function MusicFarm() {
                     <small>生存</small>
                     {formatFarmTime(view.tick)}
                   </b>
-                  {phase === 'play' && (
-                    <button aria-label="暂停游戏" onClick={() => openPanel('pause')}>
-                      <Icon name="pause" />
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
