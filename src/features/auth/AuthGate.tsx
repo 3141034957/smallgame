@@ -189,7 +189,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
       await loadAccountProgress(next.id, controller.signal)
       if (!mounted.current || controller.signal.aborted) return
       setFormOpen(false)
-      accept(next)
+      // Keep the run that just finished: remounting the game would drop the
+      // result screen and with it the only chance to upload this score.
+      accept(next, true)
       setNotice('已进入，进度已同步')
       announceAccountChange()
     } catch (cause) {
