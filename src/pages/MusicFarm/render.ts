@@ -868,6 +868,13 @@ function groundEffect(
     }
   } else if (event.kind === 'blackhole') {
     ctx.translate(x, y)
+    // The evolved column keeps the bass artwork as the core the spiral swallows.
+    const core = effectArt(assets, 'power', true)
+    if (core) {
+      const reach = Math.max(30, radius * 0.9)
+      ctx.globalAlpha = (1 - progress) * 0.95
+      ctx.drawImage(core, -reach / 2, -reach / 2, reach, reach)
+    }
     ctx.globalAlpha = (1 - progress) * 0.55
     // A unit disc scaled by the radius: one gradient for every black hole.
     ctx.save()
