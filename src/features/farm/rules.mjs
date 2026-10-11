@@ -17,10 +17,9 @@ const DRUM_BOSS = MONSTERS.find((monster) => monster.id === 'drum-boss')
 const BASS_BOSS = MONSTERS.find((monster) => monster.id === 'bass-boss')
 export const FPS = 16
 export const MOVE_STEP = 3
-// 余音：被鼓点波及的怪持续掉血。ECHO_SECONDS 是总时长，ECHO_INTERVAL 是每两
-// 跳之间隔多少帧。掉多少只跟鼓等级走，重复命中只续时间、不叠加伤害。
-// 具体数值还在试玩阶段，调这两个常量和 echoDamage() 即可。
-export const ECHO_SECONDS = 4
+// 余音：被鼓点波及的怪一直掉血到死，没有持续时间。ECHO_INTERVAL 是每两跳之间
+// 隔多少帧，掉多少只跟鼓等级走，重复命中不叠加伤害。
+// 具体数值还在试玩阶段，调这个常量和 echoDamage() 即可。
 export const ECHO_INTERVAL = FPS
 // Every band member and piece of gear climbs to this level; reaching it on a
 // matching pair unlocks that instrument's final form.
@@ -928,7 +927,10 @@ export function stepFarm(previous, point, useSurge = false) {
       midi: PITCHES[crop.id % PITCHES.length],
       chain,
     })
-    if (gear.drum) drumEcho(crop.x, crop.y)
+    // Only a monster that was bleeding passes the echo on: the drum's basic
+    // attack is marking monsters, so deaths spread what the drum started and
+    // nothing else.
+    if (gear.drum && crop.echo) drumEcho(crop.x, crop.y)
     if (crop.boss)
       for (const drop of state.loot) {
         drop.x = state.position[0]
@@ -960,9 +962,10 @@ export function stepFarm(previous, point, useSurge = false) {
   // 永久伤害，掉多少就是多少。被同一波爆破反复命中也只续时间，不叠加。
   const echoDamage = () => gear.drum * (forms.includes('drum') ? 2 : 1)
   const markEcho = (crop) => {
-    crop.echoUntil = state.tick + ECHO_SECONDS * FPS
+    // The echo never wears off: it keeps bleeding until the monster dies.
+    crop.echo = true
     // The first tick lands one beat later; a monster already bleeding keeps its
-    // own rhythm instead of being pushed back by every new blast.
+    // own rhythm instead of being pushed back by every new beat.
     if (state.tick >= (crop.echoNext ?? -1)) crop.echoNext = state.tick + ECHO_INTERVAL
   }
   const drainEcho = (crop) => {
@@ -1009,7 +1012,7 @@ export function stepFarm(previous, point, useSurge = false) {
       crop.dashDy = undefined
       crop.slowUntil = -1
       // A fresh monster must not inherit the echo its predecessor died with.
-      crop.echoUntil = 0
+      crop.echo = false
       crop.echoNext = 0
       crop.hp = enemyHealth(state.tick, crop.kind) + (modifier?.health ?? 0)
       crop.maxHp = crop.hp
@@ -1064,7 +1067,7 @@ export function stepFarm(previous, point, useSurge = false) {
       slot.dashDy = undefined
       slot.slowUntil = -1
       // A reused slot must not inherit the echo of whatever died in it.
-      slot.echoUntil = 0
+      slot.echo = false
       slot.echoNext = 0
       placeAtEdge(state, slot, true)
     } else if (state.crops.filter((crop) => !crop.boss).length < 100) {
@@ -1634,14 +1637,10 @@ export function stepFarm(previous, point, useSurge = false) {
   for (const enemy of state.crops) {
     if (enemy.hp <= 0) continue
     // 余音按自己的节拍掉血，跟这只怪这帧移到哪里无关。
-    if (enemy.echoUntil) {
+    if (enemy.echo) {
       if (state.tick >= (enemy.echoNext ?? 0)) {
         drainEcho(enemy)
         enemy.echoNext = state.tick + ECHO_INTERVAL
-      }
-      if (state.tick >= enemy.echoUntil) {
-        enemy.echoUntil = 0
-        enemy.echoNext = 0
       }
       if (enemy.hp <= 0) continue
     }
