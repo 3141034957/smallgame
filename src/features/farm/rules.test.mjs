@@ -23,7 +23,11 @@ import {
   clampPoint,
   comboModifiers,
   createFarm,
+  ECHO_EVOLVED_TARGETS,
   evolved,
+  farmBellRadius,
+  farmReach,
+  finishFarm,
   farmModifier,
   farmMoveStep,
   farmXpThreshold,
@@ -33,6 +37,7 @@ import {
   statCardLevel,
   stepFarm,
 } from './rules.mjs'
+import { verifyFarm } from '../../../server/farm.mjs'
 
 const day = '2026-10-04'
 // Four minutes is plenty to reach the final form; death is produced by the
@@ -1000,4 +1005,112 @@ describe('music roguelite farming', () => {
       expect(orphan?.score).not.toBe(round.state.score)
     }
   }, 120000)
+
+  it('freezes the member into the round so shopping afterwards cannot re-check it', () => {
+    const characterId = memberFor('echo')
+    const played = run('echo', '2026-10-01', characterId)
+    expect(played.state.characterId).toBe(characterId)
+    const round = finishFarm(played.state, played.frames, played.choices, played.surges)
+    expect(round.characterId).toBe(characterId)
+    // The loadout is the one this run opened with, so submitting it under the
+    // member picked later replays a different run and is rejected.
+    const submission = { ...round, playerId: 'switching_player', name: '换角乐手' }
+    expect(verifyFarm({ ...submission, characterId })?.score).toBe(played.state.score)
+    expect(verifyFarm({ ...submission, characterId: memberFor('drum') })).toBeNull()
+  }, 120000)
+
+  it('ranks a run the player stopped on purpose, and only when the stop is named', () => {
+    const characterId = memberFor('echo')
+    const played = run('echo', '2026-10-01', characterId)
+    // Stop while the band is still playing: the run has scored and has not
+    // died, which is exactly the round the pause panel banks.
+    const at = Math.floor(played.frames.length / 2)
+    const frames = played.frames.slice(0, at)
+    const choices = played.choices.filter((choice) => choice.tick < at)
+    const surges = played.surges.filter((tick) => tick < at)
+    // The client closes the run on the state it has, and only the flag turns a
+    // living band into a rankable round.
+    let live = createFarm('2026-10-01', {}, characterId)
+    const opening = [],
+      openingChoices = []
+    for (let tick = 0; tick < 120; tick++) {
+      while (live.offered.length) {
+        openingChoices.push({ tick: live.tick, id: live.offered[0] })
+        live = chooseTalent(live, live.offered[0])
+      }
+      const point = clampPoint(
+        live.position,
+        [50 + 20 * Math.sin(tick / 9), 76 + 20 * Math.cos(tick / 9)],
+        farmMoveStep(live),
+      )
+      const walked = stepFarm(live, point, false)
+      if (!walked) break
+      live = walked.state
+      opening.push(point)
+    }
+    expect(live.hp).toBeGreaterThan(0)
+    expect(finishFarm(live, opening, openingChoices, [])).toBeNull()
+    expect(finishFarm({ ...live, retired: true }, opening, openingChoices, [])).toMatchObject({
+      outcome: 'retired',
+      retired: true,
+      hp: live.hp,
+    })
+    // The stopped round replays to the same score the client closed it with.
+    expect(
+      replayFarm('2026-10-01', opening, openingChoices, [], {}, characterId, true),
+    ).toMatchObject({ score: live.score, outcome: 'retired' })
+    // The same frames are only rankable with the stop: a living band that
+    // never asked to stop is not a finished run.
+    expect(replayFarm('2026-10-01', frames, choices, surges, {}, characterId)).toBeNull()
+    const stopped = replayFarm('2026-10-01', frames, choices, surges, {}, characterId, true)
+    expect(stopped).toMatchObject({ outcome: 'retired', retired: true })
+    expect(stopped.hp).toBeGreaterThan(0)
+    expect(stopped.score).toBeGreaterThan(0)
+    // Only the boolean is a stop: anything else falls back to the death check.
+    for (const forged of [1, 'true', {}, [], null, undefined])
+      expect(replayFarm('2026-10-01', frames, choices, surges, {}, characterId, forged)).toBeNull()
+    // The server accepts the same action through the public body.
+    const body = { ...stopped, playerId: 'stopped_player', name: '停演乐手', characterId }
+    expect(verifyFarm({ ...body, retired: true })?.score).toBe(stopped.score)
+    expect(verifyFarm({ ...body, retired: false })).toBeNull()
+  }, 120000)
+
+  it('keeps the star wave radius and the spawn ring on one number', () => {
+    const gear = { bell: MAX_GEAR_LEVEL, sustain: MAX_GEAR_LEVEL }
+    const state = arena(gear, [], 0)
+    expect(evolved(state.gear)).toContain('bell')
+    // The reach the ring is measured against is the wave the keyboard fires,
+    // so an arrival only has to walk the intended gap into the build.
+    expect(farmReach(state)).toBe(farmBellRadius(state.gear))
+    const rung = stepFarm(state, state.position)
+    const wave = rung.events.find((event) => event.kind === 'shock')
+    expect(wave).toBeTruthy()
+    expect(wave.radius).toBe(farmReach(state))
+  })
+
+  it('sends the star microphone after eight voices once it evolves', () => {
+    const crowd = Array.from({ length: 9 }, (_, index) =>
+      crop(200 + index, 50 + (index % 3) * 6, 50 + Math.floor(index / 3) * 6, 1e6),
+    )
+    const plain = arena(
+      { echo: MAX_GEAR_LEVEL },
+      crowd.map((enemy) => ({ ...enemy })),
+      0,
+    )
+    const evolvedStar = arena(
+      { echo: MAX_GEAR_LEVEL, lucky: MAX_GEAR_LEVEL },
+      crowd.map((enemy) => ({ ...enemy })),
+      0,
+    )
+    const rained = (state) =>
+      stepFarm(state, state.position).events.filter((event) => event.kind === 'rain').length
+    // A plain Lv.5 reaches six; the evolved microphone reaches the eight the
+    // recipe promises, and every extra voice is one more monster hurt.
+    expect(rained(plain)).toBe(MAX_GEAR_LEVEL + 1)
+    expect(rained(evolvedStar)).toBe(ECHO_EVOLVED_TARGETS)
+    // The recipe is the promise: the number it advertises is the number the
+    // evolution actually sends.
+    expect(RECIPES.find((recipe) => recipe.weapon === 'echo').description).toContain('八')
+    expect(ECHO_EVOLVED_TARGETS).toBe(8)
+  })
 })

@@ -363,6 +363,65 @@ it('parks a session identity switch until the live run ends, instead of dropping
   expect(screen.getByText(/完成局数 0/)).toBeTruthy()
   expect(screen.getByText(/身份检查/)).not.toBe(node)
 })
+// A cloud save that refuses every upload: the account bar then offers the way
+// back to the cloud while a round may still be on screen.
+const conflictOnUpload = () => {
+  let conflicting = true
+  const offline = { current: false }
+  vi.mocked(fetch).mockImplementation(async (url, options) => {
+    if (String(url) === '/api/progress') {
+      if (offline.current) throw new Error('offline')
+      if (options?.method === 'POST' && conflicting) return json({ error: 'conflict' }, 409)
+      return json({ data: cloud, revision: 1 })
+    }
+    return json({ user: current })
+  })
+  return { offline }
+}
+const reachConflict = async () => {
+  current = user
+  render(
+    <AuthGate>
+      <LiveRun />
+    </AuthGate>,
+  )
+  await screen.findByText('♫ player_one')
+  fireEvent.click(screen.getByRole('button', { name: '开始一局' }))
+  await act(async () => accountStorage.setItem('farm-career-v1', JSON.stringify({ runs: 1 })))
+  await waitFor(() => expect(screen.getByText(/云端有更新/)).toBeTruthy())
+}
+it('asks before restoring the cloud over a live run and keeps the run when the download fails', async () => {
+  const link = conflictOnUpload()
+  cloud = { [FARM_PROFILE_KEY]: '{"coins":9000}' }
+  await reachConflict()
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '恢复云端进度' })))
+  // One tap only asks: the round is still on screen and nothing was discarded.
+  expect(screen.getByRole('button', { name: '放弃当前对局并恢复云端进度' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: '取消恢复云端进度' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: '结束本局' })).toBeTruthy()
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '取消恢复云端进度' })))
+  expect(screen.getByRole('button', { name: '恢复云端进度' })).toBeTruthy()
+  // A failed download must not remount the game: the round survives it.
+  link.offline.current = true
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '恢复云端进度' })))
+  await act(async () =>
+    fireEvent.click(screen.getByRole('button', { name: '放弃当前对局并恢复云端进度' })),
+  )
+  await screen.findByRole('alert')
+  expect(screen.getByRole('button', { name: '结束本局' })).toBeTruthy()
+  expect(screen.getByText(/完成局数 0/)).toBeTruthy()
+})
+it('restores the cloud only after the round is given up', async () => {
+  conflictOnUpload()
+  cloud = { [FARM_PROFILE_KEY]: '{"coins":9000}' }
+  await reachConflict()
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '恢复云端进度' })))
+  await act(async () =>
+    fireEvent.click(screen.getByRole('button', { name: '放弃当前对局并恢复云端进度' })),
+  )
+  await screen.findByText('已恢复云端进度')
+  expect(loadFarmProfile().coins).toBe(9000)
+})
 it('parks a logout until the live run ends', async () => {
   current = user
   render(

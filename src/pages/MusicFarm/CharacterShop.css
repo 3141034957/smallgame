@@ -616,9 +616,10 @@
     padding: max(8px, env(safe-area-inset-top)) 12px 6px;
   }
   .farm-shop-back {
-    width: 38px;
-    height: 38px;
-    font-size: 32px;
+    /* Decoration shrinks on a short screen, the tap target never does. */
+    width: 40px;
+    height: 40px;
+    font-size: 30px;
   }
   .farm-shop-title {
     padding: 6px 10px;

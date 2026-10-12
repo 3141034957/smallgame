@@ -3,6 +3,7 @@ import { beforeEach, afterEach, it, expect } from 'vitest'
 import { createAuthStore } from './auth-store.mjs'
 import { createAuthHandler, sessionToken, AUTH_BODY_LIMIT } from './auth.mjs'
 import { ACCOUNT_HINT } from '../src/features/auth/validation.mjs'
+import { PROGRESS_LIMIT } from '../src/features/auth/progress.mjs'
 let store, handler
 beforeEach(() => {
   store = createAuthStore(':memory:')
@@ -56,10 +57,31 @@ it.each([
 it('rejects malformed and oversized inputs and rejects duplicate cookies', async () => {
   expect((await request('/api/auth/login', { body: '{' })).status).toBe(400)
   expect((await enter('/api/auth/register', 'ab')).status).toBe(400)
-  expect((await request('/api/auth/login', { body: 'x'.repeat(AUTH_BODY_LIMIT + 1) })).status).toBe(
-    413,
-  )
+  expect(
+    (await request('/api/auth/login', { body: 'x'.repeat(PROGRESS_LIMIT + AUTH_BODY_LIMIT + 1) }))
+      .status,
+  ).toBe(413)
   expect(sessionToken({ headers: { cookie: 'echo_session=one; echo_session=two' } })).toBeNull()
+})
+it('lets a guest whose legal save is larger than the bare request log in', async () => {
+  // A year of daily best scores is an ordinary save that `validProgress`
+  // accepts; it does not fit in the 16 KiB a login used to allow, so a player
+  // who had kept playing as a guest could never reach an account.
+  const progress = Object.fromEntries(
+    Array.from({ length: 365 }, (_, index) => [
+      `farm-best-v13-drum-growth:${new Date(Date.now() - index * 86_400_000)
+        .toISOString()
+        .slice(0, 10)}`,
+      String(1000 + index),
+    ]),
+  )
+  const body = JSON.stringify({ account: 'large_guest', progress })
+  expect(body.length).toBeGreaterThan(AUTH_BODY_LIMIT)
+  expect(body.length).toBeLessThan(PROGRESS_LIMIT + AUTH_BODY_LIMIT)
+  const result = await request('/api/auth/login', { body })
+  expect(result.status).toBe(200)
+  expect(result.data.user.username).toBe('large_guest')
+  expect(Object.keys(store.progress(result.data.user.id).data)).toHaveLength(365)
 })
 it.each(['ab', 'bad name', '用户名', 'x'.repeat(33)])(
   'rejects the malformed nickname %j with the hint on both routes',

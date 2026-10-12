@@ -36,6 +36,8 @@
   letter-spacing: 1px;
 }
 .farm-board-heading button {
+  /* Never shrink: a narrow start card squeezed the refresh below 40px. */
+  flex: none;
   width: 40px;
   height: 40px;
   border: 1px solid #dfd4e9;

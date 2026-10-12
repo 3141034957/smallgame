@@ -112,16 +112,14 @@ export function createAuthHandler(store, { secure = null } = {}) {
         // and the limit stays high enough for users sharing a NAT address.
         const action = url.pathname.endsWith('/register') ? 'register' : 'login'
         store.consumeAttempt(`ip:${req.socket.remoteAddress}:${action}`, 60)
+        // Both routes carry the guest growth that has to be migrated, so the
+        // quota is the same one: a login that only allowed the bare request
+        // refused exactly the players who had played the longest as guests.
         let bytes = 0
         const chunks = []
         for await (const chunk of req) {
           bytes += chunk.length
-          if (
-            bytes >
-            (url.pathname.endsWith('/register')
-              ? PROGRESS_LIMIT + AUTH_BODY_LIMIT
-              : AUTH_BODY_LIMIT)
-          ) {
+          if (bytes > PROGRESS_LIMIT + AUTH_BODY_LIMIT) {
             sendJson(res, 413, { error: '账号请求过大。' })
             req.destroy()
             return

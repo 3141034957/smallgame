@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import MusicFarm from './index'
@@ -120,6 +120,27 @@ it('settles the run from the pause panel through the same path as a death', asyn
   // The result page hands the round to the board, so the score is submitted.
   expect(screen.getByText(/·提交 /)).toBeTruthy()
   expect(vi.mocked(saveBestScore).mock.calls).toHaveLength(1)
+})
+it('keeps the build, the goals and the score one tap away on a phone recap', async () => {
+  surviveAt(600, 4321)
+  await start()
+  await pause()
+  await act(async () =>
+    fireEvent.click(screen.getByRole('button', { name: '结束本局并结算成绩，提交到生存排行榜' })),
+  )
+  // Phones hide the build, the curve, the goals and the new badges to keep the
+  // recap on one screen, so the page owes the player a way back into them.
+  await act(async () =>
+    fireEvent.click(
+      screen.getByRole('button', { name: '查看本局复盘：乐队构筑、时间曲线、今日目标与新成就' }),
+    ),
+  )
+  const dialog = screen.getByRole('dialog', { name: '本局复盘' })
+  expect(dialog.textContent).toContain('4,321')
+  expect(within(dialog).getByRole('list', { name: '今日目标' })).toBeTruthy()
+  expect(within(dialog).getByRole('button', { name: '复制本局战绩文本' })).toBeTruthy()
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '关闭弹窗' })))
+  expect(screen.getByText('演出落幕')).toBeTruthy()
 })
 it('keeps the exit past the budget but drops the promise of a rank', async () => {
   surviveAt(FARM_MAX_SUBMIT_FRAMES + 1)

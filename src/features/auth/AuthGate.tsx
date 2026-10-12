@@ -11,7 +11,12 @@ import { flushSync } from 'react-dom'
 import { activateAccount, ACCOUNT_SAVE_EVENT, exportGuestProgress } from '@/utils/accountStorage'
 import { BAND_CHARACTERS } from '@/features/farm/characterRoster.mjs'
 import { ACCOUNT_HINT, normalizeAccount } from './validation.mjs'
-import { AccountContext, AUTH_FORM_EVENT, type AccountContextValue } from './context'
+import {
+  AccountContext,
+  ACCOUNT_SWITCH_EVENT,
+  AUTH_FORM_EVENT,
+  type AccountContextValue,
+} from './context'
 import { createProgressSync, loadAccountProgress, type SyncStatus } from './cloud'
 import {
   AccountError,
@@ -38,6 +43,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('pending')
+  // Restoring from the cloud replaces the storage under a live run, so it
+  // takes a second tap that says the round will be lost.
+  const [confirmRestore, setConfirmRestore] = useState(false)
+  const confirmRestoreRef = useRef(false)
+  confirmRestoreRef.current = confirmRestore
   const userId = user?.id
   const sync = useRef<ReturnType<typeof createProgressSync> | null>(null)
   const mounted = useRef(false)
@@ -79,6 +89,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
       if (!preserveGuest) setGameKey(next?.id ?? `guest:${Date.now()}`)
       // Never carry a conflict or "saved" badge from the previous account over.
       setSyncStatus('pending')
+      // A game that stays mounted keeps showing the old owner's wallet, quests
+      // and career until it reads them again from the new scope.
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event(ACCOUNT_SWITCH_EVENT))
     } else activateAccount(next?.id ?? null)
     principal.current = next
     setUser(next)
@@ -201,6 +214,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', hiding)
     }
   }, [userId, gameKey])
+  // A conflict that resolved itself leaves nothing to confirm.
+  useEffect(() => {
+    if (syncStatus !== 'conflict') setConfirmRestore(false)
+  }, [syncStatus])
   const openAccount = useCallback((_next?: 'login' | 'register') => {
     previousFocus.current = document.activeElement as HTMLElement
     window.dispatchEvent(new Event(AUTH_FORM_EVENT))
@@ -284,28 +301,38 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const restoreCloud = async () => {
     const owner = principal.current
     if (!owner || mutating.current) return
+    // A live round, or a result still waiting to be uploaded, would be dropped
+    // by the remount: ask once instead of throwing it away on a single tap.
+    if (runActive.current && !confirmRestoreRef.current) {
+      setNotice('')
+      setError('')
+      setConfirmRestore(true)
+      return
+    }
+    setConfirmRestore(false)
     mutating.current = true
     setBusy(true)
     cancelPending()
-    sync.current?.stop()
     const controller = new AbortController()
     pending.current = controller
     try {
-      // End the old run before replacing its storage, then remount from the cloud.
-      flushSync(() => setGameVisible(false))
       await loadAccountProgress(owner.id, controller.signal, true)
       if (!mounted.current || controller.signal.aborted) return
+      // Only a successful restore may replace the storage under the game, and
+      // only then is the live round remounted. A failed download leaves the
+      // uploader it had, so the player can try again from the same button.
+      sync.current?.stop()
+      flushSync(() => setGameVisible(false))
       setGameKey(`${owner.id}:${Date.now()}`)
       setGameVisible(true)
       setUser({ ...owner })
       setSyncStatus('saved')
       setNotice('已恢复云端进度')
     } catch (cause) {
-      if (mounted.current && !controller.signal.aborted) {
-        setGameKey(`${owner.id}:${Date.now()}`)
-        setGameVisible(true)
+      // The old run is still mounted: the player keeps playing instead of
+      // losing the round to a failed download.
+      if (mounted.current && !controller.signal.aborted)
         setError(cause instanceof Error ? cause.message : '恢复失败。')
-      }
     } finally {
       if (pending.current === controller) pending.current = null
       mutating.current = false
@@ -342,15 +369,35 @@ export function AuthGate({ children }: { children: ReactNode }) {
                     重试
                   </button>
                 )}
-                {syncStatus === 'conflict' && (
-                  <button
-                    aria-label="恢复云端进度"
-                    disabled={busy}
-                    onClick={() => void restoreCloud()}
-                  >
-                    恢复云端
-                  </button>
-                )}
+                {syncStatus === 'conflict' &&
+                  (confirmRestore ? (
+                    // The round is still on screen, so the button says what
+                    // confirming does to it before it does it.
+                    <span className="account-restore-confirm">
+                      <button
+                        className="is-armed"
+                        aria-label="放弃当前对局并恢复云端进度"
+                        disabled={busy}
+                        onClick={() => void restoreCloud()}
+                      >
+                        确认恢复
+                      </button>
+                      <button
+                        aria-label="取消恢复云端进度"
+                        onClick={() => setConfirmRestore(false)}
+                      >
+                        取消
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      aria-label="恢复云端进度"
+                      disabled={busy}
+                      onClick={() => void restoreCloud()}
+                    >
+                      恢复云端
+                    </button>
+                  ))}
                 <button disabled={busy} onClick={() => void logout()}>
                   {busy ? '处理中…' : '退出登录'}
                 </button>

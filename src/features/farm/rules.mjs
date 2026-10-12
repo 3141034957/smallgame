@@ -21,6 +21,10 @@ export const MOVE_STEP = 3
 // 各等级的实际伤害、间隔与满级收割成长统一由 drumEchoStats 提供。
 export const ECHO_INTERVAL = FPS
 export const DRUM_ECHO_KILLS_PER_DAMAGE = 100
+// The star microphone promises eight voices at once, and the recipe is the
+// promise: an evolution that kept the six targets of a plain Lv.5 was not an
+// evolution at all.
+export const ECHO_EVOLVED_TARGETS = 8
 const DRUM_ECHO_DAMAGE = [0, 1, 1, 2, 2, 3]
 const DRUM_ECHO_INTERVAL = [ECHO_INTERVAL, 16, 12, 12, 8, 8]
 export function drumEchoStats(source) {
@@ -574,6 +578,13 @@ const SPAWN_RING_BASE = 52,
   SPAWN_RING_GAP = 14
 // Frames a fresh arrival stays untouchable.
 const SPAWN_GRACE = 12
+// The star wave is the keyboard's whole coverage, so the ring that fires it and
+// the reach the spawn ring has to clear are one number: reading it from two
+// places made arrivals walk in 23 units outside the wave they were meant to
+// meet.
+export function farmBellRadius(gear, forms = evolved(gear)) {
+  return 18 + gear.bell * 4 + gear.sustain * 2 + (forms.includes('bell') ? 8 : 0)
+}
 // How far the build covers *every* direction at once, so arrivals can be placed
 // beyond it. Only the sweeping attacks count: a fan, a horn or a drum blast is
 // aimed at whatever is already close, so widening the ring for them only starves
@@ -583,11 +594,9 @@ export function farmReach(state) {
     area = 1,
     forms = evolved(gear)
   return Math.max(
-    gear.bell
-      ? (24 + gear.bell * 6 + gear.sustain * 3 + (forms.includes('bell') ? 10 : 0)) * area
-      : 0,
+    gear.bell ? farmBellRadius(gear, forms) * area : 0,
     gear.deck ? (16 + gear.deck * 3) * area + 12 : 0,
-    gear.orbit ? 13 + gear.orbit * 2 + 8 : 0,
+    gear.orbit ? 13 + gear.orbit * 2 + 9 : 0,
   )
 }
 // Monsters always arrive a short walk outside the build's coverage, so a maxed
@@ -669,6 +678,9 @@ export function createFarm(day, permanent, starter) {
   // rebuilds the exact same opening loadout.
   const opening = starterTalent(starter)
   if (opening) state.gear[opening] = 1
+  // Freeze the member into the run: shopping after a round must not change the
+  // loadout this one was played with, or the server replays it as a stranger.
+  state.characterId = opening ? (migrateCharacterId(starter) ?? starter) : null
   for (let id = 0; id < 16; id++) {
     const enemy = { id, x: 0, y: 0, kind: 0, hp: 1, maxHp: 1, regrow: -1, boss: false }
     placeAtEdge(state, enemy)
@@ -1205,7 +1217,7 @@ export function stepFarm(previous, point, useSurge = false) {
       .sort(
         (a, b) => distance(a.x, a.y, point[0], point[1]) - distance(b.x, b.y, point[0], point[1]),
       )
-      .slice(0, forms.includes('echo') ? 6 : gear.echo + 1)
+      .slice(0, forms.includes('echo') ? ECHO_EVOLVED_TARGETS : gear.echo + 1)
     for (const crop of targets) {
       events.push({
         id: state.nextId++,
@@ -1342,8 +1354,7 @@ export function stepFarm(previous, point, useSurge = false) {
     if (state.tick % interval === 0) state.bellRings = forms.includes('bell') ? 3 : 1
     if (state.bellRings > 0 && state.tick % 4 === 0) {
       state.bellRings--
-      const radius =
-        (18 + gear.bell * 4 + gear.sustain * 2 + (forms.includes('bell') ? 8 : 0)) * areaBonus
+      const radius = farmBellRadius(gear, forms) * areaBonus
       events.push({ id: state.nextId++, kind: 'shock', x: point[0], y: point[1], radius, lane: 2 })
       for (const crop of state.crops) {
         if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
@@ -1902,13 +1913,22 @@ export function stepFarm(previous, point, useSurge = false) {
   offer(state)
   return { state, events }
 }
-export function replayFarm(day, frames, choices, surges = [], permanent = {}, characterId) {
+export function replayFarm(
+  day,
+  frames,
+  choices,
+  surges = [],
+  permanent = {},
+  characterId,
+  retired = false,
+) {
   if (
     !validDay(day) ||
     !validPermanentLevels(permanent) ||
     !Array.isArray(frames) ||
     !frames.length ||
     !Array.isArray(choices) ||
+    typeof retired !== 'boolean' ||
     !Array.isArray(surges) ||
     surges.length > frames.length ||
     !surges.every(
@@ -1934,14 +1954,16 @@ export function replayFarm(day, frames, choices, surges = [], permanent = {}, ch
     if (!result) return null
     state = result.state
   }
-  if (cursor !== choices.length || state.hp > 0) return null
-  return finishFarm(state, frames, choices, surges)
+  if (cursor !== choices.length || (state.hp > 0 && !retired)) return null
+  return finishFarm(state, frames, choices, surges, retired)
 }
 
 // The live client already simulated every frame. Build its result without
 // replaying a long run on the render thread; the server still replays inputs.
-export function finishFarm(state, frames, choices, surges) {
-  if (state.hp > 0) return null
+// `retired` is the shared "stopped on purpose" action: the band is still alive,
+// so only an explicit close makes the run rankable.
+export function finishFarm(state, frames, choices, surges, retired = state.retired === true) {
+  if (state.hp > 0 && !retired) return null
   return {
     ruleset: FARM_RULESET,
     day: state.day,
@@ -1949,7 +1971,9 @@ export function finishFarm(state, frames, choices, surges) {
     frames,
     choices,
     surges,
-    outcome: 'defeated',
+    retired,
+    characterId: state.characterId ?? null,
+    outcome: retired ? 'retired' : 'defeated',
     hp: state.hp,
     seconds: state.tick / FPS,
     score: state.score,

@@ -33,6 +33,10 @@ export function verifyFarm(input) {
   const characterId = normalizeCharacterId(input?.characterId)
   const replayCharacterId =
     typeof input?.characterId === 'string' && input.characterId ? characterId : null
+  // Stopping on purpose is a shared action, not a client-side patch of the
+  // health bar: only an explicit boolean lets a living band be ranked, and
+  // every frame of it is still replayed and scored.
+  const retired = input?.retired === true
   const round = replayFarm(
     input.day,
     input.frames,
@@ -40,6 +44,7 @@ export function verifyFarm(input) {
     input.surges,
     input.permanent === undefined ? {} : input.permanent,
     replayCharacterId,
+    retired,
   )
   if (!round || !Number.isInteger(input.score) || input.score !== round.score || !round.score)
     return null

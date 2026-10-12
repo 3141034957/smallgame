@@ -5,6 +5,7 @@ import {
   stepFarm,
   chooseTalent,
   replayFarm,
+  farmBellRadius,
   farmReach,
   farmSpawnRadius,
   FPS,
@@ -55,9 +56,11 @@ describe('unbounded combat world', () => {
     s.nextWave = 100
     const r = stepFarm(s, s.position).state
     // No chip widens an attack any more: the ring only has to clear whatever
-    // the sweeping attacks cover, and that coverage is no longer inflated.
+    // the sweeping attacks cover. The reach has to be that coverage and not a
+    // second, larger number: a wider reach parked the arrivals a whole star
+    // wave outside the wave the keyboard actually fires.
     const reach = farmReach(r)
-    expect(reach).toBe(79)
+    expect(reach).toBe(farmBellRadius(r.gear))
     // The ring always sits one fixed walk beyond that coverage, so a maxed
     // loadout still watches the horde close in instead of reaping it on arrival.
     expect(farmSpawnRadius(r)).toBe(reach + 14)
@@ -65,7 +68,7 @@ describe('unbounded combat world', () => {
     for (const enemy of r.crops) {
       const gap = Math.hypot((enemy.x - 50) * 0.84, enemy.y - 76)
       expect(gap).toBeGreaterThan(reach)
-      expect(gap).toBeLessThanOrEqual(134)
+      expect(gap).toBeLessThanOrEqual(farmSpawnRadius(r) + 16)
       expect(enemy.spawnAt).toBe(112)
     }
     // An empty loadout keeps the ring the opening minute was balanced around.

@@ -305,6 +305,10 @@ export type FarmState = {
   trails: Trail[]
   mines: Mine[]
   nextWave: number
+  // 开局限定的角色，本局回放与上榜都用它，换角色只影响下一局。
+  characterId?: string | null
+  // 玩家在暂停面板主动结算：生命仍大于零，但本局已经结束、可以上榜。
+  retired?: boolean
 }
 export type Choice = { tick: number; id: UpgradeId }
 export type FarmRound = {
@@ -312,7 +316,10 @@ export type FarmRound = {
   permanent?: PermanentLevels
   // finishFarm 会盖上当前规则集版本，服务端据此拒绝旧版本的成绩。
   ruleset?: string
-  outcome: 'defeated'
+  outcome: 'defeated' | 'retired'
+  // 主动结算为 true，自然死亡为 false；服务端据此接受仍然存活的结束局。
+  retired?: boolean
+  characterId?: string | null
   hp: number
   seconds: number
   day: string
@@ -331,8 +338,10 @@ export type FarmRound = {
   gear: Gear
   stars: number
 }
+export const ECHO_EVOLVED_TARGETS: number
 export function farmMoveStep(state: FarmState): number
 export function clampPoint(previous: Point, desired: Point, step?: number): Point
+export function farmBellRadius(gear: Gear, forms?: string[]): number
 export function farmReach(state: FarmState): number
 export function farmSpawnRadius(state: FarmState): number
 // 选角色即选定开局乐器：返回该角色自带的乐器 id，未知的 id 返回 null（回退到旧行为）。
@@ -356,10 +365,12 @@ export function replayFarm(
   surges?: number[],
   permanent?: Partial<PermanentLevels>,
   characterId?: string | null,
+  retired?: boolean,
 ): FarmRound | null
 export function finishFarm(
   state: FarmState,
   frames: Point[],
   choices: Choice[],
   surges: number[],
+  retired?: boolean,
 ): FarmRound | null

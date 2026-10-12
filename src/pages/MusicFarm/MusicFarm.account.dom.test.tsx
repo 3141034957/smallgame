@@ -162,6 +162,34 @@ it('parks an identity switch behind a live run and applies it once the run is ov
   await waitFor(() => expect(screen.getByText(`♫ ${user.username}`)).toBeTruthy())
   expect(activeAccountId()).toBe(user.id)
 })
+it('re-reads the career of the account it just entered instead of keeping the guest one', async () => {
+  let cloud: Record<string, string> = {}
+  vi.mocked(fetch).mockImplementation(async (url: RequestInfo | URL, options?: RequestInit) => {
+    if (String(url) === '/api/progress') {
+      if (options?.method === 'POST') cloud = JSON.parse(options.body as string).data
+      return json({ data: cloud, revision: 1 })
+    }
+    if (String(url).endsWith('/login')) current = user
+    return json({ user: current })
+  })
+  die()
+  mount()
+  await finishRun()
+  // The recap is the guest's own career: one run, nothing banked yet.
+  expect(screen.getByText(/生涯 0/)).toBeTruthy()
+  cloud = { 'farm-career-v1': JSON.stringify({ runs: 7, bestScore: 99_999 }) }
+  await act(async () =>
+    fireEvent.click(screen.getByRole('button', { name: '输入昵称登录并同步进度' })),
+  )
+  fireEvent.change(screen.getByLabelText('昵称'), { target: { value: 'PLAYER_ONE' } })
+  await act(async () =>
+    fireEvent.click(screen.getByRole('button', { name: '用这个昵称进入乐队并同步进度' })),
+  )
+  // The game stays mounted so the run can still be uploaded, but the numbers
+  // it shows belong to the account now.
+  expect(screen.getByText('演出落幕')).toBeTruthy()
+  await waitFor(() => expect(screen.getByText(/生涯 99,999/)).toBeTruthy())
+})
 it('never asks a signed-in player for a nickname after a run', async () => {
   current = user
   die()

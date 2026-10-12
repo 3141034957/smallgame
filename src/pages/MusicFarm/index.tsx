@@ -45,7 +45,7 @@ import type {
 } from '@/features/farm/rules.mjs'
 import { selectFarmUpgrade } from '@/features/farm/upgradeSelection'
 import { schoolById } from '@/features/farm/schools.mjs'
-import { AUTH_FORM_EVENT } from '@/features/auth/context'
+import { ACCOUNT_SWITCH_EVENT, AUTH_FORM_EVENT } from '@/features/auth/context'
 import { drawFarm } from './render'
 import { Icon } from './icons'
 import { FarmBoard } from './FarmBoard'
@@ -99,9 +99,24 @@ import { useAccount } from '@/features/auth/context'
 import './style.css'
 
 type Phase = 'ready' | 'play' | 'result'
-type Panel = 'help' | 'board' | 'pause' | 'shop' | 'growth' | 'badges' | null
+type Panel = 'help' | 'board' | 'pause' | 'shop' | 'growth' | 'badges' | 'recap' | null
 const talent = (id: UpgradeId) => UPGRADE_CARDS.find((item) => item.id === id)!
 const number = (value: number) => value.toLocaleString()
+// Walking is read from wherever the keyboard is inside the game, not only from
+// the arena: tapping the surge or the sound button moves the focus onto it and
+// used to leave the band standing still.
+const MOVEMENT: Record<string, Point> = {
+  ArrowLeft: [-1, 0],
+  a: [-1, 0],
+  ArrowRight: [1, 0],
+  d: [1, 0],
+  ArrowUp: [0, -1],
+  w: [0, -1],
+  ArrowDown: [0, 1],
+  s: [0, 1],
+}
+const isTyping = (target: EventTarget | null) =>
+  target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)
 // Cloud progress is stored per account, so another tab of the same account
 // writes this key instead of the legacy local ones.
 const accountSaveKey = (id: string) => `farm-account-save-v1:${id}`
@@ -349,7 +364,9 @@ export default function MusicFarm() {
     if (phaseRef.current !== 'play') return
     // `finishFarm` only closes a run that is over, so the band stops playing:
     // the score, the seconds and the replay are the ones actually played.
-    const state: FarmState = { ...model.current, hp: 0 }
+    // `retired` is the shared action the server replays: the band is still
+    // alive, so only naming the stop makes this run verifiable.
+    const state: FarmState = { ...model.current, hp: 0, retired: true }
     model.current = state
     const finished = finishFarm(
       state,
@@ -390,6 +407,17 @@ export default function MusicFarm() {
   }
   const settleRef = useRef(settleRun)
   settleRef.current = settleRun
+  const shareRound = () => {
+    const text = farmShareText(round, day)
+    navigator.clipboard
+      ?.writeText(text)
+      ?.then(() => {
+        setCopied(true)
+        if (copiedTimer.current) clearTimeout(copiedTimer.current)
+        copiedTimer.current = setTimeout(() => setCopied(false), 2400)
+      })
+      .catch(() => setCopied(false))
+  }
   const claimReward = () => {
     if (!round) return
     // Retry both payouts: a quota failure can hide either one.
@@ -444,6 +472,18 @@ export default function MusicFarm() {
   )
   useEffect(() => {
     const sync = () => setProfile(loadFarmProfile())
+    // An identity change moves the whole storage scope under a game that stays
+    // mounted: the wallet, the quests, the career, the badges and the record
+    // all belong to the new owner, so every one of them is read again. Keeping
+    // the round itself is deliberate — it is the run being uploaded.
+    const reload = () => {
+      setProfile(loadFarmProfile())
+      setBadges(loadFarmAchievements())
+      setCareer(loadFarmCareer())
+      setQuests(loadFarmQuests(dayRef.current))
+      setSettings(loadFarmSettings())
+      setBest((previous) => Math.max(previous, loadBestScore(farmBestKey(dayRef.current))))
+    }
     const onStorage = (event: StorageEvent) => {
       const owner = activeAccountId()
       if (
@@ -461,9 +501,11 @@ export default function MusicFarm() {
     window.addEventListener('storage', onStorage)
     // Same-tab writes go through `accountStorage`, which broadcasts its own event.
     window.addEventListener(ACCOUNT_SAVE_EVENT, sync)
+    window.addEventListener(ACCOUNT_SWITCH_EVENT, reload)
     return () => {
       window.removeEventListener('storage', onStorage)
       window.removeEventListener(ACCOUNT_SAVE_EVENT, sync)
+      window.removeEventListener(ACCOUNT_SWITCH_EVENT, reload)
     }
   }, [])
   const select = (id: UpgradeId) => {
@@ -923,6 +965,31 @@ export default function MusicFarm() {
   const currentXp = Math.max(0, Math.min(requiredXp, view.xp - previousThreshold))
   const progress = requiredXp > 0 ? (currentXp / requiredXp) * 100 : 100
   const forms = evolved(view.gear)
+  // The whole game reads movement, so a knob that has the focus cannot swallow
+  // the walk. The dialogs are `inert` while open, and typing never moves.
+  const onGameKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return
+    if (isTyping(event.target) || phaseRef.current !== 'play') return
+    if (event.key === ' ') {
+      // Space belongs to whatever button has the focus; only the arena uses it
+      // to fire the surge.
+      if (event.target !== field.current) return
+      event.preventDefault()
+      if (model.current.charge >= 100) surge.current = true
+      return
+    }
+    const delta = MOVEMENT[event.key]
+    if (!delta) return
+    event.preventDefault()
+    pointerTarget.current = null
+    keys.current.add(event.key)
+    const moveStep = farmMoveStep(model.current)
+    desired.current = [
+      model.current.position[0] + delta[0] * moveStep,
+      model.current.position[1] + delta[1] * moveStep,
+    ]
+  }
+  const onGameKeyUp = (event: React.KeyboardEvent<HTMLElement>) => keys.current.delete(event.key)
   const trap = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Escape' && panel) closePanel()
     if (upgrade && /^[1-9]$/.test(event.key) && !event.metaKey && !event.ctrlKey && !event.altKey) {
@@ -953,7 +1020,14 @@ export default function MusicFarm() {
       ref={page}
       data-phase={phase}
     >
-      <div className="farm-shell" inert={!!panel || upgrade}>
+      <div
+        className="farm-shell"
+        inert={!!panel || upgrade}
+        onKeyDown={onGameKeyDown}
+        onKeyUp={onGameKeyUp}
+        // A held key must not keep walking after the focus leaves the game.
+        onBlur={() => keys.current.clear()}
+      >
         <header className="farm-header">
           <a className="farm-brand" href="#/farm">
             <span className="farm-brand-mark">
@@ -1149,49 +1223,6 @@ export default function MusicFarm() {
               tabIndex={0}
               role="application"
               aria-label="生存战场：手机按住任意位置当摇杆拖动方向，电脑移动鼠标，或使用方向键和 WASD，空格释放音浪爆发"
-              onKeyDown={(event) => {
-                if (event.target !== event.currentTarget || phaseRef.current !== 'play') return
-                if (
-                  [
-                    'ArrowLeft',
-                    'ArrowRight',
-                    'ArrowUp',
-                    'ArrowDown',
-                    'w',
-                    'a',
-                    's',
-                    'd',
-                    ' ',
-                  ].includes(event.key)
-                ) {
-                  event.preventDefault()
-                  if (event.key === ' ') {
-                    if (phaseRef.current === 'play' && model.current.charge >= 100)
-                      surge.current = true
-                  } else {
-                    pointerTarget.current = null
-                    keys.current.add(event.key)
-                    const moveStep = farmMoveStep(model.current)
-                    const movement: Record<string, Point> = {
-                      ArrowLeft: [-moveStep, 0],
-                      a: [-moveStep, 0],
-                      ArrowRight: [moveStep, 0],
-                      d: [moveStep, 0],
-                      ArrowUp: [0, -moveStep],
-                      w: [0, -moveStep],
-                      ArrowDown: [0, moveStep],
-                      s: [0, moveStep],
-                    }
-                    const delta = movement[event.key]
-                    desired.current = [
-                      model.current.position[0] + delta[0],
-                      model.current.position[1] + delta[1],
-                    ]
-                  }
-                }
-              }}
-              onKeyUp={(event) => keys.current.delete(event.key)}
-              onBlur={() => keys.current.clear()}
             >
               <canvas ref={canvas} aria-label={`音乐怪物与${character.name}的生存战场`} />
               {phase === 'play' && (growthStats.regen || growthStats.shieldSeconds) ? (
@@ -1353,20 +1384,16 @@ export default function MusicFarm() {
               <button className="farm-primary" onClick={restart}>
                 再来一局
               </button>
+              {/* Phones drop the build, the curve, the goals and the new badges
+                  to keep the recap on one screen, so they get one way back in. */}
               <button
-                className="farm-text-button"
-                onClick={() => {
-                  const text = farmShareText(round, day)
-                  navigator.clipboard
-                    ?.writeText(text)
-                    ?.then(() => {
-                      setCopied(true)
-                      if (copiedTimer.current) clearTimeout(copiedTimer.current)
-                      copiedTimer.current = setTimeout(() => setCopied(false), 2400)
-                    })
-                    .catch(() => setCopied(false))
-                }}
+                className="farm-text-button farm-recap-open"
+                aria-label="查看本局复盘：乐队构筑、时间曲线、今日目标与新成就"
+                onClick={() => openPanel('recap')}
               >
+                复盘
+              </button>
+              <button className="farm-text-button" onClick={shareRound}>
                 {copied ? '已复制 ✓' : '复制战绩'}
               </button>
               <BuildSummary gear={view.gear} state={view} />
@@ -1414,7 +1441,10 @@ export default function MusicFarm() {
                   {FARM_TOO_LONG_MESSAGE}
                 </p>
               )}
-              <FarmBoard round={submitBlocked ? null : round} characterId={profile.selected} />
+              <FarmBoard
+                round={submitBlocked ? null : round}
+                characterId={round?.characterId ?? profile.selected}
+              />
             </section>
           )}
         </div>
@@ -1430,7 +1460,7 @@ export default function MusicFarm() {
           className={`farm-backdrop${panel === 'shop' || panel === 'growth' ? ' is-fullscreen' : ''}`}
         >
           <section
-            className={`farm-dialog ${upgrade ? 'farm-upgrade-dialog' : panel === 'shop' || panel === 'growth' ? 'is-fullscreen' : ''}`}
+            className={`farm-dialog ${upgrade ? 'farm-upgrade-dialog' : panel === 'shop' || panel === 'growth' ? 'is-fullscreen' : panel === 'pause' ? 'farm-pause' : ''}`}
             ref={modal}
             role="dialog"
             aria-modal="true"
@@ -1447,7 +1477,9 @@ export default function MusicFarm() {
                         ? '永久强化'
                         : panel === 'badges'
                           ? '成就墙'
-                          : '游戏暂停'
+                          : panel === 'recap'
+                            ? '本局复盘'
+                            : '游戏暂停'
             }
             onKeyDown={trap}
           >
@@ -1475,67 +1507,111 @@ export default function MusicFarm() {
                   <BadgeWall log={badges} career={career} />
                 ) : panel === 'board' ? (
                   <FarmBoard />
+                ) : panel === 'recap' ? (
+                  <div className="farm-recap-panel">
+                    <h2>本局复盘</h2>
+                    {freshBadges.length > 0 && (
+                      <div className="farm-fresh-badges">
+                        <small>本局解锁成就</small>
+                        <div>
+                          {freshBadges.map((id) => {
+                            const badge = FARM_ACHIEVEMENTS.find((item) => item.id === id)!
+                            return (
+                              <span key={id}>
+                                {badge.icon} {badge.name}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    <p>
+                      生存 {(view.tick / FPS).toFixed(1)} 秒 · {view.maxCombo} 连击 ·{' '}
+                      {number(view.score)} 分
+                    </p>
+                    <BuildSummary gear={view.gear} state={view} />
+                    <RunTimeline
+                      samples={timeline}
+                      marks={evolutionTicks}
+                      seconds={view.tick / FPS}
+                    />
+                    <QuestList quests={todayQuests} log={quests} fresh={freshQuests} />
+                    <button
+                      className="farm-text-button"
+                      aria-label="复制本局战绩文本"
+                      onClick={shareRound}
+                    >
+                      {copied ? '已复制 ✓' : '复制战绩'}
+                    </button>
+                  </div>
                 ) : panel === 'pause' ? (
                   <>
-                    <div className="farm-modal-icon">☾</div>
-                    <h2>乐队等你回来 ♡</h2>
-                    <button className="farm-primary" onClick={closePanel}>
-                      继续战斗
-                    </button>
-                    {/* The only way to bank a long run: it ends the round and
-                        submits it, instead of throwing it away like restart. */}
-                    <button
-                      className="farm-text-button"
-                      aria-label={
-                        submitStatus.expired
-                          ? `结束本局，${FARM_TOO_LONG_MESSAGE}`
-                          : '结束本局并结算成绩，提交到生存排行榜'
-                      }
-                      onClick={settleRun}
-                    >
-                      {submitStatus.expired ? '结束本局' : '结算上榜'}
-                    </button>
-                    {submitStatus.expired && <p role="alert">{FARM_TOO_LONG_MESSAGE}</p>}
-                    <button
-                      className="farm-text-button"
-                      aria-label={settings.effects ? '关闭特效，改为省电' : '开启特效'}
-                      onClick={() => {
-                        const next = saveFarmSettings({ effects: !settings.effects })
-                        settingsRef.current = next
-                        setSettings(next)
-                      }}
-                    >
-                      {settings.effects ? '特效 开' : '特效 省电'}
-                    </button>
-                    <BuildSummary gear={view.gear} state={view} />
-                    <p className="farm-pause-goals">
-                      <small>
-                        今日词缀 {modifier.icon} {modifier.name}
-                      </small>
-                      <QuestList quests={todayQuests} log={quests} />
-                    </p>
-                    {confirmRestart === 'pause' ? (
-                      <span className="farm-restart-confirm">
-                        <button
-                          className="is-armed"
-                          aria-label="确认重新开始本局"
-                          onClick={() => restart()}
-                        >
-                          确认重开
-                        </button>
-                        <button aria-label="取消重新开始" onClick={() => setConfirmRestart(null)}>
-                          取消
-                        </button>
-                      </span>
-                    ) : (
+                    {/* Two blocks: the way out of the dialog stays in one
+                        column, the build and the goals take the other on a
+                        landscape phone, so the pause never needs a scroll. */}
+                    <div className="farm-pause-actions">
+                      <div className="farm-modal-icon">☾</div>
+                      <h2>乐队等你回来 ♡</h2>
+                      <button className="farm-primary" onClick={closePanel}>
+                        继续战斗
+                      </button>
+                      {/* The only way to bank a long run: it ends the round and
+                          submits it, instead of throwing it away like restart. */}
                       <button
                         className="farm-text-button"
-                        aria-label="放弃本局进度并重新开始"
-                        onClick={() => setConfirmRestart('pause')}
+                        aria-label={
+                          submitStatus.expired
+                            ? `结束本局，${FARM_TOO_LONG_MESSAGE}`
+                            : '结束本局并结算成绩，提交到生存排行榜'
+                        }
+                        onClick={settleRun}
                       >
-                        重新开始
+                        {submitStatus.expired ? '结束本局' : '结算上榜'}
                       </button>
-                    )}
+                      {submitStatus.expired && <p role="alert">{FARM_TOO_LONG_MESSAGE}</p>}
+                      <button
+                        className="farm-text-button"
+                        aria-label={settings.effects ? '关闭特效，改为省电' : '开启特效'}
+                        onClick={() => {
+                          const next = saveFarmSettings({ effects: !settings.effects })
+                          settingsRef.current = next
+                          setSettings(next)
+                        }}
+                      >
+                        {settings.effects ? '特效 开' : '特效 省电'}
+                      </button>
+                      {confirmRestart === 'pause' ? (
+                        <span className="farm-restart-confirm">
+                          <button
+                            className="is-armed"
+                            aria-label="确认重新开始本局"
+                            onClick={() => restart()}
+                          >
+                            确认重开
+                          </button>
+                          <button aria-label="取消重新开始" onClick={() => setConfirmRestart(null)}>
+                            取消
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          className="farm-text-button"
+                          aria-label="放弃本局进度并重新开始"
+                          onClick={() => setConfirmRestart('pause')}
+                        >
+                          重新开始
+                        </button>
+                      )}
+                    </div>
+                    <div className="farm-pause-detail">
+                      <BuildSummary gear={view.gear} state={view} />
+                      <div className="farm-pause-goals">
+                        <small>
+                          今日词缀 {modifier.icon} {modifier.name}
+                        </small>
+                        <QuestList quests={todayQuests} log={quests} />
+                      </div>
+                    </div>
                   </>
                 ) : (
                   <FarmHelp onClose={closePanel} />

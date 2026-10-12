@@ -11,3 +11,6 @@ export type AccountContextValue = {
 export const AccountContext = createContext<AccountContextValue | null>(null)
 export const useAccount = () => useContext(AccountContext)
 export const AUTH_FORM_EVENT = 'echo-account-form-opened'
+// The identity changed under a game that stays mounted: every growth view has
+// to be read again from the new storage scope, not only the wallet.
+export const ACCOUNT_SWITCH_EVENT = 'echo-account-switched'

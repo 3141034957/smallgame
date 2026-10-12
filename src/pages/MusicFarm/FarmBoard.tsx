@@ -107,9 +107,14 @@ export function FarmBoard({
         score: target.score,
         playerId,
         name: next,
+        // A voluntary stop is part of the replay: the server has to know the
+        // band was still alive when the player banked the run.
+        retired: target.retired === true,
+        // The member is frozen into the run: switching characters in the shop
+        // after it must not change the loadout this replay is checked against.
         // An empty member would replay as a legacy run without an opening
         // instrument and fail verification, so always name the member.
-        characterId: characterId || FARM_DEFAULT_CHARACTER,
+        characterId: target.characterId || characterId || FARM_DEFAULT_CHARACTER,
       }
       void farmRequest<Board>('score', controller.signal, submission)
         .then((value) => {

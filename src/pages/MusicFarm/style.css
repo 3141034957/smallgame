@@ -536,7 +536,9 @@
   margin: 12px 0;
   color: #486344;
 }
-.farm-dialog > p {
+.farm-dialog > p,
+.farm-pause-actions > p,
+.farm-recap-panel > p {
   font-size: 12px;
   color: #8b917c;
   line-height: 1.85;
@@ -691,9 +693,18 @@
     display: none;
   }
 }
-.farm-dialog > .farm-primary {
+.farm-dialog > .farm-primary,
+.farm-pause-actions > .farm-primary {
   width: 100%;
   margin-top: 18px;
+}
+/* Two underlined buttons in a row read as one sentence: the rule between them
+   is what says they are separate ways out. */
+.farm-pause-actions > .farm-text-button + .farm-text-button {
+  border-top: 1px solid #e8ebd5;
+}
+.farm-pause-detail > .farm-build {
+  margin-top: 12px;
 }
 .farm-modal-icon {
   font-size: 58px;
@@ -797,6 +808,66 @@
 }
 .farm-result .farm-board {
   text-align: left;
+}
+/* The recap is one screen on a phone, so the build, the curve, the goals and
+   the new badges live behind this one entry instead of being dropped. */
+.farm-recap-open {
+  display: none;
+}
+.farm-recap-panel > h2,
+.farm-recap-panel > p {
+  text-align: center;
+}
+.farm-recap-panel > .farm-text-button {
+  display: block;
+  margin: 14px auto 0;
+}
+.farm-recap-panel > .farm-quests {
+  margin-top: 12px;
+}
+/* A landscape phone is ~390px tall: the pause dialog puts its ways out next to
+   its information instead of under it, and both columns stay on one screen. */
+@media (max-height: 520px) and (min-width: 600px) {
+  .farm-dialog.farm-pause {
+    display: grid;
+    grid-template-columns: minmax(0, 210px) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    column-gap: 16px;
+    align-items: start;
+    padding: 16px 18px;
+  }
+  .farm-dialog.farm-pause > .farm-close {
+    grid-column: 2;
+    grid-row: 1;
+    position: static;
+    margin: 0 0 0 auto;
+  }
+  .farm-pause-actions {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+  .farm-pause-detail {
+    grid-column: 2;
+    grid-row: 2;
+    min-height: 0;
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /* Decoration is the first thing a short screen gives up. */
+  .farm-dialog.farm-pause .farm-modal-icon {
+    display: none;
+  }
+  .farm-dialog.farm-pause h2 {
+    font-size: 17px;
+    margin: 0 0 8px;
+  }
+  .farm-pause-actions > .farm-primary {
+    margin-top: 8px;
+  }
+  .farm-pause-detail > .farm-build {
+    margin-top: 0;
+  }
 }
 @keyframes farm-breathe {
   to {
@@ -2940,6 +3011,10 @@
   .farm-result .farm-result-shop {
     display: none;
   }
+  /* Hidden on a desktop where every block is already on the page. */
+  .farm-result > .farm-recap-open {
+    display: inline-block;
+  }
   .farm-result h2 {
     font-size: clamp(17px, 3.4dvh, 23px);
     margin: clamp(4px, 1dvh, 10px) 0;
@@ -3011,6 +3086,10 @@
   .farm-result > .farm-final-build,
   .farm-result > .farm-text-button {
     display: none;
+  }
+  /* The recap entry stays even where the share button goes: it carries both. */
+  .farm-result > .farm-recap-open {
+    display: inline-block;
   }
 }
 /* A landscape phone is ~390px tall: the star row goes and the last two blocks
