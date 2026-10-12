@@ -165,7 +165,10 @@ if [[ -e "$GAME_ROOT/server/data/game.db" && ! -w "$GAME_ROOT/server/data/game.d
   die "当前用户无法写入 server/data/game.db，请先检查数据库文件所有者和权限。"
 fi
 
-sudo -v
+# `sudo -v` always asks for a password even when the deploy user has NOPASSWD,
+# which hangs unattended runs (cron, ssh without a tty). Only use it to cache
+# credentials when sudo really needs them.
+sudo -n true 2>/dev/null || sudo -v
 GAME_LISTENERS="$(sudo ss -H -ltnp "sport = :${GAME_PORT}")"
 if [[ -n "$GAME_LISTENERS" ]] && ! sudo systemctl is-active --quiet "$GAME_SERVICE" 2>/dev/null && ! server_alive; then
   printf '%s\n' "$GAME_LISTENERS" >&2
