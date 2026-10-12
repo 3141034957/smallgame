@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import MusicFarm from './index'
 import { AuthGate } from '@/features/auth/AuthGate'
+import { AUTH_CHANGED_KEY } from '@/features/auth/client'
 import { FARM_HELP_SEEN_KEY } from '@/features/farm/help'
 import { stepFarm } from '@/features/farm/rules.mjs'
-import { activateAccount } from '@/utils/accountStorage'
+import { activateAccount, activeAccountId } from '@/utils/accountStorage'
 import { testStorage } from '@/test/storage'
 
 vi.mock('./FarmBoard', () => ({ FarmBoard: () => <div>测试总榜</div> }))
@@ -76,20 +77,90 @@ const mount = () =>
       </AuthGate>
     </MemoryRouter>,
   )
+const startButton = () => screen.getByRole('button', { name: '开始无限模式' }) as HTMLButtonElement
 const finishRun = async () => {
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: '开始无限模式' })))
+  // The identity check is still running right after mount and the start button
+  // waits for it, so the click has to wait too.
+  await waitFor(() => expect(startButton().disabled).toBe(false))
+  await act(async () => fireEvent.click(startButton()))
   // A 200 ms gap between two frames is two simulation ticks: the run ends.
   act(() => frame(1000))
   act(() => frame(1200))
 }
-it('asks a guest for a nickname the moment the run ends', async () => {
+it('lets a guest keep playing after a run instead of forcing a sign-in', async () => {
   die()
   mount()
   await finishRun()
   expect(screen.getByText('演出落幕')).toBeTruthy()
-  // The finished run is the offer: a nickname is all it takes to keep playing.
-  await screen.findByText(FORM)
-  expect(screen.getByLabelText('昵称')).toBeTruthy()
+  // Nothing is pushed over the recap: signing in is the player's own move.
+  expect(screen.queryByText(FORM)).toBeNull()
+  expect(screen.queryByRole('dialog', { name: '乐队账号登录' })).toBeNull()
+  // The way in is still there, and the run can simply go on.
+  expect(screen.getByRole('button', { name: '输入昵称登录并同步进度' })).toBeTruthy()
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '再来一局' })))
+  expect(screen.getByRole('button', { name: '开始无限模式' })).toBeTruthy()
+})
+it('holds the start button until the identity check answers', async () => {
+  let release: (response: Response) => void = () => {}
+  vi.mocked(fetch).mockImplementation((url) =>
+    String(url).endsWith('/session')
+      ? new Promise<Response>((resolve) => {
+          release = resolve
+        })
+      : Promise.resolve(json({ data: {}, revision: 1 })),
+  )
+  mount()
+  // An unknown identity must not own a run: the button says why it is off.
+  expect(startButton().disabled).toBe(true)
+  expect(screen.getByText('检查登录中…')).toBeTruthy()
+  await act(async () => release(json({ user: null })))
+  await waitFor(() => expect(startButton().disabled).toBe(false))
+  expect(screen.queryByText('检查登录中…')).toBeNull()
+})
+it('lets a guest start even when the account service cannot be reached', async () => {
+  vi.mocked(fetch).mockRejectedValue(new Error('offline'))
+  mount()
+  // A failure answers the question too: the gate opens for guest play.
+  await waitFor(() => expect(startButton().disabled).toBe(false))
+  await act(async () => fireEvent.click(startButton()))
+  expect(screen.getByRole('button', { name: '暂停游戏' })).toBeTruthy()
+})
+it('parks an identity switch behind a live run and applies it once the run is over', async () => {
+  // The band survives every tick: the round stays live until it is settled.
+  vi.mocked(stepFarm).mockImplementation((previous) => ({
+    state: { ...previous, tick: previous.tick + 1, offered: [] },
+    events: [],
+  }))
+  mount()
+  await waitFor(() => expect(startButton().disabled).toBe(false))
+  await act(async () => fireEvent.click(startButton()))
+  act(() => frame(1000))
+  act(() => frame(1200))
+  expect(screen.getByRole('button', { name: '暂停游戏' })).toBeTruthy()
+  // Slow network: the session finally answers, and it belongs to someone else.
+  current = user
+  await act(async () => {
+    window.dispatchEvent(new StorageEvent('storage', { key: AUTH_CHANGED_KEY }))
+  })
+  // The live run is not thrown away, and its score is not written into the
+  // other account's storage.
+  expect(screen.getByRole('button', { name: '暂停游戏' })).toBeTruthy()
+  expect(screen.queryByText(`♫ ${user.username}`)).toBeNull()
+  expect(screen.getByText('本局后切换')).toBeTruthy()
+  expect(activeAccountId()).toBeNull()
+  // Settling keeps the recap: the score and the board entry survive.
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '暂停游戏' })))
+  await act(async () =>
+    fireEvent.click(screen.getByRole('button', { name: '结束本局并结算成绩，提交到生存排行榜' })),
+  )
+  expect(screen.getByText('演出落幕')).toBeTruthy()
+  expect(screen.queryByText(`♫ ${user.username}`)).toBeNull()
+  expect(activeAccountId()).toBeNull()
+  // Going back to the start screen is the player's own move, and only then
+  // does the parked identity take over.
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '再来一局' })))
+  await waitFor(() => expect(screen.getByText(`♫ ${user.username}`)).toBeTruthy())
+  expect(activeAccountId()).toBe(user.id)
 })
 it('never asks a signed-in player for a nickname after a run', async () => {
   current = user

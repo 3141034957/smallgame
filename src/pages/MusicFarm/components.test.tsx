@@ -210,9 +210,11 @@ describe('farm screens render', () => {
       stars: 1,
       gear: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])),
     }
-    expect(renderToStaticMarkup(<FarmBoard round={round as never} />)).toContain(
-      '注册并保存本局进度',
-    )
+    // A guest keeps one voluntary way in, and it says what signing in is for.
+    const guest = renderToStaticMarkup(<FarmBoard round={round as never} />)
+    expect(guest).toContain('登录后可把本局成绩提交到生存榜')
+    expect(guest).toContain('上榜需登录')
+    expect(guest).not.toContain('注册')
     activateAccount('account_ssr_test')
     installAccountSave('account_ssr_test', { data: {}, revision: 1, dirty: false })
     const html = renderToStaticMarkup(<FarmBoard round={round as never} />)

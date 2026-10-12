@@ -1,9 +1,17 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode, type FormEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type FormEvent,
+} from 'react'
 import { flushSync } from 'react-dom'
 import { activateAccount, ACCOUNT_SAVE_EVENT, exportGuestProgress } from '@/utils/accountStorage'
 import { BAND_CHARACTERS } from '@/features/farm/characterRoster.mjs'
 import { ACCOUNT_HINT, normalizeAccount } from './validation.mjs'
-import { AccountContext, AUTH_FORM_EVENT } from './context'
+import { AccountContext, AUTH_FORM_EVENT, type AccountContextValue } from './context'
 import { createProgressSync, loadAccountProgress, type SyncStatus } from './cloud'
 import {
   AccountError,
@@ -37,6 +45,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const pending = useRef<AbortController | null>(null)
   const sequence = useRef(0)
   const mutating = useRef(false)
+  const runActive = useRef(false)
+  const deferred = useRef<AccountUser | null | undefined>(undefined)
   const dialog = useRef<HTMLElement>(null)
   const previousFocus = useRef<HTMLElement | null>(null)
   const cancelPending = useCallback(() => {
@@ -44,12 +54,27 @@ export function AuthGate({ children }: { children: ReactNode }) {
     pending.current?.abort()
     pending.current = null
   }, [])
+  // Returns false when the switch was parked because a run is still live.
   const accept = useCallback((next: AccountUser | null, preserveGuest = false) => {
     const changed = principal.current?.id !== next?.id
+    if (changed && !preserveGuest && runActive.current) {
+      // Switching now would unmount the live run and move the storage scope with
+      // it: park the identity instead and keep playing under the current owner.
+      deferred.current = next
+      setNotice('本局后切换')
+      setChecking(false)
+      return false
+    }
+    // This result is the one that is actually live: an identity parked earlier
+    // by a session that has since changed again is stale and must be dropped.
+    deferred.current = undefined
     if (changed) {
       sync.current?.stop()
       // Registration adopts this guest run. All other switches tear down under the old owner.
-      if (!preserveGuest) flushSync(() => setGameVisible(false))
+      if (!preserveGuest) {
+        flushSync(() => setGameVisible(false))
+        runActive.current = false
+      }
       activateAccount(next?.id ?? null)
       if (!preserveGuest) setGameKey(next?.id ?? `guest:${Date.now()}`)
       // Never carry a conflict or "saved" badge from the previous account over.
@@ -59,7 +84,24 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setUser(next)
     setGameVisible(true)
     setChecking(false)
+    return true
   }, [])
+  const setRunActive = useCallback(
+    (active: boolean) => {
+      runActive.current = active
+      if (active || deferred.current === undefined) return
+      const next = deferred.current
+      deferred.current = undefined
+      // The page reports this from an effect, and applying the switch unmounts
+      // it: `flushSync` must not run inside React's own commit. A microtask
+      // lands after the commit, close enough to feel immediate.
+      queueMicrotask(() => {
+        if (!mounted.current || runActive.current) return
+        if (accept(next)) setNotice('')
+      })
+    },
+    [accept],
+  )
   const check = useCallback(async () => {
     if (mutating.current || pending.current) return
     const controller = new AbortController()
@@ -72,20 +114,28 @@ export function AuthGate({ children }: { children: ReactNode }) {
         await loadAccountProgress(next.id, controller.signal)
         if (!mounted.current || revision !== sequence.current) return
       }
-      if (principal.current && !next) setNotice('已退出登录')
-      accept(next)
-      setError('')
+      const previous = principal.current
+      // A parked switch keeps the notice it was given; an applied one can say
+      // what happened.
+      if (accept(next)) {
+        if (previous && !next) setNotice('已退出登录')
+        setError('')
+      }
     } catch (cause) {
       if (!mounted.current || revision !== sequence.current || controller.signal.aborted) return
       if (cause instanceof AccountError && cause.status === 401) {
-        accept(null)
-        setNotice('登录已失效，可继续玩')
+        if (accept(null)) setNotice('登录已失效，可继续玩')
       } else {
         setChecking(false)
         setError('连不上账号服务，先存本机')
       }
     } finally {
       if (pending.current === controller) pending.current = null
+      // An aborted or superseded check never reports a result of its own: drop the
+      // gate so a cancelled session check can never block starting a run.
+      if (controller.signal.aborted || revision !== sequence.current) {
+        if (!pending.current) setChecking(false)
+      }
     }
   }, [accept])
   useEffect(() => {
@@ -106,8 +156,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     }
     const expired = () => {
       cancelPending()
-      accept(null)
-      setNotice('登录已失效，可继续玩')
+      if (accept(null)) setNotice('登录已失效，可继续玩')
       void check()
     }
     window.addEventListener('focus', focus)
@@ -200,7 +249,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
     } finally {
       if (pending.current === controller) pending.current = null
       mutating.current = false
-      if (mounted.current) setBusy(false)
+      if (mounted.current) {
+        // The login attempt answers the identity question either way: never leave
+        // the gate on "checking" after it.
+        setChecking(false)
+        setBusy(false)
+      }
     }
   }
   const logout = async () => {
@@ -213,9 +267,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
       await sync.current?.flush()
       await accountRequest('logout', {})
       if (!mounted.current) return
-      accept(null)
-      setNotice('已退出登录')
-      announceAccountChange()
+      if (accept(null)) {
+        setNotice('已退出登录')
+        announceAccountChange()
+      }
     } catch (cause) {
       if (mounted.current) {
         if (cause instanceof AccountError && cause.status === 401) accept(null)
@@ -257,8 +312,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
       if (mounted.current) setBusy(false)
     }
   }
+  const value = useMemo<AccountContextValue>(
+    () => ({ user, openAccount, checking, setRunActive }),
+    [user, openAccount, checking, setRunActive],
+  )
   return (
-    <AccountContext value={{ user, openAccount }}>
+    <AccountContext value={value}>
       <div className="account-game">
         <div
           className="account-bar"

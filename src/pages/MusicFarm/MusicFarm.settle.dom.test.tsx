@@ -135,3 +135,66 @@ it('keeps the exit past the budget but drops the promise of a rank', async () =>
   expect(vi.mocked(finishFarm)).toHaveBeenCalledOnce()
   expect(vi.mocked(finishFarm).mock.calls[0][0].hp).toBe(0)
 })
+// Restart throws the round away, so both places that offer it ask again with
+// the same labelled pair instead of a colour change nobody can read.
+const armRestart = () => screen.getByRole('button', { name: '重新开始本局' })
+const confirmRestart = () => screen.getByRole('button', { name: '确认重新开始本局' })
+const cancelRestart = () => screen.getByRole('button', { name: '取消重新开始' })
+it('asks again in the header with a labelled pair, and cancelling keeps the round', async () => {
+  surviveAt(60)
+  await start()
+  await act(async () => fireEvent.click(armRestart()))
+  // The confirmation is readable, not just a highlighted icon.
+  expect(confirmRestart().textContent).toBe('确认重开')
+  expect(cancelRestart().textContent).toBe('取消')
+  await act(async () => fireEvent.click(cancelRestart()))
+  expect(armRestart()).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '确认重新开始本局' })).toBeNull()
+  // The round is still the one that was being played.
+  expect(screen.getByRole('button', { name: '暂停游戏' })).toBeTruthy()
+  await act(async () => fireEvent.click(armRestart()))
+  await act(async () => fireEvent.click(confirmRestart()))
+  expect(screen.getByRole('button', { name: '开始无限模式' })).toBeTruthy()
+})
+it('asks again in the pause panel before a restart drops the round', async () => {
+  surviveAt(60)
+  await start()
+  await pause()
+  const restart = screen.getByRole('button', { name: '放弃本局进度并重新开始' })
+  expect(restart.textContent).toBe('重新开始')
+  await act(async () => fireEvent.click(restart))
+  expect(confirmRestart().textContent).toBe('确认重开')
+  await act(async () => fireEvent.click(cancelRestart()))
+  expect(screen.getByRole('button', { name: '放弃本局进度并重新开始' })).toBeTruthy()
+  await act(async () =>
+    fireEvent.click(screen.getByRole('button', { name: '结束本局并结算成绩，提交到生存排行榜' })),
+  )
+  expect(screen.getByText('演出落幕')).toBeTruthy()
+})
+it('drops an unanswered restart confirmation when the pause panel closes', async () => {
+  surviveAt(60)
+  await start()
+  await pause()
+  await act(async () =>
+    fireEvent.click(screen.getByRole('button', { name: '放弃本局进度并重新开始' })),
+  )
+  expect(confirmRestart()).toBeTruthy()
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '关闭弹窗' })))
+  await pause()
+  // Nothing is left armed behind the panel.
+  expect(screen.queryByRole('button', { name: '确认重新开始本局' })).toBeNull()
+  expect(screen.getByRole('button', { name: '放弃本局进度并重新开始' })).toBeTruthy()
+})
+it('leaves a first visit alone and keeps the full codex one tap away', async () => {
+  localStorage.removeItem(FARM_HELP_SEEN_KEY)
+  render(
+    <MemoryRouter initialEntries={['/farm?day=2026-10-04']}>
+      <MusicFarm />
+    </MemoryRouter>,
+  )
+  // No long codex over the start card, and the way into the run is reachable.
+  expect(screen.queryByRole('dialog', { name: '玩法与进化配方' })).toBeNull()
+  expect(screen.getByRole('button', { name: '开始无限模式' })).toBeTruthy()
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '查看进化配方' })))
+  expect(screen.getByRole('dialog', { name: '玩法与进化配方' })).toBeTruthy()
+})

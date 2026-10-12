@@ -1,5 +1,4 @@
 import {
-  accountStorage,
   ACCOUNT_SAVE_EVENT,
   activeAccountId,
   GUEST_SAVE_KEY,
@@ -73,7 +72,7 @@ import {
   FARM_SAMPLE_LIMIT,
   type FarmSample,
 } from '@/features/farm/timeline'
-import { activeSchoolCombos, FARM_HELP_SEEN_KEY } from '@/features/farm/help'
+import { activeSchoolCombos } from '@/features/farm/help'
 import { loadFarmSettings, saveFarmSettings, type FarmSettings } from '@/features/farm/settings'
 import {
   FARM_MAX_SUBMIT_FRAMES,
@@ -121,8 +120,15 @@ export default function MusicFarm() {
   const account = useAccount()
   const accountRef = useRef(account)
   accountRef.current = account
+  // AuthGate adds `checking` (the identity check is still open) and
+  // `setRunActive` (a round is not over, so an identity switch waits for it).
+  // Without AuthGate there is no context at all and the game opens straight
+  // away.
+  const authChecking = account?.checking === true
   const [view, setView] = useState(model.current)
-  const [confirmRestart, setConfirmRestart] = useState(false)
+  // Which place asked for the confirmation: the header and the pause panel
+  // share one state, so an unanswered confirmation cannot survive a switch.
+  const [confirmRestart, setConfirmRestart] = useState<null | 'header' | 'pause'>(null)
   const [inputMode, setInputMode] = useState<'touch' | 'mouse'>(() =>
     window.matchMedia?.('(pointer: coarse)').matches ? 'touch' : 'mouse',
   )
@@ -233,6 +239,9 @@ export default function MusicFarm() {
     keys.current.clear()
     controls.current?.reset()
     previousFocus.current = document.activeElement as HTMLElement
+    // A half-finished restart confirmation belongs to the screen it was asked
+    // on, never to the panel that opens over it.
+    setConfirmRestart(null)
     panelRef.current = next
     setPanel(next)
     pushDialogHistory()
@@ -249,6 +258,8 @@ export default function MusicFarm() {
   }
   const dismissPanel = (fromHistory: boolean) => {
     dropDialogHistory(!fromHistory)
+    // Closing the pause panel must not leave the confirmation armed behind it.
+    setConfirmRestart(null)
     panelRef.current = null
     setPanel(null)
     if (phaseRef.current === 'play') void prepare()
@@ -279,6 +290,9 @@ export default function MusicFarm() {
     setView(model.current)
   }
   const start = () => {
+    // An unknown identity cannot own a run: wait for the check instead of
+    // opening a round that an account switch would throw away.
+    if (authChecking) return
     initializeBattle()
     samples.current = []
     setTimeline([])
@@ -300,7 +314,7 @@ export default function MusicFarm() {
     field.current?.focus({ preventScroll: true })
   }
   const restart = () => {
-    setConfirmRestart(false)
+    setConfirmRestart(null)
     audio.current?.stop()
     audioSerial.current++
     initializeBattle()
@@ -369,6 +383,7 @@ export default function MusicFarm() {
       bestRecorded.current = true
       setBest((previous) => Math.max(previous, finished.score))
     }
+    setConfirmRestart(null)
     dropDialogHistory(true)
     panelRef.current = null
     setPanel(null)
@@ -402,22 +417,9 @@ export default function MusicFarm() {
       cancelled = true
     }
   }, [profile.selected])
-  // First visit: show the rules straight away instead of hiding them behind "?".
-  useEffect(() => {
-    let seen = true
-    try {
-      seen = accountStorage.getItem(FARM_HELP_SEEN_KEY) === '1'
-    } catch {
-      seen = true
-    }
-    if (seen) return
-    try {
-      accountStorage.setItem(FARM_HELP_SEEN_KEY, '1')
-    } catch {
-      /* Storage optional. */
-    }
-    openPanel('help')
-  }, [])
+  // The full codex (schools, recipes, monsters) stays one tap away in the
+  // header; a first visit is no longer interrupted by it. The start card and
+  // the opening drag hint are the only instructions a new player needs.
   // A hand-edited ?day= must not leave the run on another day's seed: the
   // leaderboard would reject the score because the replay would not match.
   useEffect(() => {
@@ -889,19 +891,25 @@ export default function MusicFarm() {
   useEffect(() => {
     if (!confirmRestart) return
     // An unanswered confirmation should not linger into the next run.
-    const timer = window.setTimeout(() => setConfirmRestart(false), 4000)
+    const timer = window.setTimeout(() => setConfirmRestart(null), 4000)
     return () => window.clearTimeout(timer)
   }, [confirmRestart])
   useEffect(() => {
     if (phase !== 'result') return
     page.current?.scrollIntoView({ block: 'start' })
     page.current?.querySelector<HTMLElement>('.farm-result h2')?.focus({ preventScroll: true })
-    // A guest is welcome to play, but only a nickname puts the score on the
-    // board — so a finished run asks for one. Signed-in players never see the
-    // prompt. Read the account through a ref: the context object is new on
-    // every render, and depending on it would reopen the form the moment the
-    // player closes it.
-    if (!accountRef.current?.user) accountRef.current?.openAccount()
+    // Signing in is offered by the board on the result page, not pushed in the
+    // player's face: a guest keeps playing without ever seeing a form.
+  }, [phase])
+  // Hand the run state to AuthGate: it holds an identity switch until the
+  // round is over instead of dropping it mid-game. A round is only over once
+  // the player is back on the start screen — settling into the result page
+  // still owns a score that has to reach the board. Read through a ref so the
+  // context object, new on every render, cannot make this effect re-fire, and
+  // never release from the cleanup: that would fire on every phase change and
+  // hand the switch over while the result is still on screen.
+  useEffect(() => {
+    accountRef.current?.setRunActive(phase !== 'ready')
   }, [phase])
   const upgrade = phase === 'play' && view.offered.length > 0
   // Past the replay budget the server would reject the upload anyway, so the
@@ -965,22 +973,26 @@ export default function MusicFarm() {
                 <button aria-label="暂停游戏" onClick={() => openPanel('pause')}>
                   <Icon name="pause" />
                 </button>
-                <button
-                  className={confirmRestart ? 'is-armed' : undefined}
-                  aria-label={confirmRestart ? '确认重新开始本局' : '重新开始本局'}
-                  onClick={() => {
-                    // Restarting throws the run away, so it takes two taps: the
-                    // armed state is shown by the highlight, not by a label.
-                    if (confirmRestart) {
-                      setConfirmRestart(false)
-                      restart()
-                      return
-                    }
-                    setConfirmRestart(true)
-                  }}
-                >
-                  <Icon name="refresh" />
-                </button>
+                {confirmRestart === 'header' ? (
+                  // Restarting throws the run away, so it takes a second tap
+                  // that says what it does.
+                  <span className="farm-restart-confirm">
+                    <button
+                      className="is-armed"
+                      aria-label="确认重新开始本局"
+                      onClick={() => restart()}
+                    >
+                      确认重开
+                    </button>
+                    <button aria-label="取消重新开始" onClick={() => setConfirmRestart(null)}>
+                      取消
+                    </button>
+                  </span>
+                ) : (
+                  <button aria-label="重新开始本局" onClick={() => setConfirmRestart('header')}>
+                    <Icon name="refresh" />
+                  </button>
+                )}
               </>
             ) : (
               <>
@@ -1215,9 +1227,19 @@ export default function MusicFarm() {
                     )}
                     <p>撑越久分越高</p>
                     <FarmBoard compact />
-                    <button className="farm-primary" onClick={start} aria-label="开始无限模式">
+                    <button
+                      className="farm-primary"
+                      onClick={start}
+                      disabled={authChecking}
+                      aria-label="开始无限模式"
+                    >
                       开始
                     </button>
+                    {authChecking && (
+                      <p role="status" className="farm-auth-checking">
+                        检查登录中…
+                      </p>
+                    )}
                     <button
                       className="farm-shop-pill"
                       onClick={() => {
@@ -1492,9 +1514,28 @@ export default function MusicFarm() {
                       </small>
                       <QuestList quests={todayQuests} log={quests} />
                     </p>
-                    <button className="farm-text-button" onClick={restart}>
-                      重新开始
-                    </button>
+                    {confirmRestart === 'pause' ? (
+                      <span className="farm-restart-confirm">
+                        <button
+                          className="is-armed"
+                          aria-label="确认重新开始本局"
+                          onClick={() => restart()}
+                        >
+                          确认重开
+                        </button>
+                        <button aria-label="取消重新开始" onClick={() => setConfirmRestart(null)}>
+                          取消
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        className="farm-text-button"
+                        aria-label="放弃本局进度并重新开始"
+                        onClick={() => setConfirmRestart('pause')}
+                      >
+                        重新开始
+                      </button>
+                    )}
                   </>
                 ) : (
                   <FarmHelp onClose={closePanel} />

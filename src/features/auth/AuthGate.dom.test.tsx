@@ -80,6 +80,57 @@ function Game() {
     </div>
   )
 }
+// Reports the gate's own state the way a page would read it: 身份检查 进行中 / 已结束.
+function CheckingProbe() {
+  const account = useAccount()
+  return <p>身份检查 {account?.checking ? '进行中' : '已结束'}</p>
+}
+// A page that tells the gate whether a run is live, like the real game does.
+function LiveRun() {
+  const account = useAccount()
+  const [runs, setRuns] = useState(0)
+  const [playing, setPlaying] = useState(false)
+  return (
+    <div>
+      <p>
+        身份检查 {account?.checking ? '进行中' : '已结束'} 玩家 {account?.user?.id ?? 'guest'}{' '}
+        完成局数 {runs}
+      </p>
+      {playing ? (
+        <button
+          onClick={() => {
+            setPlaying(false)
+            setRuns(runs + 1)
+            account?.setRunActive(false)
+          }}
+        >
+          结束本局
+        </button>
+      ) : (
+        <button
+          onClick={() => {
+            setPlaying(true)
+            account?.setRunActive(true)
+          }}
+        >
+          开始一局
+        </button>
+      )}
+    </div>
+  )
+}
+const deferSession = () => {
+  let release: (response: Response) => void = () => {}
+  const normal = vi.mocked(fetch).getMockImplementation()!
+  vi.mocked(fetch).mockImplementation((url, options) =>
+    String(url).endsWith('/session')
+      ? new Promise<Response>((resolve) => {
+          release = resolve
+        })
+      : normal(url, options),
+  )
+  return (response: Response) => release(response)
+}
 const mount = () =>
   render(
     <StrictMode>
@@ -283,4 +334,92 @@ it('unmounts the previous owner before activating another account storage scope'
   activateAccount(user.id)
   expect(accountStorage.getItem('last-owner')).toBe(user.id)
   activateAccount(next.id)
+})
+it('parks a session identity switch until the live run ends, instead of dropping the run', async () => {
+  const release = deferSession()
+  current = user
+  render(
+    <AuthGate>
+      <LiveRun />
+    </AuthGate>,
+  )
+  expect(screen.getByText(/身份检查 进行中/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '开始一局' }))
+  const node = screen.getByText(/身份检查/)
+  await act(async () => release(json({ user: current })))
+  // The identity is parked: same game instance, same guest storage scope.
+  await screen.findByText('本局后切换')
+  expect(screen.getByText(/身份检查 已结束/)).toBeTruthy()
+  expect(screen.getByText(/玩家 guest/)).toBeTruthy()
+  expect(screen.getByText('游客模式')).toBeTruthy()
+  expect(activeAccountId()).toBeNull()
+  expect(screen.getByText(/身份检查/)).toBe(node)
+  expect(screen.getByRole('button', { name: '结束本局' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '结束本局' }))
+  await screen.findByText('♫ player_one')
+  expect(activeAccountId()).toBe(user.id)
+  expect(screen.getByText(/玩家 account_/)).toBeTruthy()
+  // The switch really happened: the game was remounted under the account.
+  expect(screen.getByText(/完成局数 0/)).toBeTruthy()
+  expect(screen.getByText(/身份检查/)).not.toBe(node)
+})
+it('parks a logout until the live run ends', async () => {
+  current = user
+  render(
+    <AuthGate>
+      <LiveRun />
+    </AuthGate>,
+  )
+  await screen.findByText('♫ player_one')
+  fireEvent.click(screen.getByRole('button', { name: '开始一局' }))
+  fireEvent.click(screen.getByRole('button', { name: '退出登录' }))
+  await waitFor(() => expect(screen.getByText('本局后切换')).toBeTruthy())
+  expect(screen.getByText('♫ player_one')).toBeTruthy()
+  expect(activeAccountId()).toBe(user.id)
+  fireEvent.click(screen.getByRole('button', { name: '结束本局' }))
+  await screen.findByText('游客模式')
+  expect(activeAccountId()).toBeNull()
+})
+it('reports checking only until the first session check settles', async () => {
+  const release = deferSession()
+  render(
+    <AuthGate>
+      <CheckingProbe />
+      <Game />
+    </AuthGate>,
+  )
+  expect(screen.getByText('身份检查 进行中')).toBeTruthy()
+  await act(async () => release(json({ user: null })))
+  await screen.findByText('身份检查 已结束')
+})
+it('drops checking when the session is gone and still lets the guest play', async () => {
+  const normal = vi.mocked(fetch).getMockImplementation()!
+  vi.mocked(fetch).mockImplementation((url, options) =>
+    String(url).endsWith('/session')
+      ? Promise.resolve(json({ error: '登录已失效' }, 401))
+      : normal(url, options),
+  )
+  render(
+    <AuthGate>
+      <CheckingProbe />
+      <Game />
+    </AuthGate>,
+  )
+  await screen.findByText('登录已失效，可继续玩')
+  expect(screen.getByText('身份检查 已结束')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '完成游客局' }))
+  expect(loadFarmProfile().coins).toBe(1200)
+})
+it('drops checking when the account service is unreachable and still lets the guest play', async () => {
+  vi.mocked(fetch).mockRejectedValue(new Error('offline'))
+  render(
+    <AuthGate>
+      <CheckingProbe />
+      <Game />
+    </AuthGate>,
+  )
+  await screen.findByRole('alert')
+  expect(screen.getByText('身份检查 已结束')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '完成游客局' }))
+  expect(loadFarmProfile().coins).toBe(1200)
 })

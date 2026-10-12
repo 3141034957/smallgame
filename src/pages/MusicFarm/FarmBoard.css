@@ -76,6 +76,23 @@
   align-items: center;
   gap: 4px;
 }
+/* Two blocks: the ranking itself (`.farm-board-ladder`) and the state of the
+   run the player just finished (`.farm-board-status`). Narrow screens can drop
+   the ladder without losing the upload state or the retry button. */
+.farm-board-ladder {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.farm-board-status {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.farm-board-status:not(:empty) {
+  margin-top: 12px;
+}
 .farm-board-columns {
   display: grid;
   grid-template-columns: 34px 44px minmax(0, 1fr) auto;
@@ -226,10 +243,30 @@
   font-size: 12px;
   line-height: 1.7;
 }
+/* The status block owns the vertical rhythm: one gap, no doubled margins. */
+.farm-board .farm-board-status > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.farm-board .farm-board-pending {
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: #f6f1fa;
+  color: #8e759f;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.farm-board-guest button,
+.farm-board form button,
 .farm-board-retry {
-  display: block;
+  min-height: 40px;
+}
+.farm-board-retry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  margin-top: 10px;
+  margin-top: 0;
   padding: 10px;
   border: 1px solid #dfd4e9;
   border-radius: 12px;
@@ -270,6 +307,17 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+/* The ladder absorbs the leftover height so the list inside it can scroll. */
+.farm-board.is-compact .farm-board-ladder {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.farm-board.is-compact .farm-board-heading {
+  flex: none;
+}
+.farm-board.is-compact .farm-board-status {
+  flex: none;
 }
 .farm-board.is-compact .farm-board-heading h2 {
   margin: 4px 0 0;
@@ -315,11 +363,13 @@
 .farm-board.is-compact .farm-board-error {
   font-size: 11px;
 }
+/* Sits inside `.farm-board-status`, which owns the outer spacing. */
 .farm-board-guest {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 16px 0;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
 }
 .farm-board-guest p,
 .farm-board-guest small {
@@ -330,10 +380,16 @@
   color: var(--farm-muted, #809088);
 }
 .farm-board-guest button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 10px;
   padding: 10px 14px;
   background: #dbe7b7;
   color: #304235;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
 }
 @media (prefers-reduced-motion: reduce) {
   .farm-board * {

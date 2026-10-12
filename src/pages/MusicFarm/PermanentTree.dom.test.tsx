@@ -3,15 +3,37 @@ import { useState } from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { PermanentTree } from './PermanentTree'
-import { awardFarmCoins, buyFarmUpgrade, loadFarmProfile } from '@/features/farm/characters'
+import {
+  awardFarmCoins,
+  buyFarmUpgrade,
+  FARM_PROFILE_KEY,
+  loadFarmProfile,
+} from '@/features/farm/characters'
 import {
   PERMANENT_BRANCHES,
   PERMANENT_CHAIN,
   PERMANENT_TOTAL_LEVELS,
 } from '@/features/farm/permanent.mjs'
+import { GUEST_SAVE_KEY } from '@/utils/accountStorage'
 import { testStorage } from '@/test/storage'
 
-beforeEach(() => vi.stubGlobal('localStorage', testStorage()))
+// jsdom ships no scrollIntoView at all, which is exactly why the panel calls it
+// through an optional call.
+const scrollIntoView = vi.fn()
+const scrolled: Element[] = []
+beforeEach(() => {
+  vi.stubGlobal('localStorage', testStorage())
+  scrollIntoView.mockClear()
+  scrolled.length = 0
+  Object.defineProperty(Element.prototype, 'scrollIntoView', {
+    configurable: true,
+    writable: true,
+    value: function (this: Element, options?: boolean | ScrollIntoViewOptions) {
+      scrolled.push(this)
+      scrollIntoView(options)
+    },
+  })
+})
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
@@ -31,6 +53,17 @@ const buyButtons = () => Array.from(document.querySelectorAll('.farm-growth-buy'
 const total = () => document.querySelector('.farm-growth-total')!.textContent ?? ''
 const chainPrice = (count: number) =>
   PERMANENT_CHAIN.slice(0, count).reduce((sum, item) => sum + item.price, 0)
+// Writes straight to the guest save: the panel keeps whatever it was rendered
+// with, which is what another tab spending the coins looks like.
+const writeSave = (patch: Record<string, unknown>) => {
+  const guest = JSON.parse(localStorage.getItem(GUEST_SAVE_KEY) ?? '{}') as Record<string, string>
+  guest[FARM_PROFILE_KEY] = JSON.stringify({ ...loadFarmProfile(), ...patch })
+  localStorage.setItem(GUEST_SAVE_KEY, JSON.stringify(guest))
+}
+const fullChain = () => ({
+  levels: Object.fromEntries(PERMANENT_CHAIN.map((item) => [item.id, 1] as const)),
+  spent: 0,
+})
 
 it(`shows all ${PERMANENT_TOTAL_LEVELS} steps at once and leaves only the first one buyable`, () => {
   render(<Tree />)
@@ -87,7 +120,11 @@ it('buys the head of the chain, unlocks the next step and survives a remount', (
   expect(buyButtons()).toHaveLength(1)
   expect(screen.getByRole('button', { name: buyLabel(2) })).toBeTruthy()
   expect(within(node(3)).queryByRole('button')).toBeNull()
-  expect(screen.getByRole('status').textContent).toBe(`已获得 ${step(1).name}`)
+  // The sticky banner and the note pinned to step 1 both carry the result.
+  expect(screen.getAllByRole('status').map((el) => el.textContent)).toContain(
+    `已获得 ${step(1).name}`,
+  )
+  expect(within(node(1)).getByRole('status').textContent).toBe(`已获得 ${step(1).name}`)
   expect(loadFarmProfile().coins).toBe(step(2).price)
   expect(total()).toContain(`1 / ${PERMANENT_TOTAL_LEVELS}`)
   mounted.unmount()
@@ -154,4 +191,68 @@ it('refunds every coin on a confirmed reset and keeps them when cancelled', asyn
   expect((screen.getByRole('button', { name: '免费重置强化' }) as HTMLButtonElement).disabled).toBe(
     true,
   )
+})
+
+it('opens on the step that is waiting instead of at the top of the chain', () => {
+  render(<Tree />)
+  expect(scrollIntoView).toHaveBeenCalled()
+  expect(scrolled.at(-1)).toBe(node(1).parentElement)
+  expect(node(1).parentElement!.className).toContain('is-next')
+})
+
+it('follows the chain: a purchase scrolls the next step into view', async () => {
+  awardFarmCoins('follow', chainPrice(2))
+  render(<Tree />)
+  scrolled.length = 0
+  fireEvent.click(screen.getByRole('button', { name: buyLabel(1) }))
+  await Promise.resolve()
+  expect(scrolled.at(-1)).toBe(node(2).parentElement)
+})
+
+it('lands on the end of the chain once every step is bought', () => {
+  writeSave({ growth: fullChain() })
+  render(<Tree />)
+  expect(total()).toContain(`${PERMANENT_TOTAL_LEVELS} / ${PERMANENT_TOTAL_LEVELS}`)
+  expect(scrolled.at(-1)).toBe(node(PERMANENT_TOTAL_LEVELS).parentElement)
+})
+
+it('folds bought steps into a compact row without dropping any of them', async () => {
+  awardFarmCoins('fold', chainPrice(2))
+  render(<Tree />)
+  fireEvent.click(screen.getByRole('button', { name: buyLabel(1) }))
+  await Promise.resolve()
+  const rows = () => screen.getAllByRole('listitem')
+  // Compact is a visual change only: every step stays in the chain, in order.
+  expect(rows()).toHaveLength(PERMANENT_TOTAL_LEVELS)
+  expect(node(1).parentElement!.className).toContain('is-compact')
+  const toggle = screen.getByRole('button', { name: '展开已购的 1 个强化步骤' })
+  expect(toggle.textContent).toBe('已购 1')
+  fireEvent.click(toggle)
+  expect(node(1).parentElement!.className).not.toContain('is-compact')
+  expect(rows()).toHaveLength(PERMANENT_TOTAL_LEVELS)
+  expect(screen.getAllByRole('article')).toHaveLength(PERMANENT_TOTAL_LEVELS)
+  expect(node(1).getAttribute('aria-label')).toBe(`第 1 步 ${step(1).name}`)
+  expect(node(1).querySelector('.farm-growth-owned')!.textContent).toBe('已获得 ✓')
+  expect(screen.getByRole('button', { name: buyLabel(2) })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '收起已购的 1 个强化步骤' }))
+  expect(node(1).parentElement!.className).toContain('is-compact')
+  expect(rows()).toHaveLength(PERMANENT_TOTAL_LEVELS)
+  expect(screen.getAllByRole('article')).toHaveLength(PERMANENT_TOTAL_LEVELS)
+})
+
+it('shows why a purchase was refused next to the step that was pressed', () => {
+  awardFarmCoins('refused', step(1).price)
+  render(<Tree />)
+  // Another tab empties the wallet after the panel rendered, so the click is
+  // live but the store says no.
+  writeSave({ coins: 0 })
+  fireEvent.click(screen.getByRole('button', { name: buyLabel(1) }))
+  expect(within(node(1)).getByRole('alert').textContent).toBe(`还差 ${step(1).price} 金币。`)
+  expect(within(node(2)).queryByRole('alert')).toBeNull()
+  // The banner pinned to the bottom of the scroll area says the same thing.
+  expect(document.querySelector('.farm-growth-message')!.textContent).toBe(
+    `还差 ${step(1).price} 金币。`,
+  )
+  expect(loadFarmProfile().coins).toBe(0)
+  expect(total()).toContain('0 / ')
 })
