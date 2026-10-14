@@ -63,6 +63,14 @@ bash scripts/game-service.sh stop
 bash scripts/game-service.sh start
 ```
 
+查看上线后累计开局次数（游客和登录玩家合计，同一局重试不重复计数）：
+
+```bash
+npm run stats:plays
+```
+
+数据位于 `server/data/game.db` 的 `farm_run_starts` 表；若服务设置了 `DATA_DIR`，查询命令也需使用相同目录。只统计收到上报的新开局，不追溯上线前或持续离线的对局，前端不展示该统计。
+
 `install`、`update`、`start`、`restart` 都会等待进程和首页、排行榜接口就绪，失败时输出日志并返回非零退出码。`status` 也会检查进程和两个接口；未就绪时返回非零退出码，不能仅凭日志中出现「守护进程：运行中」判定部署成功。
 
 主动停止后不会自动重启；但开机自启仍然有效。如需取消开机自启并立即停止：

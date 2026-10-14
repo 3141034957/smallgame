@@ -7,6 +7,7 @@
 - `src/pages/MusicFarm/UpgradeChoices.tsx`、`FarmHelp.tsx`：升级选项与玩法说明，接收数据和回调，不修改存档或推进游戏。
 - `src/features/farm/upgradeSelection.ts`：执行选择及后续单选项的连续自动升级，返回每次选择的日志；页面在发布画面前处理单选项，多选项继续等待玩家，服务端仍按原规则回放日志。
 - `src/pages/MusicFarm/FarmBoard.tsx`：生存榜读取、提交与重试。
+- `src/features/farm/runReporting.ts`：新对局开始后静默上报对局 ID，失败最多重试一次；服务端 `farm_run_starts` 按 ID 去重，后台用 `npm run stats:plays` 查询累计开局次数。
 - `src/pages/MusicFarm/render.ts`、`background.ts`：绘图和背景；不改变游戏规则。
 - `src/features/farm/`：战斗规则、控制器、本地角色钱包、成就、任务、生涯统计等独立模块。
 - `src/features/farm/permanent.mjs`：局外永久成长的数据与纯函数。成长是一条全局链而非多项多级树：`PERMANENT_CHAIN`（`PERMANENT_UPGRADES` 的别名）是 200 个 `max: 1` 的节点，`permanentNextStep` / `permanentIsUnlocked` 实现严格顺序解锁，`RECOVERY` 保存安全期与回血周期，`normalizePermanentLevels` 只认链上的 200 个 id（旧的多级存档键读回来为全 0，即强化数据直接清空，不做折算），`permanentStats` 汇总成战斗用的固定数值（`maxHp` / `damage` / `speed` / `attraction` / `xp` / `armor` / `regen` / `shieldSeconds`）。加成全为固定数值，链上没有百分比；`rules.mjs` 负责把它们接到伤害、受击、拾取、经验与步长上。

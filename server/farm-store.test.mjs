@@ -7,6 +7,37 @@ import { spawnSync } from 'node:child_process'
 import { createFarmStore } from './farm-store.mjs'
 import { farmKey } from './farm.mjs'
 
+it('persists distinct starts across restarts and preserves the first server timestamp', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'farm-starts-'))
+  const path = join(directory, 'game.db')
+  let store = createFarmStore(path)
+  try {
+    expect(store.countStarts()).toBe(0)
+    expect(store.recordStart('farm_1791993600000_1_2', 100)).toBe(true)
+    expect(store.recordStart('farm_1791993600000_1_2', 200)).toBe(false)
+    store.close()
+    store = createFarmStore(path)
+    expect(store.countStarts()).toBe(1)
+    expect(store.recordStart('farm_1791993600000_1_2', 300)).toBe(false)
+    expect(store.recordStart('farm_1791993600000_3_4', 400)).toBe(true)
+    expect(store.countStarts()).toBe(2)
+    const inspection = new DatabaseSync(path, { readOnly: true })
+    try {
+      expect(inspection.prepare('SELECT * FROM farm_run_starts ORDER BY started_at').all()).toEqual(
+        [
+          { run_id: 'farm_1791993600000_1_2', started_at: 100 },
+          { run_id: 'farm_1791993600000_3_4', started_at: 400 },
+        ],
+      )
+    } finally {
+      inspection.close()
+    }
+  } finally {
+    store.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 it('keeps the score write and the rename in one transaction, scoped to the submitted song', () => {
   const directory = mkdtempSync(join(tmpdir(), 'farm-tx-'))
   const store = createFarmStore(join(directory, 'game.db'))

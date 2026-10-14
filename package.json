@@ -11,6 +11,7 @@
     "dev:server": "node server/index.mjs",
     "build": "tsc -b && vite build",
     "db:inspect": "node scripts/inspect-database.mjs",
+    "stats:plays": "node scripts/inspect-database.mjs --starts",
     "test": "vitest run",
     "start": "PORT=${PORT:-80} node server/index.mjs",
     "lint": "oxlint",

@@ -44,6 +44,7 @@ import type {
   UpgradeId,
 } from '@/features/farm/rules.mjs'
 import { selectFarmUpgrade } from '@/features/farm/upgradeSelection'
+import { reportFarmStart } from '@/features/farm/runReporting'
 import { schoolById } from '@/features/farm/schools.mjs'
 import { ACCOUNT_SWITCH_EVENT, AUTH_FORM_EVENT } from '@/features/auth/context'
 import { drawFarm } from './render'
@@ -310,7 +311,7 @@ export default function MusicFarm() {
   const start = () => {
     // An unknown identity cannot own a run: wait for the check instead of
     // opening a round that an account switch would throw away.
-    if (authChecking) return
+    if (authChecking || phaseRef.current !== 'ready') return
     initializeBattle()
     samples.current = []
     setTimeline([])
@@ -330,6 +331,7 @@ export default function MusicFarm() {
     }
     void prepare()
     field.current?.focus({ preventScroll: true })
+    void reportFarmStart(runId.current)
   }
   const restart = () => {
     setConfirmRestart(null)

@@ -3,6 +3,7 @@ import { FPS, replayFarm } from '../src/features/farm/rules.mjs'
 import { AuthError } from './auth-store.mjs'
 import { normalizeCharacterId, normalizePlayerId } from './identity.mjs'
 export const MAX_FARM_BODY_BYTES = 1024 * 1024
+export const MAX_FARM_START_BODY_BYTES = 1024
 // Replay verification is synchronous, so one account may only start a bounded
 // number of runs per attempt window.
 export const FARM_SCORE_LIMIT = 20
@@ -78,7 +79,40 @@ export async function handleFarmRequest(
     res.end(JSON.stringify(body))
   }
   try {
-    if (req.method === 'GET' && url.pathname === '/api/farm/leaderboard') {
+    if (url.pathname === '/api/farm/start') {
+      if (req.method !== 'POST') {
+        send(405, { error: '开局上报只支持 POST 方法。' }, { Allow: 'POST' })
+        return
+      }
+      let bytes = 0
+      const chunks = []
+      for await (const chunk of req) {
+        bytes += chunk.length
+        if (bytes > MAX_FARM_START_BODY_BYTES) {
+          send(413, { error: '开局记录过大。' })
+          req.destroy()
+          return
+        }
+        chunks.push(chunk)
+      }
+      let input
+      try {
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+      } catch {
+        send(400, { error: '开局记录格式错误。' })
+        return
+      }
+      if (
+        typeof input?.runId !== 'string' ||
+        !/^farm_\d{13}_\d{1,10}_\d{1,10}$/.test(input.runId)
+      ) {
+        send(400, { error: '开局编号无效。' })
+        return
+      }
+      // Guests and signed-in players count alike; no identity is collected.
+      store.recordStart(input.runId)
+      send(200, { ok: true })
+    } else if (req.method === 'GET' && url.pathname === '/api/farm/leaderboard') {
       send(200, store.boardAcrossDays('farm', authenticate()?.id ?? null))
     } else if (req.method === 'POST' && url.pathname === '/api/farm/score') {
       const user = authenticate()

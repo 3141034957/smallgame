@@ -18,7 +18,10 @@ export function createFarmStore(databasePath) {
       max_combo INTEGER NOT NULL CHECK(max_combo >= 0), stars INTEGER NOT NULL CHECK(stars BETWEEN 0 AND 3), updated_at INTEGER NOT NULL,
       PRIMARY KEY(player_id, song_id, difficulty)
     ) STRICT;
-    CREATE INDEX IF NOT EXISTS idx_melody_ranking ON melody_scores(song_id, difficulty, score DESC, accuracy DESC, max_combo DESC, updated_at ASC);`)
+    CREATE INDEX IF NOT EXISTS idx_melody_ranking ON melody_scores(song_id, difficulty, score DESC, accuracy DESC, max_combo DESC, updated_at ASC);
+    CREATE TABLE IF NOT EXISTS farm_run_starts (
+      run_id TEXT PRIMARY KEY NOT NULL, started_at INTEGER NOT NULL
+    ) STRICT;`)
   // Older databases predate the survival clock: add the column in place.
   const columns = db
     .prepare('PRAGMA table_info(melody_scores)')
@@ -51,6 +54,16 @@ export function createFarmStore(databasePath) {
         }
       : null
   return {
+    recordStart(runId, now = Date.now()) {
+      return (
+        db
+          .prepare('INSERT OR IGNORE INTO farm_run_starts (run_id, started_at) VALUES (?, ?)')
+          .run(runId, now).changes > 0
+      )
+    },
+    countStarts() {
+      return db.prepare('SELECT COUNT(*) AS total FROM farm_run_starts').get().total
+    },
     submit(record, now = Date.now()) {
       // One transaction: a crash between the two writes must not leave the best
       // score carrying a nickname from another run.

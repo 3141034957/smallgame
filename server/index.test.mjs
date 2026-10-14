@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
+import { DatabaseSync } from 'node:sqlite'
 
 import { createFarm, chooseTalent, stepFarm, replayFarm, FPS } from '../src/features/farm/rules.mjs'
 
@@ -118,6 +119,28 @@ it('returns JSON 404 for unknown APIs instead of a page or cached asset', async 
   expect(result.status).toBe(404)
   expect(result.headers['content-type']).toContain('application/json')
   expect(JSON.parse(result.text).error).toBe('API not found')
+})
+
+it('records guest starts through the protected HTTP route and deduplicates retries', async () => {
+  const runId = 'farm_1791993600000_42_43'
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = await post('/api/farm/start', { runId }, { Origin: `http://127.0.0.1:${port}` })
+    expect(result.status).toBe(200)
+    expect(result.data).toEqual({ ok: true })
+  }
+  expect((await get('/api/farm/start')).status).toBe(405)
+  expect((await post('/api/farm/start', { runId }, { 'X-Echo-Request': '0' })).status).toBe(403)
+  expect(
+    (await post('/api/farm/start', { runId }, { Origin: 'http://unrelated.example' })).status,
+  ).toBe(403)
+  expect((await post('/api/farm/start', { runId: 'bad' })).status).toBe(400)
+  expect((await post('/api/farm/start', { runId, extra: 'x'.repeat(1024) })).status).toBe(413)
+  const db = new DatabaseSync(join(directory, 'game.db'), { readOnly: true })
+  try {
+    expect(db.prepare('SELECT COUNT(*) AS total FROM farm_run_starts').get().total).toBe(1)
+  } finally {
+    db.close()
+  }
 })
 
 it('preserves Chinese nicknames when request chunks split a UTF-8 character', async () => {
