@@ -190,4 +190,30 @@ describe('chips are universal stats', () => {
       stepFarm(brief, brief.position).state.crops[0].slowUntil,
     )
   })
+
+  it.each([3, MAX_GEAR_LEVEL])(
+    'extends distant and nearby sax level %i slows equally with either duration chip',
+    (sax) => {
+      // 55 units is inside the horn but outside its separate 14-unit nearby wash.
+      // Test the ordinary and evolved horn without another attack damaging the target.
+      const slowedAt = (distance, chips) => {
+        const state = arena(
+          { sax, mute: MAX_GEAR_LEVEL, ...chips },
+          [crop(0, 50 + distance, 50, 1000)],
+          12,
+        )
+        const result = stepFarm(state, state.position)
+        expect(result.events.some((event) => event.kind === 'horn')).toBe(true)
+        expect(result.state.crops[0].hp).toBeLessThan(1000)
+        return result.state.crops[0].slowUntil
+      }
+      const base = slowedAt(55, {})
+      expect(base).toBe(12 + FPS * (sax === MAX_GEAR_LEVEL ? 3 : 2) + MAX_GEAR_LEVEL * 6)
+      for (const chips of [{ sustain: 5 }, { delay: 5 }, { sustain: 3, delay: 2 }]) {
+        const distant = slowedAt(55, chips)
+        expect(distant - base).toBe(FPS * 5)
+        expect(slowedAt(3, chips)).toBe(distant)
+      }
+    },
+  )
 })

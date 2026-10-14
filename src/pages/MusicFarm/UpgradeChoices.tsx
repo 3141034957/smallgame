@@ -63,7 +63,7 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
                 <span className="farm-choice-icon">{cardIcon(item.id)}</span>
                 <small>恢复卡 · {item.tag}</small>
                 <b>
-                  {item.name}
+                  <span className="farm-choice-name">{item.name}</span>
                   <em>
                     生命 {hp} → {maxHp}
                   </em>
@@ -85,7 +85,9 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
                 </i>
                 <span className="farm-choice-icon">{cardIcon(item.id)}</span>
                 <small>乐队成长 · {item.tag}</small>
-                <b>{item.name}</b>
+                <b>
+                  <span className="farm-choice-name">{item.name}</span>
+                </b>
                 <p>{item.description}</p>
                 <div className="farm-choice-note">
                   <strong>本局生效</strong>
@@ -136,7 +138,7 @@ export function UpgradeChoices({ gear, offered, hp = 100, maxHp = 100, state, on
                 {item.tag}
               </small>
               <b>
-                {item.name}
+                <span className="farm-choice-name">{item.name}</span>
                 <em>
                   Lv.{gear[gearId]} → {gear[gearId] + 1}
                 </em>

@@ -266,7 +266,7 @@ describe('farm screens render', () => {
     for (const id of state.offered)
       expect(html).toContain(UPGRADE_CARDS.find((item) => item.id === id)!.name)
     const help = renderToStaticMarkup(<FarmHelp onClose={() => {}} />)
-    expect(help).toContain('懂啦，开战')
+    expect(help).toContain('aria-label="关闭帮助并返回">返回</button>')
     expect(help).toContain(`Lv.${MAX_GEAR_LEVEL}`)
   })
 })

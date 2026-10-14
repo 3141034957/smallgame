@@ -201,3 +201,60 @@ it('never asks a signed-in player for a nickname after a run', async () => {
   expect(screen.queryByText(FORM)).toBeNull()
   expect(screen.queryByRole('dialog', { name: '乐队账号登录' })).toBeNull()
 })
+
+it('closes login before the pause panel on browser back and never advances under login', async () => {
+  vi.mocked(stepFarm).mockImplementation((previous) => ({
+    state: { ...previous, tick: previous.tick + 1, offered: [] },
+    events: [],
+  }))
+  mount()
+  await waitFor(() => expect(startButton().disabled).toBe(false))
+  fireEvent.click(startButton())
+  act(() => frame(1000))
+  act(() => frame(1200))
+  const before = vi.mocked(stepFarm).mock.calls.length
+  fireEvent.click(screen.getByRole('button', { name: '输入昵称登录并同步进度' }))
+  expect(screen.getByRole('dialog', { name: '乐队账号登录' })).toBeTruthy()
+  act(() => frame(2200))
+  expect(vi.mocked(stepFarm).mock.calls.length).toBe(before)
+  await act(async () => window.history.back())
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '乐队账号登录' })).toBeNull())
+  expect(screen.getByRole('button', { name: '继续战斗' })).toBeTruthy()
+  // The landing entry belongs to the pause panel, including a repeated pop
+  // notification after the account context has already closed.
+  act(() => window.dispatchEvent(new PopStateEvent('popstate', { state: { farmDialog: true } })))
+  expect(screen.getByRole('button', { name: '继续战斗' })).toBeTruthy()
+  act(() => frame(3200))
+  expect(vi.mocked(stepFarm).mock.calls.length).toBe(before)
+  await act(async () => window.history.back())
+  await waitFor(() => expect(screen.queryByRole('button', { name: '继续战斗' })).toBeNull())
+  act(() => frame(3400))
+  act(() => frame(3600))
+  expect(vi.mocked(stepFarm).mock.calls.length).toBeGreaterThan(before)
+})
+
+it('keeps the battle paused when browser back occurs during a login request', async () => {
+  vi.mocked(stepFarm).mockImplementation((previous) => ({
+    state: { ...previous, tick: previous.tick + 1, offered: [] },
+    events: [],
+  }))
+  mount()
+  await waitFor(() => expect(startButton().disabled).toBe(false))
+  fireEvent.click(startButton())
+  act(() => frame(1000))
+  act(() => frame(1200))
+  fireEvent.click(screen.getByRole('button', { name: '输入昵称登录并同步进度' }))
+  const before = vi.mocked(stepFarm).mock.calls.length
+  const normal = vi.mocked(fetch).getMockImplementation()!
+  vi.mocked(fetch).mockImplementation((url, options) =>
+    String(url).endsWith('/login') ? new Promise(() => {}) : normal(url, options),
+  )
+  fireEvent.change(screen.getByLabelText('昵称'), { target: { value: 'PLAYER_ONE' } })
+  fireEvent.click(screen.getByRole('button', { name: '用这个昵称进入乐队并同步进度' }))
+  await act(async () => window.history.back())
+  await waitFor(() => expect(window.history.state?.accountDialog).toBe(true))
+  expect(screen.getByRole('dialog', { name: '乐队账号登录' })).toBeTruthy()
+  act(() => frame(2200))
+  act(() => frame(3200))
+  expect(vi.mocked(stepFarm).mock.calls.length).toBe(before)
+})

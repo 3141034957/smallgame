@@ -609,7 +609,7 @@
   font-size: 8px;
   color: #9a9b88;
 }
-.farm-choices b {
+.farm-choices > button > b {
   display: block;
   font-size: 17px;
   margin: 8px 0;
@@ -1022,19 +1022,19 @@
     line-height: 1.7;
     margin-bottom: 14px;
   }
-  /* One card per row, straight down the screen: icon, then name and level on
-     the eye line, then the effect, then the evolution note. */
+  /* Keep the school tag on its own row so names retain the full content width. */
   .farm-choices {
     grid-template-columns: 1fr;
     gap: 10px;
   }
   .farm-choices > button {
     display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-columns: 44px minmax(0, 1fr);
     grid-template-areas:
-      'icon name tag'
-      'icon desc desc'
-      'icon note note';
+      'icon name'
+      'icon tag'
+      'icon desc'
+      'icon note';
     column-gap: 10px;
     row-gap: 1px;
     align-items: center;
@@ -1061,15 +1061,20 @@
   .farm-choices > button > small {
     display: none;
   }
-  .farm-choices b {
+  .farm-choices > button > b {
     grid-area: name;
     font-size: 15px;
     margin: 0;
     min-width: 0;
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
-    gap: 8px;
+    gap: 2px 8px;
+  }
+  .farm-choice-name {
+    word-break: keep-all;
+    overflow-wrap: anywhere;
   }
   .farm-choices em {
     flex: none;
@@ -1078,6 +1083,7 @@
     padding: 1px 6px;
     border-radius: 8px;
     background: color-mix(in srgb, var(--talent-color) 14%, #fffdf6);
+    white-space: nowrap;
   }
   .farm-choices p {
     grid-area: desc;
@@ -1093,6 +1099,7 @@
   }
   .farm-choices .farm-school-tag {
     grid-area: tag;
+    justify-self: start;
     margin-top: 0;
     font-size: 8px;
     padding: 2px 7px;

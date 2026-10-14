@@ -484,7 +484,7 @@ export const RECIPES = [
     chip: 'trigger',
     name: '爆音采样台',
     icon: '🎛️',
-    description: '音爆连锁三连炸，炸开整片怪潮',
+    description: '采样爆炸范围扩大、伤害提升',
   },
   {
     weapon: 'deck',
@@ -1390,6 +1390,8 @@ export function stepFarm(previous, point, useSurge = false) {
   if (gear.sax) {
     const every = Math.max(6, 22 - gear.mute * 2 - hasteBonus)
     if (state.tick % every === 0) {
+      const slowUntil =
+        state.tick + FPS * ((forms.includes('sax') ? 3 : 2) + durationBonus) + gear.mute * 6
       const dir = aimAt()
       const norm = Math.max(0.01, Math.hypot(dir[0], dir[1]))
       const heading = [dir[0] / norm, dir[1] / norm]
@@ -1413,7 +1415,7 @@ export function stepFarm(previous, point, useSurge = false) {
         const side = Math.abs(vx * -heading[1] + vy * heading[0])
         if (along < -4 || along > length || side > half + along * 0.9) continue
         damage(crop, (2 + gear.sax * 2 + (forms.includes('sax') ? 4 : 0) + powerBonus) * combo.horn)
-        crop.slowUntil = state.tick + FPS * (forms.includes('sax') ? 3 : 2) + gear.mute * 6
+        crop.slowUntil = slowUntil
         crop.x += heading[0] * (forms.includes('sax') ? 9 : 6)
         crop.y += heading[1] * (forms.includes('sax') ? 9 : 6)
       }
@@ -1421,8 +1423,7 @@ export function stepFarm(previous, point, useSurge = false) {
       for (const crop of state.crops) {
         if (crop.hp <= 0 || state.tick < (crop.spawnAt ?? 0)) continue
         if (distance(crop.x, crop.y, point[0], point[1]) > 14) continue
-        crop.slowUntil =
-          state.tick + FPS * ((forms.includes('sax') ? 3 : 2) + durationBonus) + gear.mute * 6
+        crop.slowUntil = slowUntil
       }
     }
   }

@@ -108,6 +108,6 @@ it('opens and closes the farm help dialog', async () => {
   await screen.findByRole('button', { name: '退出登录' })
   fireEvent.click(screen.getByRole('button', { name: '查看进化配方' }))
   expect(screen.getByRole('dialog')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: /懂啦，开战/ }))
+  fireEvent.click(screen.getByRole('button', { name: '关闭帮助并返回' }))
   expect(screen.queryByRole('dialog')).toBeNull()
 })

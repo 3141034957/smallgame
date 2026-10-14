@@ -358,3 +358,27 @@
     max-width: 65%;
   }
 }
+
+.account-resolution {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 4px 10px;
+  background: #fff8e6;
+  color: #48634a;
+  font-size: 12px;
+}
+.account-resolution > span {
+  flex-basis: 100%;
+  text-align: center;
+}
+.account-resolution button {
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid #c4d3bd;
+  border-radius: 8px;
+  background: #fffef9;
+}

@@ -5,6 +5,7 @@ export type AccountContextValue = {
   openAccount: () => void
   /** 首次身份确认尚未出结果。 */
   checking: boolean
+  formOpen?: boolean
   /** 游戏告知「当前有一局未结束」，引用稳定，可直接放进 effect 依赖。 */
   setRunActive: (active: boolean) => void
 }

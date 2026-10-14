@@ -284,8 +284,11 @@ export default function MusicFarm() {
   dismissPanelRef.current = dismissPanel
   useEffect(() => {
     // The back gesture closes the dialog instead of leaving the page.
-    const onPopState = () => {
-      if (dialogHistory.current) dismissPanelRef.current(true)
+    const onPopState = (event: PopStateEvent) => {
+      // Returning from the account dialog lands on this panel's own entry.
+      // Only leaving that entry may dismiss the panel itself.
+      if (dialogHistory.current && !event.state?.farmDialog && !accountRef.current?.formOpen)
+        dismissPanelRef.current(true)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
@@ -609,7 +612,10 @@ export default function MusicFarm() {
     window.addEventListener('scroll', onScroll, scrollSettings)
     controls.current = bindFarmControls(controlField, {
       canMove: () =>
-        phaseRef.current === 'play' && !panelRef.current && !model.current.offered.length,
+        phaseRef.current === 'play' &&
+        !accountRef.current?.formOpen &&
+        !panelRef.current &&
+        !model.current.offered.length,
       bounds: () => rect,
       refreshBounds,
       target: (point) => {
@@ -687,7 +693,11 @@ export default function MusicFarm() {
       const delta = last ? Math.min(125, now - last) : 0
       last = now
       let state = model.current
-      const running = phaseRef.current === 'play' && !panelRef.current && !state.offered.length
+      const running =
+        phaseRef.current === 'play' &&
+        !accountRef.current?.formOpen &&
+        !panelRef.current &&
+        !state.offered.length
       if (running) {
         elapsed += delta
         while (elapsed >= 1000 / FPS && state.hp > 0 && !state.offered.length) {

@@ -156,7 +156,7 @@ export const COMBOS = [
     requires: [],
     any: FULL_ENCORE_SCHOOLS,
     requirement: `任意 ${FULL_ENCORE_SCHOOLS} 个流派完成进化`,
-    effect: `全部伤害 +${percent(FULL_ENCORE_DAMAGE)}、拾取范围 +${percent(FULL_ENCORE_ATTRACTION)}`,
+    effect: `命中伤害 +${percent(FULL_ENCORE_DAMAGE)}、拾取范围 +${percent(FULL_ENCORE_ATTRACTION)}`,
     bonus: { damage: FULL_ENCORE_DAMAGE, attraction: FULL_ENCORE_ATTRACTION },
   },
 ]

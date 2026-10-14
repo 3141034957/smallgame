@@ -11,7 +11,12 @@ export const isDailyBestKey = (key: string) => DAILY_BEST.test(key)
 const DAILY_BEST_DAYS = 400
 export const ACCOUNT_SAVE_EVENT = 'echo-progress-changed'
 export type ProgressData = Record<string, string>
-export type AccountSave = { data: ProgressData; revision: number | null; dirty: boolean }
+export type AccountSave = {
+  data: ProgressData
+  revision: number | null
+  dirty: boolean
+  conflict?: boolean
+}
 let accountId: string | null = null
 const fallback = new Map<string, AccountSave>()
 export const activeAccountId = () => accountId
@@ -67,7 +72,8 @@ export function readAccountSave(id: string): AccountSave {
   if (memory) return memory
   const raw = localStorage.getItem(PREFIX + id)
   if (raw !== null) {
-    let parsed: { data?: unknown; revision?: unknown; dirty?: unknown } | null = null
+    let parsed: { data?: unknown; revision?: unknown; dirty?: unknown; conflict?: unknown } | null =
+      null
     try {
       parsed = JSON.parse(raw)
     } catch {
@@ -78,6 +84,7 @@ export function readAccountSave(id: string): AccountSave {
         data: object(JSON.stringify(parsed.data)),
         revision: safeRevision(parsed.revision),
         dirty: parsed.dirty === true,
+        ...(parsed.conflict === true ? { conflict: true } : {}),
       }
     // Migrate the flat account save from before cloud storage.
     return { data: object(raw), revision: null, dirty: true }
@@ -109,6 +116,9 @@ export function installAccountSave(id: string, save: AccountSave) {
 }
 export function acknowledgeAccountSave(id: string, sent: ProgressData, revision: number) {
   const current = readAccountSave(id)
+  // A different tab can restore a backup while this upload is in flight.
+  // Its explicit-choice barrier owns the snapshot; an old ACK cannot rebase it.
+  if (current.conflict) return true
   const dirty = JSON.stringify(progressForCloud(current.data)) !== JSON.stringify(sent)
   installAccountSave(id, { data: current.data, revision, dirty })
   return dirty

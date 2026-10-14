@@ -17,7 +17,14 @@ import {
   AUTH_FORM_EVENT,
   type AccountContextValue,
 } from './context'
-import { createProgressSync, loadAccountProgress, type SyncStatus } from './cloud'
+import {
+  createProgressSync,
+  loadAccountProgress,
+  keepAccountProgress,
+  readAccountBackup,
+  restoreAccountBackup,
+  type SyncStatus,
+} from './cloud'
 import {
   AccountError,
   accountRequest,
@@ -46,6 +53,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
   // Restoring from the cloud replaces the storage under a live run, so it
   // takes a second tap that says the round will be lost.
   const [confirmRestore, setConfirmRestore] = useState(false)
+  const [confirmBackup, setConfirmBackup] = useState(false)
+  const [confirmLocal, setConfirmLocal] = useState(false)
+  const [syncEpoch, setSyncEpoch] = useState(0)
   const confirmRestoreRef = useRef(false)
   confirmRestoreRef.current = confirmRestore
   const userId = user?.id
@@ -58,6 +68,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const runActive = useRef(false)
   const deferred = useRef<AccountUser | null | undefined>(undefined)
   const dialog = useRef<HTMLElement>(null)
+  const formHistory = useRef(false)
   const previousFocus = useRef<HTMLElement | null>(null)
   const cancelPending = useCallback(() => {
     sequence.current++
@@ -89,6 +100,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
       if (!preserveGuest) setGameKey(next?.id ?? `guest:${Date.now()}`)
       // Never carry a conflict or "saved" badge from the previous account over.
       setSyncStatus('pending')
+      setConfirmRestore(false)
+      setConfirmBackup(false)
+      setConfirmLocal(false)
       // A game that stays mounted keeps showing the old owner's wallet, quests
       // and career until it reads them again from the new scope.
       if (typeof window !== 'undefined') window.dispatchEvent(new Event(ACCOUNT_SWITCH_EVENT))
@@ -213,21 +227,44 @@ export function AuthGate({ children }: { children: ReactNode }) {
       window.removeEventListener('pagehide', leaving)
       document.removeEventListener('visibilitychange', hiding)
     }
-  }, [userId, gameKey])
+  }, [userId, gameKey, syncEpoch])
   // A conflict that resolved itself leaves nothing to confirm.
   useEffect(() => {
     if (syncStatus !== 'conflict') setConfirmRestore(false)
   }, [syncStatus])
   const openAccount = useCallback((_next?: 'login' | 'register') => {
     previousFocus.current = document.activeElement as HTMLElement
+    if (formHistory.current) return
     window.dispatchEvent(new Event(AUTH_FORM_EVENT))
+    window.history.pushState({ accountDialog: true }, '')
+    formHistory.current = true
     setError('')
     setFormOpen(true)
   }, [])
+  const dismissForm = () => {
+    setFormOpen(false)
+    if (formHistory.current) window.history.back()
+  }
   const closeForm = () => {
     if (mutating.current) return
-    setFormOpen(false)
+    dismissForm()
   }
+  useEffect(() => {
+    const pop = (event: PopStateEvent) => {
+      if (!formHistory.current) return
+      // Consume the topmost dialog gesture; the game also checks the target
+      // history entry, so listener ordering cannot close its pause panel.
+      event.stopImmediatePropagation()
+      if (mutating.current) {
+        window.history.pushState({ accountDialog: true }, '')
+        return
+      }
+      formHistory.current = false
+      setFormOpen(false)
+    }
+    window.addEventListener('popstate', pop, true)
+    return () => window.removeEventListener('popstate', pop, true)
+  }, [])
   useEffect(() => {
     if (formOpen) dialog.current?.querySelector<HTMLInputElement>('input')?.focus()
     else previousFocus.current?.focus({ preventScroll: true })
@@ -252,13 +289,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
       const progress = exportGuestProgress()
       const next = await accountRequest('login', { account, progress }, controller.signal)
       if (!mounted.current || controller.signal.aborted || !next) return
-      await loadAccountProgress(next.id, controller.signal)
+      const loaded = await loadAccountProgress(next.id, controller.signal)
       if (!mounted.current || controller.signal.aborted) return
-      setFormOpen(false)
+      dismissForm()
       // Keep the run that just finished: remounting the game would drop the
       // result screen and with it the only chance to upload this score.
       accept(next, true)
-      setNotice('已进入，进度已同步')
+      setNotice(loaded.conflict ? '本机进度已保留，请选择' : '已进入，进度已同步')
       announceAccountChange()
     } catch (cause) {
       if (mounted.current && !controller.signal.aborted)
@@ -303,13 +340,14 @@ export function AuthGate({ children }: { children: ReactNode }) {
     if (!owner || mutating.current) return
     // A live round, or a result still waiting to be uploaded, would be dropped
     // by the remount: ask once instead of throwing it away on a single tap.
-    if (runActive.current && !confirmRestoreRef.current) {
+    if (!confirmRestoreRef.current) {
       setNotice('')
       setError('')
       setConfirmRestore(true)
       return
     }
     setConfirmRestore(false)
+    sync.current?.stop()
     mutating.current = true
     setBusy(true)
     cancelPending()
@@ -336,12 +374,79 @@ export function AuthGate({ children }: { children: ReactNode }) {
     } finally {
       if (pending.current === controller) pending.current = null
       mutating.current = false
-      if (mounted.current) setBusy(false)
+      if (mounted.current) {
+        setBusy(false)
+        setSyncEpoch((value) => value + 1)
+      }
+    }
+  }
+  const restoreBackup = () => {
+    const owner = principal.current
+    if (!owner || mutating.current) return
+    if (!confirmBackup) {
+      setConfirmBackup(true)
+      setConfirmRestore(false)
+      setConfirmLocal(false)
+      return
+    }
+    sync.current?.stop()
+    try {
+      restoreAccountBackup(owner.id)
+      flushSync(() => setGameVisible(false))
+      setGameKey(`${owner.id}:${Date.now()}`)
+      setGameVisible(true)
+      setSyncStatus('conflict')
+      setNotice('已恢复备份，尚未上传')
+      setError('')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '恢复失败，请重试')
+    } finally {
+      setConfirmBackup(false)
+      setSyncEpoch((value) => value + 1)
+    }
+  }
+  const keepLocal = async () => {
+    const owner = principal.current
+    if (!owner || mutating.current) return
+    if (!confirmLocal) {
+      setConfirmLocal(true)
+      setConfirmRestore(false)
+      setConfirmBackup(false)
+      return
+    }
+    sync.current?.stop()
+    mutating.current = true
+    setBusy(true)
+    cancelPending()
+    const controller = new AbortController()
+    pending.current = controller
+    try {
+      await keepAccountProgress(owner.id, controller.signal)
+      if (!mounted.current || controller.signal.aborted) return
+      setNotice('本机进度已同步')
+      setError('')
+    } catch (cause) {
+      if (mounted.current && !controller.signal.aborted)
+        setError(
+          cause instanceof AccountError && cause.status === 409
+            ? '云端又有更新，请重新选择'
+            : cause instanceof Error
+              ? cause.message
+              : '保存失败，请重试',
+        )
+    } finally {
+      if (pending.current === controller) pending.current = null
+      mutating.current = false
+      if (mounted.current) {
+        setBusy(false)
+        setConfirmLocal(false)
+        setSyncEpoch((value) => value + 1)
+      }
     }
   }
   const value = useMemo<AccountContextValue>(
-    () => ({ user, openAccount, checking, setRunActive }),
-    [user, openAccount, checking, setRunActive],
+    () => ({ user, openAccount, checking, formOpen, setRunActive }),
+    [user, openAccount, checking, formOpen, setRunActive],
   )
   return (
     <AccountContext value={value}>
@@ -369,35 +474,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
                     重试
                   </button>
                 )}
-                {syncStatus === 'conflict' &&
-                  (confirmRestore ? (
-                    // The round is still on screen, so the button says what
-                    // confirming does to it before it does it.
-                    <span className="account-restore-confirm">
-                      <button
-                        className="is-armed"
-                        aria-label="放弃当前对局并恢复云端进度"
-                        disabled={busy}
-                        onClick={() => void restoreCloud()}
-                      >
-                        确认恢复
-                      </button>
-                      <button
-                        aria-label="取消恢复云端进度"
-                        onClick={() => setConfirmRestore(false)}
-                      >
-                        取消
-                      </button>
-                    </span>
-                  ) : (
-                    <button
-                      aria-label="恢复云端进度"
-                      disabled={busy}
-                      onClick={() => void restoreCloud()}
-                    >
-                      恢复云端
-                    </button>
-                  ))}
                 <button disabled={busy} onClick={() => void logout()}>
                   {busy ? '处理中…' : '退出登录'}
                 </button>
@@ -411,6 +487,87 @@ export function AuthGate({ children }: { children: ReactNode }) {
             )}
           </div>
         </div>
+        {user && !formOpen && (syncStatus === 'conflict' || readAccountBackup(user.id)) && (
+          <div className="account-resolution" role="group" aria-label="选择账号进度">
+            {confirmBackup ? (
+              <>
+                <span>{runActive.current ? '放弃本局，替换为备份' : '替换当前进度，保留备份'}</span>
+                <button
+                  disabled={busy}
+                  aria-label="备份当前进度并恢复本机备份"
+                  onClick={restoreBackup}
+                >
+                  确认恢复
+                </button>
+                <button disabled={busy} onClick={() => setConfirmBackup(false)}>
+                  取消
+                </button>
+              </>
+            ) : confirmLocal ? (
+              <>
+                <span>本机进度将替换云端</span>
+                <button
+                  disabled={busy}
+                  aria-label="备份云端并用本机进度替换云端"
+                  onClick={() => void keepLocal()}
+                >
+                  确认保留
+                </button>
+                <button disabled={busy} onClick={() => setConfirmLocal(false)}>
+                  取消
+                </button>
+              </>
+            ) : confirmRestore ? (
+              <>
+                <span>{runActive.current ? '放弃本局，替换为云端' : '本机进度将替换为云端'}</span>
+                <button
+                  className="is-armed"
+                  disabled={busy}
+                  aria-label={
+                    runActive.current ? '放弃当前对局并恢复云端进度' : '备份本机并恢复云端进度'
+                  }
+                  onClick={() => void restoreCloud()}
+                >
+                  确认恢复
+                </button>
+                <button aria-label="取消恢复云端进度" onClick={() => setConfirmRestore(false)}>
+                  取消
+                </button>
+              </>
+            ) : (
+              <>
+                {syncStatus === 'conflict' && (
+                  <>
+                    <span>本机与云端进度不同</span>
+                    <button
+                      disabled={busy}
+                      aria-label="保留本机进度并替换云端"
+                      onClick={() => void keepLocal()}
+                    >
+                      保留本机
+                    </button>
+                    <button
+                      disabled={busy}
+                      aria-label="恢复云端进度"
+                      onClick={() => void restoreCloud()}
+                    >
+                      恢复云端
+                    </button>
+                  </>
+                )}
+                {readAccountBackup(user.id) && (
+                  <button
+                    disabled={busy}
+                    aria-label="恢复上次替换前的本机备份"
+                    onClick={restoreBackup}
+                  >
+                    恢复备份
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
         {!formOpen && (error || notice) && (
           <p className="account-game-notice" role={error ? 'alert' : 'status'}>
             {error || notice}

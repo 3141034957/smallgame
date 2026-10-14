@@ -6,7 +6,13 @@ import {
   installAccountSave,
   readAccountSave,
 } from '@/utils/accountStorage'
-import { createProgressSync, loadAccountProgress } from './cloud'
+import {
+  createProgressSync,
+  loadAccountProgress,
+  keepAccountProgress,
+  readAccountBackup,
+  restoreAccountBackup,
+} from './cloud'
 
 const owner = 'account_cloud_test'
 const key = 'farm-career-v1'
@@ -122,22 +128,105 @@ it('keeps unrelated local keys when the local copy wins over the cloud', async (
     'unrelated-secret': 'private',
   })
 })
-it('reports the backup key when the cloud replaces local progress', async () => {
+it('reports the backup key when explicitly restoring cloud progress', async () => {
   accountStorage.setItem(key, 'local')
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({ [key]: 'cloud' }, 5)))
-  const result = await loadAccountProgress(owner, new AbortController().signal)
+  const result = await loadAccountProgress(owner, new AbortController().signal, true)
   expect(result.backup).toBe(`farm-account-backup-v1:${owner}`)
   expect(JSON.parse(localStorage.getItem(result.backup!)!).data[key]).toBe('local')
 })
-it('restores the cloud copy even when the local backup cannot be written', async () => {
+it('keeps dirty local progress and its original revision on a default load conflict', async () => {
+  accountStorage.setItem(key, 'local 5000')
+  const fetcher = vi.fn().mockResolvedValue(reply({ [key]: 'cloud 100' }, 5))
+  vi.stubGlobal('fetch', fetcher)
+  const result = await loadAccountProgress(owner, new AbortController().signal)
+  expect(result.conflict).toBe(true)
+  expect(readAccountSave(owner)).toEqual({
+    data: { [key]: 'local 5000' },
+    revision: 1,
+    dirty: true,
+    conflict: true,
+  })
+  const status = vi.fn()
+  const sync = createProgressSync(owner, status)
+  expect(await sync.flush()).toBe(false)
+  expect(status).toHaveBeenLastCalledWith('conflict')
+  expect(fetcher).toHaveBeenCalledTimes(1)
+  sync.stop()
+})
+it('refuses cloud replacement if the local backup cannot be written', async () => {
   accountStorage.setItem(key, 'local')
-  vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+  const write = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
     throw new Error('full')
   })
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({ [key]: 'cloud' }, 5)))
-  const result = await loadAccountProgress(owner, new AbortController().signal)
-  expect(result.backup).toBeNull()
-  expect(readAccountSave(owner).data[key]).toBe('cloud')
+  await expect(loadAccountProgress(owner, new AbortController().signal, true)).rejects.toThrow(
+    '备份失败',
+  )
+  expect(readAccountSave(owner).data[key]).toBe('local')
+  write.mockRestore()
+})
+it('restores a legacy backup locally, preserving current data and blocking automatic upload', async () => {
+  const backup = { data: { [key]: 'backup' }, revision: 0, dirty: true }
+  localStorage.setItem(`farm-account-backup-v1:${owner}`, JSON.stringify(backup))
+  restoreAccountBackup(owner)
+  expect(readAccountSave(owner)).toEqual({ ...backup, dirty: true, conflict: true })
+  expect(readAccountBackup(owner)?.data[key]).toBe('old')
+  const fetcher = vi.fn()
+  vi.stubGlobal('fetch', fetcher)
+  const sync = createProgressSync(owner, vi.fn())
+  expect(await sync.flush()).toBe(false)
+  expect(fetcher).not.toHaveBeenCalled()
+  sync.stop()
+})
+it('leaves current data and backup intact when restoring cannot save the replacement', () => {
+  const backup = { data: { [key]: 'backup' }, revision: 0, dirty: true }
+  const backupKey = `farm-account-backup-v1:${owner}`
+  localStorage.setItem(backupKey, JSON.stringify(backup))
+  const original = localStorage.setItem.bind(localStorage)
+  const write = vi.spyOn(localStorage, 'setItem').mockImplementation((name, value) => {
+    if (name === `farm-account-save-v1:${owner}`) throw new Error('full')
+    original(name, value)
+  })
+  expect(() => restoreAccountBackup(owner)).toThrow('full')
+  expect(readAccountSave(owner).data[key]).toBe('old')
+  expect(readAccountBackup(owner)).toEqual(backup)
+  write.mockRestore()
+})
+it('rejects invalid backups without touching the current save', () => {
+  localStorage.setItem(
+    `farm-account-backup-v1:${owner}`,
+    '{"data":{"x":123},"revision":1,"dirty":true}',
+  )
+  expect(readAccountBackup(owner)).toBeNull()
+  expect(() => restoreAccountBackup(owner)).toThrow('备份不可用')
+  expect(readAccountSave(owner).data[key]).toBe('old')
+})
+it('only an explicit local choice uses the latest revision and backs up the cloud', async () => {
+  accountStorage.setItem(key, 'local')
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(reply({ [key]: 'remote' }, 5))
+    .mockResolvedValueOnce(reply({ [key]: 'local' }, 6))
+  vi.stubGlobal('fetch', fetcher)
+  await keepAccountProgress(owner, new AbortController().signal)
+  expect(JSON.parse(fetcher.mock.calls[1][1].body)).toEqual({
+    data: { [key]: 'local' },
+    revision: 5,
+  })
+  expect(readAccountSave(owner)).toEqual({ data: { [key]: 'local' }, revision: 6, dirty: false })
+  expect(readAccountBackup(owner)?.data[key]).toBe('remote')
+})
+it('keeps the original local version when the explicit local choice races another device', async () => {
+  const local = { data: { [key]: 'local' }, revision: 1, dirty: true, conflict: true }
+  installAccountSave(owner, local)
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(reply({ [key]: 'remote' }, 5))
+    .mockResolvedValueOnce(new Response('{"error":"conflict"}', { status: 409 }))
+  vi.stubGlobal('fetch', fetcher)
+  await expect(keepAccountProgress(owner, new AbortController().signal)).rejects.toThrow('conflict')
+  expect(readAccountSave(owner)).toEqual(local)
 })
 it('sends its own keepalive request instead of reusing an in-flight save', async () => {
   let finish!: (value: Response) => void
@@ -187,4 +276,73 @@ it('does not acknowledge a response arriving after the account synchronizer is s
   expect(readAccountSave(owner).revision).toBe(1)
   expect(readAccountSave(owner).dirty).toBe(true)
   expect(status).not.toHaveBeenCalledWith('saved')
+})
+
+it('does not roll back a newer clean local revision after a delayed GET', async () => {
+  let finish!: (value: Response) => void
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = resolve
+        }),
+    ),
+  )
+  const loading = loadAccountProgress(owner, new AbortController().signal)
+  const newer = { data: { [key]: 'newer' }, revision: 5, dirty: false }
+  installAccountSave(owner, newer)
+  finish(reply({ [key]: 'stale' }, 4))
+  expect((await loading).retained).toBe(true)
+  expect(readAccountSave(owner)).toEqual(newer)
+})
+it('does not acknowledge or upload a backup restored in another tab during an in-flight save', async () => {
+  let finish!: (value: Response) => void
+  const fetcher = vi.fn(
+    () =>
+      new Promise<Response>((resolve) => {
+        finish = resolve
+      }),
+  )
+  vi.stubGlobal('fetch', fetcher)
+  accountStorage.setItem(key, 'uploading')
+  const status = vi.fn()
+  const sync = createProgressSync(owner, status)
+  const uploading = sync.flush()
+  await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1))
+  const restored = { data: { [key]: 'backup' }, revision: 0, dirty: true, conflict: true }
+  installAccountSave(owner, restored)
+  finish(reply({ [key]: 'uploading' }, 2))
+  expect(await uploading).toBe(false)
+  expect(status).toHaveBeenLastCalledWith('conflict')
+  expect(readAccountSave(owner)).toEqual(restored)
+  expect(fetcher).toHaveBeenCalledTimes(1)
+  sync.stop()
+})
+
+it('preserves a different backup restored while an explicit local choice is uploading', async () => {
+  const chosen = { data: { [key]: 'chosen' }, revision: 1, dirty: true, conflict: true }
+  installAccountSave(owner, chosen)
+  let finish!: (value: Response) => void
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(reply({ [key]: 'cloud' }, 5))
+    .mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = resolve
+        }),
+    )
+  vi.stubGlobal('fetch', fetcher)
+  const saving = keepAccountProgress(owner, new AbortController().signal)
+  await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2))
+  const restored = { data: { [key]: 'restored' }, revision: 0, dirty: true, conflict: true }
+  installAccountSave(owner, restored)
+  finish(reply({ [key]: 'chosen' }, 6))
+  await expect(saving).rejects.toThrow('本机进度已变化')
+  expect(readAccountSave(owner)).toEqual(restored)
+  const sync = createProgressSync(owner, vi.fn())
+  expect(await sync.flush()).toBe(false)
+  expect(fetcher).toHaveBeenCalledTimes(2)
+  sync.stop()
 })

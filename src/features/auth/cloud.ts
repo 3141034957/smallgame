@@ -3,6 +3,8 @@ import {
   installAccountSave,
   progressForCloud,
   readAccountSave,
+  writeAccountSave,
+  type AccountSave,
   type ProgressData,
 } from '@/utils/accountStorage'
 import { validProgress } from './progress.mjs'
@@ -42,37 +44,95 @@ export async function progressRequest(
     throw new Error('云端进度异常')
   return result
 }
+const backupKey = (id: string) => `farm-account-backup-v1:${id}`
+export function readAccountBackup(id: string): AccountSave | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(backupKey(id)) ?? 'null')
+    if (
+      !value ||
+      !value.data ||
+      typeof value.data !== 'object' ||
+      Array.isArray(value.data) ||
+      !Object.values(value.data).every((item) => typeof item === 'string') ||
+      !(value.revision === null || (Number.isSafeInteger(value.revision) && value.revision >= 0)) ||
+      typeof value.dirty !== 'boolean'
+    )
+      return null
+    return value
+  } catch {
+    return null
+  }
+}
+function backupAccount(id: string, save: AccountSave) {
+  try {
+    localStorage.setItem(backupKey(id), JSON.stringify(save))
+  } catch {
+    throw new Error('备份失败，请释放存储后重试')
+  }
+  return backupKey(id)
+}
 export async function loadAccountProgress(id: string, signal: AbortSignal, forceCloud = false) {
   const remote = await progressRequest(id, undefined, signal)
   if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
-  let local
-  try {
-    local = readAccountSave(id)
-  } catch {
-    local = { data: {}, revision: null, dirty: false }
+  const local = readAccountSave(id)
+  // Another tab may finish a newer sync while this GET is in flight.
+  if (!forceCloud && local.revision !== null && local.revision > remote.revision) {
+    return { persisted: true, retained: true, conflict: local.conflict === true, backup: null }
   }
-  const keepLocal =
-    !forceCloud &&
-    local.dirty &&
-    (local.revision === remote.revision ||
-      (remote.revision === 0 && Object.keys(local.data).length > 0))
+  const keepLocal = !forceCloud && (local.dirty || local.conflict === true)
+  const conflict =
+    keepLocal &&
+    (local.conflict === true ||
+      (local.revision !== remote.revision && !(remote.revision === 0 && local.revision === null)))
+  if (conflict) {
+    // Never advance the base revision: doing so would turn the next automatic
+    // upload into silent authorization to overwrite the other device.
+    const persisted = installAccountSave(id, { ...local, conflict: true })
+    return { persisted, retained: true, conflict: true, backup: null }
+  }
   let backup: string | null = null
-  if (local.dirty && !keepLocal && Object.keys(local.data).length) {
-    const key = `farm-account-backup-v1:${id}`
-    try {
-      localStorage.setItem(key, JSON.stringify(local))
-      backup = key
-    } catch {
-      // A full quota must not turn the cloud restore into a failure.
-    }
-  }
-  const persisted = installAccountSave(id, {
-    // Keep every local key: only the upload is limited to progress keys.
+  if (forceCloud && Object.keys(local.data).length) backup = backupAccount(id, local)
+  const save = {
     data: keepLocal ? local.data : remote.data,
     revision: remote.revision,
     dirty: keepLocal,
-  })
-  return { persisted, retained: keepLocal, backup }
+  }
+  // Explicit replacement is only successful if it survives a reload.
+  const persisted = forceCloud ? (writeAccountSave(id, save), true) : installAccountSave(id, save)
+  return { persisted, retained: keepLocal, conflict: false, backup }
+}
+export function restoreAccountBackup(id: string) {
+  const backup = readAccountBackup(id)
+  if (!backup) throw new Error('备份不可用')
+  const current = readAccountSave(id)
+  const original = localStorage.getItem(backupKey(id))!
+  backupAccount(id, current)
+  try {
+    // Restoration is local only. Choosing this snapshot for cloud upload is a
+    // separate explicit action; its old revision must never be silently rebased.
+    writeAccountSave(id, { ...backup, dirty: true, conflict: true })
+  } catch (cause) {
+    localStorage.setItem(backupKey(id), original)
+    throw cause
+  }
+}
+export async function keepAccountProgress(id: string, signal: AbortSignal) {
+  const remote = await progressRequest(id, undefined, signal)
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+  backupAccount(id, { ...remote, dirty: false })
+  const current = readAccountSave(id)
+  const data = progressForCloud(current.data)
+  // A newer write on the other device still rejects this explicit choice.
+  const result = await progressRequest(id, { data, revision: remote.revision }, signal)
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+  const latest = readAccountSave(id)
+  if (latest.conflict && JSON.stringify(latest) !== JSON.stringify(current)) {
+    // Another tab restored/changed the chosen snapshot during the request.
+    // This response authorizes only the original choice, never that new save.
+    throw new AccountError(409, '本机进度已变化，请重新选择')
+  }
+  const dirty = JSON.stringify(progressForCloud(latest.data)) !== JSON.stringify(data)
+  installAccountSave(id, { data: latest.data, revision: result.revision, dirty })
 }
 
 export function createProgressSync(id: string, onStatus: (status: SyncStatus) => void) {
@@ -94,7 +154,8 @@ export function createProgressSync(id: string, onStatus: (status: SyncStatus) =>
       await Promise.resolve()
       try {
         let current = readAccountSave(id)
-        while (current.dirty && !stopped) {
+        while ((current.dirty || current.conflict) && !stopped) {
+          if (current.conflict) throw new AccountError(409, '请选择保留哪份进度')
           if (current.revision === null) throw new Error('尚未恢复云端存档。')
           onStatus('pending')
           const data = progressForCloud(current.data)

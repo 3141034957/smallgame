@@ -74,8 +74,8 @@ export function FarmHelp({ onClose }: { onClose: () => void }) {
       <p className="farm-help-keyboard">
         数字键 1–9 选择升级，方向键 / WASD 移动，空格释放音浪爆发。
       </p>
-      <button className="farm-primary" onClick={onClose}>
-        懂啦，开战
+      <button className="farm-primary" onClick={onClose} aria-label="关闭帮助并返回">
+        返回
       </button>
     </>
   )

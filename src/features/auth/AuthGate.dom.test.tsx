@@ -10,6 +10,8 @@ import {
   activateAccount,
   accountStorage,
   exportGuestProgress,
+  installAccountSave,
+  readAccountSave,
 } from '@/utils/accountStorage'
 import {
   loadFarmProfile,
@@ -481,4 +483,54 @@ it('drops checking when the account service is unreachable and still lets the gu
   expect(screen.getByText('身份检查 已结束')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: '完成游客局' }))
   expect(loadFarmProfile().coins).toBe(1200)
+})
+
+it('shows an initial load conflict without uploading local progress until explicitly chosen', async () => {
+  current = user
+  cloud = { 'farm-career-v1': 'cloud' }
+  installAccountSave(user.id, { data: { 'farm-career-v1': 'offline' }, revision: 0, dirty: true })
+  mount()
+  await screen.findByText('本机与云端进度不同')
+  expect(readAccountSave(user.id).data['farm-career-v1']).toBe('offline')
+  const uploads = () =>
+    vi
+      .mocked(fetch)
+      .mock.calls.filter(([url, options]) => url === '/api/progress' && options?.method === 'POST')
+  expect(uploads()).toHaveLength(0)
+  fireEvent.click(screen.getByRole('button', { name: '保留本机进度并替换云端' }))
+  expect(screen.getByText('本机进度将替换云端')).toBeTruthy()
+  expect(uploads()).toHaveLength(0)
+  fireEvent.click(screen.getByRole('button', { name: '备份云端并用本机进度替换云端' }))
+  await screen.findByText('本机进度已同步')
+  expect(uploads()).toHaveLength(1)
+  expect(cloud['farm-career-v1']).toBe('offline')
+  expect(screen.getByRole('button', { name: '恢复上次替换前的本机备份' })).toBeTruthy()
+})
+it('requires visible confirmation for cloud replacement and restores its backup without auto upload', async () => {
+  current = user
+  cloud = { 'farm-career-v1': 'cloud' }
+  installAccountSave(user.id, { data: { 'farm-career-v1': 'offline' }, revision: 0, dirty: true })
+  mount()
+  await screen.findByText('本机与云端进度不同')
+  fireEvent.click(screen.getByRole('button', { name: '恢复云端进度' }))
+  expect(screen.getByText('本机进度将替换为云端')).toBeTruthy()
+  expect(readAccountSave(user.id).data['farm-career-v1']).toBe('offline')
+  fireEvent.click(screen.getByRole('button', { name: '备份本机并恢复云端进度' }))
+  await screen.findByText('已恢复云端进度')
+  expect(readAccountSave(user.id).data['farm-career-v1']).toBe('cloud')
+  fireEvent.click(screen.getByRole('button', { name: '恢复上次替换前的本机备份' }))
+  expect(screen.getByText('替换当前进度，保留备份')).toBeTruthy()
+  expect(readAccountSave(user.id).data['farm-career-v1']).toBe('cloud')
+  fireEvent.click(screen.getByRole('button', { name: '备份当前进度并恢复本机备份' }))
+  await screen.findByText('已恢复备份，尚未上传')
+  expect(readAccountSave(user.id).data['farm-career-v1']).toBe('offline')
+  expect(readAccountSave(user.id).conflict).toBe(true)
+  expect(
+    JSON.parse(localStorage.getItem(`farm-account-backup-v1:${user.id}`)!).data['farm-career-v1'],
+  ).toBe('cloud')
+  expect(
+    vi
+      .mocked(fetch)
+      .mock.calls.filter(([url, options]) => url === '/api/progress' && options?.method === 'POST'),
+  ).toHaveLength(0)
 })
