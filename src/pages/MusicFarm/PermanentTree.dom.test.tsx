@@ -256,3 +256,15 @@ it('shows why a purchase was refused next to the step that was pressed', () => {
   expect(loadFarmProfile().coins).toBe(0)
   expect(total()).toContain('0 / ')
 })
+
+it('returns keyboard focus to the next purchase, including when it is unaffordable', () => {
+  awardFarmCoins('navigation', step(1).price)
+  render(<Tree />)
+  fireEvent.click(screen.getByRole('button', { name: '定位下一步强化' }))
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: buyLabel(1) }))
+  fireEvent.click(document.activeElement!)
+  fireEvent.click(screen.getByRole('button', { name: '定位下一步强化' }))
+  expect(document.activeElement).toBe(node(2))
+  expect(scrolled.at(-1)).toBe(node(2).parentElement)
+  expect(loadFarmProfile().coins).toBe(0)
+})

@@ -30,8 +30,8 @@ export function bindFarmControls(field: HTMLElement, options: Options) {
     const rect = options.bounds()
     return [((x - rect.left) / rect.width) * 100, ((y - rect.top) / rect.height) * 100]
   }
-  // Touch keeps the press point as a fixed stick base: direction comes from the
-  // offset, so the camera can follow without the hero chasing the finger.
+  // Keep the base within one radius of the finger, measured in screen pixels.
+  // Long drags can then reverse without travelling back to the original press.
   const stickAt = (x: number, y: number) => {
     const rect = options.bounds()
     if (!rect.width || !rect.height || !origin) return
@@ -40,10 +40,13 @@ export function bindFarmControls(field: HTMLElement, options: Options) {
       dy = y - origin[1]
     const distance = Math.hypot(dx, dy)
     const pull = distance > radius ? radius / distance : 1
+    const offsetX = dx * pull,
+      offsetY = dy * pull
+    if (distance > radius) origin = [x - offsetX, y - offsetY]
     options.stick({
-      vector: farmStickVector(dx, dy, rect.width, rect.height, radius),
+      vector: farmStickVector(offsetX, offsetY, rect.width, rect.height, radius),
       base: percent(origin[0], origin[1]),
-      knob: percent(origin[0] + dx * pull, origin[1] + dy * pull),
+      knob: percent(x, y),
     })
   }
   // HUD overlays inside the field are fair game; anything else belongs to a
@@ -63,9 +66,9 @@ export function bindFarmControls(field: HTMLElement, options: Options) {
       // Only the primary button aims: a right or middle click must not turn the hero.
       if (event.button !== 0) return
       if (!options.canMove() || !onField(event) || event.isPrimary === false) return
+      if (activePointer !== null) return
       options.refreshBounds()
       if (event.pointerType !== 'mouse') {
-        if (activePointer !== null) return
         activePointer = event.pointerId
         origin = [event.clientX, event.clientY]
         field.setPointerCapture?.(event.pointerId)
@@ -77,34 +80,40 @@ export function bindFarmControls(field: HTMLElement, options: Options) {
     listen('pointermove', (raw) => {
       const event = raw as PointerEvent
       if (!options.canMove() || event.isPrimary === false) return
-      if (event.pointerType === 'mouse') move(event.clientX, event.clientY)
-      else if (activePointer === event.pointerId) stickAt(event.clientX, event.clientY)
+      if (event.pointerType === 'mouse') {
+        if (activePointer === null) move(event.clientX, event.clientY)
+      } else if (activePointer === event.pointerId) stickAt(event.clientX, event.clientY)
     })
     const release = (raw: Event) => {
       const event = raw as PointerEvent
       if (activePointer !== event.pointerId) return
       reset()
-      if (field.hasPointerCapture?.(event.pointerId)) field.releasePointerCapture(event.pointerId)
     }
     listen('pointerup', release)
     listen('pointercancel', release)
     listen('lostpointercapture', release)
     listen('pointerleave', (raw) => {
-      if ((raw as PointerEvent).pointerType === 'mouse') options.stop()
+      if ((raw as PointerEvent).pointerType === 'mouse' && activePointer === null) options.stop()
     })
   } else {
     // Older embedded webviews can expose touch/mouse events without PointerEvent.
     listen('mouseenter', () => options.refreshBounds())
     listen('mousemove', (raw) => {
       const event = raw as MouseEvent
-      if (options.canMove()) move(event.clientX, event.clientY)
+      if (options.canMove() && activePointer === null) move(event.clientX, event.clientY)
     })
-    listen('mouseleave', () => options.stop())
+    listen('mouseleave', () => {
+      if (activePointer === null) options.stop()
+    })
     listen(
       'touchstart',
       (raw) => {
         const event = raw as TouchEvent
-        if (!options.canMove() || !onField(event) || activePointer !== null) return
+        if (!options.canMove() || !onField(event)) return
+        if (activePointer !== null) {
+          event.preventDefault()
+          return
+        }
         const touch = event.changedTouches[0]
         if (!touch) return
         options.refreshBounds()

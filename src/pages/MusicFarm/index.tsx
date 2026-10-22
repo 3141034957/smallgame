@@ -89,6 +89,7 @@ import { QuestList } from './QuestList'
 import { BuildSummary } from './BuildSummary'
 import { UpgradeChoices } from './UpgradeChoices'
 import { FarmHelp } from './FarmHelp'
+import StartStage from './StartStage'
 import { loadBestScore, saveBestScore } from '@/utils/localScores'
 import {
   applyFarmQuests,
@@ -1262,13 +1263,13 @@ export default function MusicFarm() {
               {phase === 'ready' && (
                 <div className="farm-ready">
                   <div className="farm-start-card">
-                    <h2>带上你的乐队</h2>
+                    <StartStage character={character} />
+                    <h2>{character.name}</h2>
                     {openingSchool && (
                       <p className="farm-start-gear">
                         起始 {openingSchool.weaponIcon} {openingSchool.name}
                       </p>
                     )}
-                    <p>撑越久分越高</p>
                     <FarmBoard compact />
                     <button
                       className="farm-primary"
@@ -1283,24 +1284,28 @@ export default function MusicFarm() {
                         检查登录中…
                       </p>
                     )}
-                    <button
-                      className="farm-shop-pill"
-                      onClick={() => {
-                        setProfile(loadFarmProfile())
-                        openPanel('shop')
-                      }}
-                    >
-                      <Icon name="workshop" /> <span>角色工坊</span>
-                    </button>
-                    <button
-                      className="farm-shop-pill"
-                      onClick={() => {
-                        setProfile(loadFarmProfile())
-                        openPanel('growth')
-                      }}
-                    >
-                      <Icon name="upgrade" /> <span>永久强化</span>
-                    </button>
+                    <div className="farm-start-actions">
+                      <button
+                        className="farm-shop-pill"
+                        aria-label="选择下局出场角色"
+                        onClick={() => {
+                          setProfile(loadFarmProfile())
+                          openPanel('shop')
+                        }}
+                      >
+                        <Icon name="workshop" /> <span>选择角色</span>
+                      </button>
+                      <button
+                        className="farm-shop-pill"
+                        aria-label="升级乐队永久属性"
+                        onClick={() => {
+                          setProfile(loadFarmProfile())
+                          openPanel('growth')
+                        }}
+                      >
+                        <Icon name="upgrade" /> <span>永久强化</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1563,7 +1568,7 @@ export default function MusicFarm() {
                         landscape phone, so the pause never needs a scroll. */}
                     <div className="farm-pause-actions">
                       <div className="farm-modal-icon">☾</div>
-                      <h2>乐队等你回来 ♡</h2>
+                      <h2>游戏暂停</h2>
                       <button className="farm-primary" onClick={closePanel}>
                         继续战斗
                       </button>
@@ -1590,7 +1595,7 @@ export default function MusicFarm() {
                           setSettings(next)
                         }}
                       >
-                        {settings.effects ? '特效 开' : '特效 省电'}
+                        {settings.effects ? '关闭特效' : '开启特效'}
                       </button>
                       {confirmRestart === 'pause' ? (
                         <span className="farm-restart-confirm">

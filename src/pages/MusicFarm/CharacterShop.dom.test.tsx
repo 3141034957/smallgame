@@ -70,6 +70,18 @@ it('names the instrument every character starts with on its card', () => {
   }
 })
 
+it('updates the attack style when previewing a different member without equipping them', () => {
+  render(<Shop />)
+  for (const character of BAND_CHARACTERS) {
+    fireEvent.click(screen.getByRole('button', { name: `预览${character.name}` }))
+    const school = schoolById(character.talentId)!
+    expect(
+      screen.getByLabelText(`起始流派：${school.name}，攻击方式：${school.style}`).textContent,
+    ).toContain(school.style)
+    expect(loadFarmProfile().selected).toBe('bear-drums')
+  }
+})
+
 it('uses the same identities across upgrades, help, builds, career and share text', () => {
   for (const character of BAND_CHARACTERS) {
     const id = character.talentId as TalentId

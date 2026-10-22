@@ -1,0 +1,227 @@
+.farm-dialog.farm-upgrade-dialog {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.farm-upgrade-dialog > :not(.farm-upgrade-choices) {
+  flex-shrink: 0;
+}
+
+.farm-upgrade-choices {
+  min-height: 0;
+  padding: 6px 6px 10px;
+  margin: -6px -6px -10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.farm-upgrade-choices > button {
+  min-width: 0;
+  min-height: 40px;
+}
+
+.farm-upgrade-choices > button:focus-visible {
+  outline: 3px solid #47785d;
+  outline-offset: 4px;
+}
+
+.farm-upgrade-choices > button.is-pair-ready {
+  background: #f5faed;
+}
+
+.farm-upgrade-choices > button.is-evolution-ready,
+.farm-upgrade-choices > button.is-combo-ready {
+  border-color: #c5a357;
+  background: linear-gradient(145deg, #fffbee, #edf5df);
+  box-shadow:
+    0 5px 0 #e1d5a9,
+    inset 0 0 0 2px #fffdf1;
+}
+
+.farm-upgrade-choices .farm-choice-note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.farm-upgrade-choices .farm-choice-pair,
+.farm-upgrade-choices .farm-choice-slot-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 3px 7px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.farm-upgrade-choices .farm-choice-pair {
+  color: #4c7353;
+  background: #eaf1df;
+}
+
+.farm-upgrade-choices .farm-choice-pair.is-new-pair {
+  background: #dcebcf;
+}
+
+.farm-upgrade-choices .farm-choice-slot-warning {
+  color: #8a5f2b;
+  background: #fbefda;
+}
+
+.farm-upgrade-choices .farm-choice-note > strong {
+  margin-top: 0;
+  color: #876622;
+}
+
+.farm-upgrade-choices .farm-choice-note > strong.is-combo {
+  color: #47785d;
+}
+
+@media (max-width: 680px) {
+  .farm-upgrade-choices .farm-choice-note {
+    flex-direction: row;
+    align-items: center;
+    gap: 3px 6px;
+    margin-top: 4px;
+  }
+
+  .farm-upgrade-choices .farm-choice-pair,
+  .farm-upgrade-choices .farm-choice-slot-warning {
+    padding: 2px 6px;
+    font-size: 9px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .farm-dialog.farm-upgrade-dialog {
+    padding: 12px 16px;
+    border-radius: 18px;
+  }
+
+  .farm-upgrade-dialog > .farm-eyebrow {
+    display: none;
+  }
+
+  .farm-dialog.farm-upgrade-dialog > h2 {
+    font-size: 18px;
+    line-height: 1.25;
+    margin: 0 0 3px;
+  }
+
+  .farm-upgrade-dialog > .farm-slot-note {
+    font-size: 10px;
+    line-height: 1.4;
+    margin: 0 0 8px;
+  }
+
+  .farm-upgrade-dialog .farm-upgrade-choices {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .farm-upgrade-dialog .farm-upgrade-choices > button {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    grid-template-areas:
+      'icon name'
+      'tag tag'
+      'desc desc'
+      'note note';
+    align-content: start;
+    align-items: start;
+    gap: 4px 7px;
+    padding: 9px;
+    border-radius: 12px;
+  }
+
+  .farm-upgrade-choices .farm-choice-icon {
+    grid-area: icon;
+    width: 32px;
+    height: 32px;
+    margin: 0;
+    border-radius: 9px;
+  }
+
+  .farm-upgrade-choices .farm-choice-icon .farm-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .farm-upgrade-choices .farm-choice-key,
+  .farm-upgrade-choices > button > small {
+    display: none;
+  }
+
+  .farm-upgrade-dialog .farm-upgrade-choices > button > b {
+    grid-area: name;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.25;
+  }
+
+  .farm-upgrade-dialog .farm-upgrade-choices em {
+    margin: 0;
+    font-size: 9px;
+  }
+
+  .farm-upgrade-dialog .farm-upgrade-choices .farm-school-tag {
+    grid-area: tag;
+    justify-self: start;
+    margin: 0;
+    padding: 2px 6px;
+    font-size: 8px;
+    letter-spacing: 0;
+  }
+
+  .farm-upgrade-dialog .farm-upgrade-choices p {
+    grid-area: desc;
+    margin: 0;
+    min-height: 0;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .farm-upgrade-choices .farm-choice-note {
+    grid-area: note;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    margin: 0;
+  }
+
+  .farm-upgrade-choices .farm-recipe-progress {
+    padding-top: 3px;
+    font-size: 9px;
+  }
+
+  .farm-upgrade-choices .farm-choice-pair,
+  .farm-upgrade-choices .farm-choice-slot-warning {
+    padding: 2px 5px;
+    font-size: 9px;
+  }
+
+  .farm-upgrade-choices .farm-choice-note > strong {
+    font-size: 9px;
+    line-height: 1.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .farm-upgrade-choices > button {
+    transition: none;
+  }
+
+  .farm-upgrade-choices > button:hover {
+    transform: none;
+  }
+}

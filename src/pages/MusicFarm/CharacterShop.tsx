@@ -21,6 +21,7 @@ export function CharacterShop({
   const [busy, setBusy] = useState(false)
   const pending = useRef(false)
   const character = FARM_CHARACTERS.find((item) => item.id === previewId) ?? FARM_CHARACTERS[0]
+  const school = schoolById(character.talentId)
   const owned = profile.owned.includes(character.id)
   const equipped = profile.selected === character.id
   const affordable = profile.coins >= character.price
@@ -80,12 +81,27 @@ export function CharacterShop({
           <div>
             <small>NO. {String(FARM_CHARACTERS.indexOf(character) + 1).padStart(2, '0')}</small>
             <h3>{character.name}</h3>
+            {school && (
+              <p
+                className="farm-shop-playstyle"
+                aria-label={`起始流派：${school.name}，攻击方式：${school.style}`}
+              >
+                <span aria-hidden="true">{school.weaponIcon}</span> {school.style}
+              </p>
+            )}
             {!owned && <p>还差 ✦{missing.toLocaleString()}</p>}
           </div>
           <button
             type="button"
             className={`farm-shop-action${equipped ? ' is-active' : ''}${!owned ? ' is-buy' : ''}`}
             disabled={busy || equipped || (!owned && !affordable)}
+            aria-label={
+              equipped
+                ? '使用中'
+                : owned
+                  ? '使用角色'
+                  : `解锁${character.name}，花费 ${character.price.toLocaleString()} 金币`
+            }
             onClick={() => {
               if (pending.current) return
               pending.current = true
@@ -100,11 +116,7 @@ export function CharacterShop({
               }
             }}
           >
-            {equipped
-              ? '使用中'
-              : owned
-                ? '使用角色'
-                : `解锁 · ✦${character.price.toLocaleString()}`}
+            {equipped ? '使用中' : owned ? '使用角色' : '解锁角色'}
           </button>
         </section>
       </main>

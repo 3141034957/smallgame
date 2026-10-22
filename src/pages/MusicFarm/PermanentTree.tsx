@@ -51,6 +51,14 @@ export function PermanentTree({
   // or on the end of the chain once everything is bought, never on step 1.
   const anchorId = nextId ?? PERMANENT_CHAIN[PERMANENT_CHAIN.length - 1]?.id ?? ''
   const anchor = useRef<HTMLLIElement | null>(null)
+  const locateNext = () => {
+    const el = anchor.current
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+    el?.scrollIntoView?.({ block: 'center', behavior: still ? 'auto' : 'smooth' })
+    const button = el?.querySelector<HTMLButtonElement>('button:not(:disabled)')
+    if (button) button.focus({ preventScroll: true })
+    else el?.querySelector<HTMLElement>('article')?.focus({ preventScroll: true })
+  }
   useEffect(() => {
     const el = anchor.current
     if (!el) return
@@ -59,20 +67,20 @@ export function PermanentTree({
   }, [anchorId])
   return (
     <div className="farm-growth">
+      <header className="farm-growth-bar">
+        <button type="button" aria-label="返回游戏" onClick={onClose}>
+          ‹
+        </button>
+        <div>
+          <small>BAND GROWTH</small>
+          <h2>乐队升级</h2>
+        </div>
+        <div className="farm-growth-wallet">
+          <small>金币余额</small>
+          <strong>✦ {profile.coins.toLocaleString()}</strong>
+        </div>
+      </header>
       <div className="farm-growth-scroll">
-        <header className="farm-growth-bar">
-          <button type="button" aria-label="返回游戏" onClick={onClose}>
-            ‹
-          </button>
-          <div>
-            <small>BAND GROWTH</small>
-            <h2>乐队升级</h2>
-          </div>
-          <div className="farm-growth-wallet">
-            <small>金币余额</small>
-            <strong>✦ {profile.coins.toLocaleString()}</strong>
-          </div>
-        </header>
         <div className="farm-growth-intro">
           <div>
             <span>下局生效 · 按顺序解锁</span>
@@ -125,7 +133,11 @@ export function PermanentTree({
                 <span className="farm-growth-tile" aria-hidden="true">
                   <Icon name={open ? (item.kind as IconName) : 'lock'} />
                 </span>
-                <article className="farm-growth-node" aria-label={`第 ${step} 步 ${item.name}`}>
+                <article
+                  className="farm-growth-node"
+                  tabIndex={-1}
+                  aria-label={`第 ${step} 步 ${item.name}`}
+                >
                   <h4>{item.name}</h4>
                   {owned ? (
                     <span className="farm-growth-owned">已获得 ✓</span>
@@ -177,51 +189,63 @@ export function PermanentTree({
             )
           })}
         </ol>
-        <footer className="farm-growth-reset">
-          {confirmReset ? (
-            <div role="group" aria-label="确认重置强化">
-              <p>返还 ✦ {(profile.growth?.spent ?? 0).toLocaleString()}</p>
-              <button type="button" onClick={() => setConfirmReset(false)}>
-                取消
-              </button>
-              <button
-                type="button"
-                className="is-primary"
-                onClick={() => {
-                  const result = resetFarmUpgrades()
-                  onChange(result.profile)
-                  const text =
-                    result.error ??
-                    (result.paid ? '强化已重置，金币已返还。' : '当前没有需要重置的强化。')
-                  setFailed(!!result.error)
-                  setMessage(text)
-                  // Every step is on sale again, so a note left on one of them
-                  // would be describing a purchase that no longer exists. The
-                  // answer belongs to the button that was pressed instead.
-                  setHint({ target: RESET_TARGET, text, failed: !!result.error })
-                  setConfirmReset(false)
-                }}
-              >
-                确认重置
-              </button>
-            </div>
-          ) : (
-            <>
-              <button type="button" disabled={!count} onClick={() => setConfirmReset(true)}>
-                免费重置强化
-              </button>
-            </>
-          )}
-          {hint?.target === RESET_TARGET && (
-            <p
-              className={`farm-growth-hint${hint.failed ? ' is-error' : ''}`}
-              role={hint.failed ? 'alert' : 'status'}
-            >
-              {hint.text}
-            </p>
-          )}
-        </footer>
       </div>
+      <footer className="farm-growth-reset">
+        <button
+          type="button"
+          onClick={locateNext}
+          aria-label={nextId ? '定位下一步强化' : '定位最后一步强化'}
+        >
+          {nextId ? '下一步' : '查看末步'}
+        </button>
+        {confirmReset ? (
+          <div role="group" aria-label="确认重置强化">
+            <p>返还 ✦ {(profile.growth?.spent ?? 0).toLocaleString()}</p>
+            <button type="button" onClick={() => setConfirmReset(false)}>
+              取消
+            </button>
+            <button
+              type="button"
+              className="is-primary"
+              onClick={() => {
+                const result = resetFarmUpgrades()
+                onChange(result.profile)
+                const text =
+                  result.error ??
+                  (result.paid ? '强化已重置，金币已返还。' : '当前没有需要重置的强化。')
+                setFailed(!!result.error)
+                setMessage(text)
+                // Every step is on sale again, so a note left on one of them
+                // would be describing a purchase that no longer exists. The
+                // answer belongs to the button that was pressed instead.
+                setHint({ target: RESET_TARGET, text, failed: !!result.error })
+                setConfirmReset(false)
+              }}
+            >
+              确认重置
+            </button>
+          </div>
+        ) : (
+          <>
+            <button
+              type="button"
+              aria-label="免费重置强化"
+              disabled={!count}
+              onClick={() => setConfirmReset(true)}
+            >
+              重置强化
+            </button>
+          </>
+        )}
+        {hint?.target === RESET_TARGET && (
+          <p
+            className={`farm-growth-hint${hint.failed ? ' is-error' : ''}`}
+            role={hint.failed ? 'alert' : 'status'}
+          >
+            {hint.text}
+          </p>
+        )}
+      </footer>
       {/* Outside the scroller, so the answer is on screen wherever the chain
           has been scrolled to. The note next to the button carries the live
           region: one message, announced once. */}

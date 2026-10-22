@@ -1,0 +1,223 @@
+.farm-start-stage {
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 296px);
+  height: clamp(90px, 15dvh, 120px);
+  margin: 0 auto 2px;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: 24px 24px 18px 18px;
+  background:
+    radial-gradient(ellipse at 50% 60%, #fff9e7 0 22%, transparent 64%),
+    linear-gradient(180deg, #edf2dc80, #f7f5de 75%, #dde7c6);
+}
+
+.farm-start-stage-sun {
+  position: absolute;
+  top: 18%;
+  right: 16%;
+  width: 24px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #f2db9b;
+  box-shadow: 0 0 0 7px #f4e6b74d;
+}
+
+.farm-start-stage-hills {
+  position: absolute;
+  inset: 40% -12% -50%;
+  border-radius: 50% 55% 0 0;
+  background: #dbe5bd;
+  transform: rotate(-8deg);
+}
+
+.farm-start-stage-hills::after {
+  position: absolute;
+  inset: 12% -8% -10% 30%;
+  content: '';
+  border-radius: 50% 50% 0 0;
+  background: #cad9ac;
+  transform: rotate(20deg);
+}
+
+.farm-start-stage-flags {
+  position: absolute;
+  inset: -17px 7% auto;
+  height: 36px;
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  border-bottom: 1px solid #ac9f7b;
+  border-radius: 0 0 50% 50%;
+  transform: rotate(-3deg);
+}
+
+.farm-start-stage-flags i {
+  width: 12px;
+  height: 14px;
+  margin-bottom: -13px;
+  background: #c49a7d;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  transform-origin: top center;
+  animation: farm-start-flag 4s ease-in-out infinite alternate;
+}
+
+.farm-start-stage-flags i:nth-child(2n) {
+  background: #96af80;
+  animation-delay: -1.5s;
+}
+
+.farm-start-stage-flags i:nth-child(3n) {
+  background: #dbbb72;
+  animation-delay: -2.5s;
+}
+
+.farm-start-stage-flags i:first-child,
+.farm-start-stage-flags i:last-child {
+  margin-bottom: -9px;
+}
+
+.farm-start-stage-platform {
+  position: absolute;
+  right: 12%;
+  bottom: 8px;
+  left: 12%;
+  height: 20px;
+  border: 1px solid #c8ae82;
+  border-radius: 50%;
+  background: repeating-linear-gradient(0deg, #edd8ae 0 5px, #dfc596 5px 6px);
+  box-shadow:
+    0 5px 0 #bfa37e,
+    0 8px 0 #a1b88333;
+}
+
+.farm-start-stage-speaker {
+  position: absolute;
+  bottom: 19px;
+  z-index: 1;
+  width: 23px;
+  height: 34px;
+  border: 3px solid #9c9675;
+  border-radius: 5px 5px 3px 3px;
+  background:
+    radial-gradient(circle at 50% 67%, #c2bd96 0 5px, #918c70 5px 6px, transparent 6px),
+    radial-gradient(circle at 50% 23%, #c2bd96 0 2px, transparent 3px), #797d64;
+  box-shadow: 0 3px 0 #b3a181;
+}
+
+.farm-start-stage-speaker.is-left {
+  left: 19%;
+  transform: rotate(-5deg);
+}
+
+.farm-start-stage-speaker.is-right {
+  right: 19%;
+  transform: rotate(5deg);
+}
+
+.farm-start-stage-character {
+  position: absolute;
+  bottom: 11px;
+  left: 50%;
+  z-index: 2;
+  width: auto;
+  height: calc(100% - 15px);
+  max-width: 52%;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 4px var(--stage-glow));
+  transform: translateX(-50%);
+  transform-origin: center bottom;
+  animation: farm-start-character-in 280ms ease-out both;
+}
+
+.farm-start-stage-note {
+  position: absolute;
+  top: 35%;
+  color: #a0ad7d;
+  font:
+    700 21px/1 Georgia,
+    serif;
+  animation: farm-start-note 3.8s ease-in-out infinite;
+}
+
+.farm-start-stage-note.is-left {
+  left: 23%;
+  transform: rotate(-14deg);
+}
+
+.farm-start-stage-note.is-right {
+  top: 27%;
+  right: 26%;
+  color: #c3a570;
+  animation-delay: -1.8s;
+}
+
+@keyframes farm-start-character-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+}
+
+@keyframes farm-start-flag {
+  to {
+    transform: rotate(7deg);
+  }
+}
+
+@keyframes farm-start-note {
+  50% {
+    translate: 0 -4px;
+    opacity: 0.65;
+  }
+}
+
+@media (max-width: 680px) {
+  .farm-start-stage {
+    height: clamp(78px, 14dvh, 100px);
+  }
+}
+
+/* Keep the actual choices and start action available on short phone screens. */
+@media (max-height: 620px) {
+  .farm-start-stage {
+    height: 60px;
+    width: min(100%, 220px);
+    margin-bottom: 0;
+  }
+
+  .farm-start-stage-flags,
+  .farm-start-stage-sun,
+  .farm-start-stage-note {
+    display: none;
+  }
+
+  .farm-start-stage-platform {
+    bottom: 4px;
+    height: 12px;
+  }
+
+  .farm-start-stage-character {
+    bottom: 5px;
+    height: calc(100% - 6px);
+  }
+
+  .farm-start-stage-speaker {
+    bottom: 10px;
+    width: 17px;
+    height: 25px;
+  }
+}
+
+@media (max-height: 500px) {
+  .farm-start-stage {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .farm-start-stage *,
+  .farm-start-stage *::after {
+    animation: none;
+  }
+}

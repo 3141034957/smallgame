@@ -49,16 +49,16 @@ beforeAll(() => {
 const day = '2026-10-04'
 
 describe('farm screens render', () => {
-  it('renders the ready screen with just the leaderboard and the start button', () => {
+  it('renders the selected member with the leaderboard and start button', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter initialEntries={[`/farm?day=${day}`]}>
         <MusicFarm />
       </MemoryRouter>,
     )
     expect(html).toContain('怪潮乐队历险记')
-    expect(html).toContain('带上你的乐队')
+    expect(html).toContain('鼓手咚咚')
     expect(html).toContain('0 / 12 经验')
-    // The start screen stays focused: leaderboard and start button, nothing else.
+    // The start screen shows the loadout without duplicating battle details.
     expect(html).toContain('无限总榜')
     expect(html).not.toContain('今日词缀')
     expect(html).not.toContain('今日目标')

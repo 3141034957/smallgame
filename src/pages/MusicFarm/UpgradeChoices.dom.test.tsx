@@ -74,4 +74,72 @@ it('flashes a cross-school combo the pick would unlock', () => {
   expect(card.querySelector('.farm-school-layer')?.textContent).toBe('终极')
   expect(card.textContent).toContain('✦ 这次解锁 棱镜合成器')
   expect(card.textContent).toContain('✦ 触发组合技：共振风暴')
+  expect(card.classList.contains('is-evolution-ready')).toBe(true)
+  expect(card.classList.contains('is-combo-ready')).toBe(true)
+  expect(card.textContent?.match(/棱镜合成器/g)).toHaveLength(1)
+})
+
+it('marks a matching pick with the carried partner and preserves offered order', () => {
+  const select = vi.fn()
+  const gear = gearWith({ drum: 3 })
+  render(<UpgradeChoices gear={gear} offered={['tempo', 'range', 'heal']} onSelect={select} />)
+  const cards = screen.getAllByRole('button')
+  expect(cards.map((card) => card.querySelector('.farm-choice-name')?.textContent)).toEqual([
+    '节拍器',
+    '共鸣音箱',
+    '恢复满血',
+  ])
+  expect(cards[0].querySelector('.farm-choice-pair')).toBeNull()
+  expect(cards[1].querySelector('.farm-choice-pair')?.textContent).toContain('鼓手咚咚 Lv.3')
+  expect(cards[1].getAttribute('aria-label')).toContain('补齐配套：鼓手咚咚，等级 3')
+  expect(cards[1].classList.contains('is-pair-ready')).toBe(true)
+  fireEvent.click(cards[1])
+  expect(select).toHaveBeenCalledExactlyOnceWith('range')
+})
+
+it('names the lost evolution paths without preventing a last-slot pick', () => {
+  const select = vi.fn()
+  const gear = gearWith({ drum: 2, synth: 1, magnet: 1, lucky: 1, sustain: 1, delay: 1 })
+  render(<UpgradeChoices gear={gear} offered={['tempo']} onSelect={select} />)
+  const card = screen.getByRole('button')
+  expect(
+    Array.from(card.querySelectorAll('.farm-choice-slot-warning')).map((item) => item.textContent),
+  ).toEqual(['⚠鼓组流无法进化', '⚠合成器流无法进化'])
+  expect(card.getAttribute('aria-label')).toContain(
+    '芯片槽位已满，鼓组流缺少共鸣音箱，本局无法进化',
+  )
+  expect(card.getAttribute('aria-label')).toContain('合成器流缺少琶音器')
+  expect((card as HTMLButtonElement).disabled).toBe(false)
+  fireEvent.click(card)
+  expect(select).toHaveBeenCalledExactlyOnceWith('tempo')
+})
+
+it('does not copy an unrelated near-combo hint into every card', () => {
+  const gear = gearWith({ drum: 5, range: 5, synth: 5, arp: 4 })
+  render(<UpgradeChoices gear={gear} offered={['tempo']} onSelect={() => {}} />)
+  expect(screen.getByRole('button').textContent).not.toContain('共振风暴')
+  expect(screen.getByRole('button').querySelector('.is-next')).toBeNull()
+})
+
+it('keeps damage exclusions and recipe progress in the focused button name', () => {
+  const gear = gearWith({ echo: 2, deck: 3 })
+  render(<UpgradeChoices gear={gear} offered={['lucky', 'needle']} onSelect={() => {}} />)
+  const lucky = screen.getByRole('button', { name: /余音不暴击/ })
+  expect(lucky.getAttribute('aria-label')).toContain('进化配方星雨麦克风：乐器 2/5，芯片 1/5')
+  expect(lucky.querySelector('p')?.textContent).toContain('余音不暴击')
+  const needle = screen.getByRole('button', { name: /命中伤害 \+（不含余音）/ })
+  expect(needle.getAttribute('aria-label')).toContain('进化配方黑胶风暴台：乐器 3/5，芯片 1/5')
+})
+
+it('reads the drum growth last-hit requirement from the focused button', () => {
+  render(
+    <UpgradeChoices
+      gear={gearWith({ drum: 4, range: 5 })}
+      offered={['drum']}
+      onSelect={() => {}}
+    />,
+  )
+  const card = screen.getByRole('button', { name: /每 100 次余音最后一击/ })
+  expect(card.getAttribute('aria-label')).toContain('余音每跳伤害 2 提升至 6')
+  expect(card.getAttribute('aria-label')).toContain('解锁进化：雷霆鼓组')
 })

@@ -5,6 +5,8 @@
 - `src/App.tsx`：仅保留 `/` 与 `/farm` 两个游戏入口；其他旧地址回到首页。分享链接继续携带日期和挑战参数。
 - `src/pages/MusicFarm/index.tsx`：串联对局生命周期、动画循环、输入、音频与本地结算。可变的逐帧状态在 ref 中，界面状态在 React state 中。
 - `src/pages/MusicFarm/UpgradeChoices.tsx`、`FarmHelp.tsx`：升级选项与玩法说明，接收数据和回调，不修改存档或推进游戏。
+- `src/features/farm/upgradeGuidance.ts`：只读计算当前升级的配套关系，以及本次选择使哪些已接触流派失去进化条件；不参与抽卡、战斗或服务端回放。
+- `src/pages/MusicFarm/StartStage.tsx`：开场角色小舞台，复用现有角色素材，装饰随屏高收缩。
 - `src/features/farm/upgradeSelection.ts`：执行选择及后续单选项的连续自动升级，返回每次选择的日志；页面在发布画面前处理单选项，多选项继续等待玩家，服务端仍按原规则回放日志。
 - `src/pages/MusicFarm/FarmBoard.tsx`：生存榜读取、提交与重试。
 - `src/features/farm/runReporting.ts`：新对局开始后静默上报对局 ID，失败最多重试一次；服务端 `farm_run_starts` 按 ID 去重，后台用 `npm run stats:plays` 查询累计开局次数。

@@ -17,7 +17,8 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 24px clamp(16px, 4vw, 64px) 40px;
+  padding: 0 clamp(16px, 4vw, 64px) 24px;
+  scroll-padding-block: 20px;
 }
 .farm-growth button {
   font: inherit;
@@ -32,14 +33,13 @@
   outline-offset: 4px;
 }
 .farm-growth-bar {
-  position: sticky;
-  top: 0;
+  flex: none;
   z-index: 2;
   background: #f4faf6;
   display: flex;
   gap: 16px;
   align-items: center;
-  padding: 12px 0 22px;
+  padding: 12px clamp(16px, 4vw, 64px);
   border-bottom: 1px solid #d4e5db;
 }
 .farm-growth-bar > button {
@@ -348,17 +348,28 @@
   color: #974b26;
 }
 .farm-growth-reset {
-  margin-top: 18px;
-  padding: 16px;
-  border: 2px dashed #bbcebf;
-  border-radius: 18px;
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+  border-top: 1px solid #bbcebf;
   background: #fffef5;
   text-align: center;
+}
+.farm-growth-reset > [role='group'] {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
 }
 .farm-growth-reset p {
   font-size: 12px;
   line-height: 1.7;
-  margin: 0 0 12px;
+  margin: 0;
 }
 .farm-growth-reset button {
   min-height: 40px;
@@ -366,8 +377,8 @@
   border-radius: 12px;
   background: #fff;
   color: #305f48;
-  padding: 9px 18px;
-  margin: 0 6px;
+  padding: 9px 12px;
+  margin: 0;
   font-weight: 600;
   box-shadow: 0 4px 0 #e3eade;
 }
@@ -379,7 +390,7 @@
 }
 @media (max-width: 700px) {
   .farm-growth-scroll {
-    padding: 16px 12px 30px;
+    padding: 0 12px 20px;
   }
   .farm-growth-nodes,
   .farm-growth-ownedbar {
@@ -413,6 +424,17 @@
   }
   .farm-growth-wallet strong {
     font-size: 16px;
+  }
+}
+@media (max-height: 520px) {
+  .farm-growth-bar {
+    padding-block: 6px;
+  }
+  .farm-growth-bar small {
+    display: none;
+  }
+  .farm-growth-reset {
+    padding-block: 6px;
   }
 }
 /* 320–380px: the title wraps onto its own line so the price and the shortfall
