@@ -20,12 +20,14 @@ import {
   farmWorldBounds,
 } from '../../features/farm/presentation'
 import { FARM_GROUND_COLOR, paintFarmGround } from './background'
+import { farmDeckFeedback, farmHeroFeedback } from './combatFeedback'
 
 type Effect = { event: FarmEvent; born: number }
 export type FarmPose = {
   character?: HTMLCanvasElement | null
   joystick?: { base: Point; knob: Point }
   simple?: boolean
+  reducedMotion?: boolean
   position: Point
   tick: number
   previousEnemies?: ReadonlyMap<number, { x: number; y: number }>
@@ -180,6 +182,13 @@ const MINE_FONTS = Array.from(
 )
 // Effects alive this frame; reused so a long fight does not churn arrays.
 const activeEffects: Effect[] = []
+const ESSENTIAL_AIR_EFFECTS = new Set<FarmEvent['kind']>([
+  'hurt',
+  'heal',
+  'shield',
+  'block',
+  'boss',
+])
 
 // Juice helpers: everything stays stateless so a frame can be redrawn anywhere.
 const easeOut = (t: number) => 1 - (1 - t) ** 3
@@ -314,6 +323,7 @@ function cropSprite(
   tick: number,
   hit: boolean,
   assets: Assets,
+  compact: boolean,
 ) {
   if (crop.hp <= 0) return
   const x = X(worldX),
@@ -346,9 +356,9 @@ function cropSprite(
     ctx.stroke()
     ctx.restore()
   }
-  const bob = Math.sin(now / (crop.kind === 1 ? 70 : 110) + crop.id * 1.3) * 2
+  const bob = compact ? 0 : Math.sin(now / (crop.kind === 1 ? 70 : 110) + crop.id * 1.3) * 2
   ctx.save()
-  ctx.translate(x + (hit ? Math.sin(now / 18) * 2 : 0), y + bob)
+  ctx.translate(x + (hit && !compact ? Math.sin(now / 18) * 2 : 0), y + bob)
   ellipse(ctx, 0, monster.size * 0.34, monster.size * 0.3, 5, '#5e775b35')
   const warning =
     winding ||
@@ -375,7 +385,7 @@ function cropSprite(
     ctx.strokeStyle = '#9b7fd4'
     ctx.lineWidth = 1.6
     ctx.setLineDash([3, 4])
-    ctx.lineDashOffset = -now / 90
+    ctx.lineDashOffset = compact ? 0 : -now / 90
     ctx.beginPath()
     ctx.ellipse(0, 0, monster.size * 0.56, monster.size * 0.56, 0, 0, Math.PI * 2)
     ctx.stroke()
@@ -421,10 +431,12 @@ function drawHero(
   character: HTMLCanvasElement | null | undefined,
   scale: number,
   ultimate: boolean,
+  compact: boolean,
 ) {
   const x = X(state.position[0]),
     y = Y(state.position[1])
-  const bob = Math.sin(now / 150) * 1.1
+  const bob = compact ? 0 : Math.sin(now / 150) * 1.1
+  const feedback = farmHeroFeedback(state)
   ctx.save()
   ctx.translate(x, y + bob)
   if (ultimate) {
@@ -433,22 +445,27 @@ function drawHero(
     ctx.beginPath()
     ctx.ellipse(0, 9, 21, 8, 0, 0, Math.PI * 2)
     ctx.stroke()
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < (compact ? 0 : 3); i++) {
       const a = now / 600 + (i * Math.PI * 2) / 3
       sparkle(ctx, Math.cos(a) * 24, Math.sin(a) * 9 + 7, 3, '#f7d881')
     }
   }
-  if (state.tick < state.hurtUntil && state.tick > 32)
-    ctx.globalAlpha = Math.floor(now / 80) % 2 ? 0.45 : 1
-  if (state.combo >= 30) ellipse(ctx, 0, 4, 40, 40, comboGlow(ctx, state.combo >= 60))
-  if (state.shields > 0) {
-    ctx.strokeStyle = '#7fd4e8'
-    ctx.lineWidth = 2
-    ctx.globalAlpha = 0.55 + Math.sin(now / 160) * 0.25
+  if (state.combo >= 30 && !compact) ellipse(ctx, 0, 4, 40, 40, comboGlow(ctx, state.combo >= 60))
+  if (feedback.protection !== 'none') {
+    // Stable outlines preserve the hero silhouette during the grace period.
+    // A solid shield and a dashed grace ring are readable without flashing.
+    const shield = feedback.protection === 'shield'
+    if (shield) ellipse(ctx, 0, -4, 29 * scale, 29 * scale, '#9fd9df21')
+    ctx.strokeStyle = '#fffaf0'
+    ctx.lineWidth = 4
     ctx.beginPath()
-    ctx.arc(0, 0, 27, 0, Math.PI * 2)
+    ctx.arc(0, -4, 29 * scale, 0, Math.PI * 2)
     ctx.stroke()
-    ctx.globalAlpha = 1
+    ctx.strokeStyle = shield ? '#4c98a5' : '#8da792'
+    ctx.lineWidth = 2
+    if (!shield) ctx.setLineDash([4, 5])
+    ctx.stroke()
+    ctx.setLineDash([])
   }
   if (character) {
     ellipse(ctx, 0, 17 * scale, 16 * scale, 5 * scale, '#70608030')
@@ -461,6 +478,21 @@ function drawHero(
       80 * scale,
       80 * scale,
     )
+  if (feedback.lowHealth) {
+    // Health is still in the HUD; this small local track keeps danger visible
+    // while the player's eyes follow the character through a dense crowd.
+    ctx.fillStyle = '#fffaf0'
+    ctx.beginPath()
+    roundedRect(ctx, -17 * scale, 29 * scale, 34 * scale, 7 * scale, 3 * scale)
+    ctx.fill()
+    ctx.fillStyle = '#dfb9b6'
+    ctx.fillRect(-15 * scale, 31 * scale, 30 * scale, 3 * scale)
+    ctx.fillStyle = '#b64b63'
+    ctx.fillRect(-15 * scale, 31 * scale, 30 * scale * feedback.healthRatio, 3 * scale)
+    ctx.font = '700 10px system-ui, sans-serif'
+    ctx.textAlign = 'right'
+    ctx.fillText('♥', -20 * scale, 36 * scale)
+  }
   ctx.restore()
 }
 
@@ -613,6 +645,7 @@ function groundEffect(
   now: number,
   assets: Assets,
   forms: readonly string[],
+  compact: boolean,
 ) {
   const x = X(event.x),
     y = Y(event.y),
@@ -716,7 +749,9 @@ function groundEffect(
           : event.kind === 'echo'
             ? '#9b7fd4'
             : '#94b0d7'
-    const expanding = radius * (0.18 + easeOut(Math.min(1, progress * 1.5)) * 0.82)
+    const expanding = compact
+      ? radius
+      : radius * (0.18 + easeOut(Math.min(1, progress * 1.5)) * 0.82)
     ctx.globalAlpha = (1 - progress) * (event.kind === 'pulse' ? 0.5 : 0.8)
     ctx.strokeStyle = color
     ctx.lineWidth = event.kind === 'surge' ? 5 : 1.8
@@ -901,22 +936,47 @@ function groundEffect(
   ctx.restore()
 }
 
-function airEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress: number) {
+function airEffect(
+  ctx: CanvasRenderingContext2D,
+  event: FarmEvent,
+  progress: number,
+  compact: boolean,
+) {
   const x = X(event.x),
     y = Y(event.y),
     color = COLORS[event.lane]
   ctx.save()
   if (event.kind === 'shield') {
     ctx.globalAlpha = Math.max(0, 1 - progress) * 0.9
-    ctx.strokeStyle = '#7fd4e8'
-    ctx.lineWidth = 4
+    ctx.strokeStyle = '#4c98a5'
+    ctx.lineWidth = 3
+    const radius = compact ? 28 : 24 + progress * 22
+    // Broken arcs distinguish consuming a charge from collecting a shield.
+    for (let i = 0; i < 6; i++) {
+      const angle = (i * Math.PI) / 3
+      ctx.beginPath()
+      ctx.arc(x, y, radius, angle + 0.12, angle + 0.7)
+      ctx.stroke()
+    }
+    ctx.fillStyle = '#e7f7f5'
+    ctx.lineWidth = 1.5
     ctx.beginPath()
-    ctx.arc(x, y, 22 + progress * 30, 0, Math.PI * 2)
+    ctx.moveTo(x - 12, y - 43)
+    ctx.lineTo(x - 6, y - 41)
+    ctx.lineTo(x - 7, y - 35)
+    ctx.lineTo(x - 12, y - 31)
+    ctx.lineTo(x - 17, y - 35)
+    ctx.lineTo(x - 18, y - 41)
+    ctx.closePath()
+    ctx.fill()
     ctx.stroke()
-    ctx.fillStyle = '#3f9db8'
-    ctx.font = 'bold 12px system-ui'
-    ctx.textAlign = 'center'
-    ctx.fillText('🛡', x, y + 4)
+    ctx.fillStyle = '#326d78'
+    ctx.font = '800 13px system-ui'
+    ctx.textAlign = 'left'
+    ctx.strokeStyle = '#fffaf4'
+    ctx.lineWidth = 3
+    ctx.strokeText('−1', x - 3, y - 32)
+    ctx.fillText('−1', x - 3, y - 32)
     ctx.globalAlpha = 1
     ctx.restore()
     return
@@ -926,12 +986,12 @@ function airEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress: nu
     ctx.strokeStyle = '#b7a0dd'
     ctx.lineWidth = 3
     ctx.beginPath()
-    ctx.arc(x, y, 5 + progress * 16, 0, Math.PI * 2)
+    ctx.arc(x, y, compact ? 14 : 5 + progress * 16, 0, Math.PI * 2)
     ctx.stroke()
     ctx.fillStyle = '#8f74c4'
     ctx.font = 'bold 13px system-ui'
     ctx.textAlign = 'center'
-    ctx.fillText('♪', x, y + 5 - progress * 10)
+    ctx.fillText('♪', x, y + 5 - (compact ? 0 : progress * 10))
     ctx.globalAlpha = 1
     ctx.restore()
     return
@@ -962,11 +1022,12 @@ function airEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress: nu
     ctx.strokeStyle = '#fffaf4'
     ctx.lineWidth = 3
     const text = `${event.kind === 'hurt' ? '−' : '+'}${event.points}`
-    ctx.strokeText(text, x, y - 30 - progress * 30)
-    ctx.fillText(text, x, y - 30 - progress * 30)
+    const lift = y - 42 - (compact ? 0 : progress * 22)
+    ctx.strokeText(text, x, lift)
+    ctx.fillText(text, x, lift)
   } else if (event.kind === 'harvest' || event.kind === 'boss') {
     ctx.globalAlpha = 1 - progress
-    for (let i = 0; i < (event.kind === 'boss' ? 9 : 4); i++) {
+    for (let i = 0; i < (compact ? 0 : event.kind === 'boss' ? 9 : 4); i++) {
       const angle = i * 2.4 + event.id * 0.5,
         travel = 8 + progress * (event.kind === 'boss' ? 44 : 22)
       sparkle(
@@ -984,7 +1045,7 @@ function airEffect(ctx: CanvasRenderingContext2D, event: FarmEvent, progress: nu
       ctx.lineWidth = 3
       ctx.strokeStyle = '#fffaf0'
       const text = `+${event.points ?? 0}`,
-        lift = y - 15 - progress * 25
+        lift = y - 15 - (compact ? 0 : progress * 25)
       ctx.strokeText(text, x, lift)
       ctx.fillStyle = '#b58028'
       ctx.fillText(text, x, lift)
@@ -1025,6 +1086,7 @@ export function drawFarm(
   const assets = assetsFor(ctx)
   // One evolved() for the hero halo, the orbit ring and the deck blades.
   const forms = evolvedForms(state.gear)
+  const compact = Boolean(pose?.simple || pose?.reducedMotion)
   const moving = pose ? { ...state, position: pose.position, tick: pose.tick } : state
   const camera = farmCamera(moving.position, width, height)
   ctx.save()
@@ -1051,6 +1113,7 @@ export function drawFarm(
   let shakeX = 0,
     shakeY = 0
   for (const { event, born } of activeEffects) {
+    if (compact) break
     const age = now - born
     if (age > 260) continue
     const power =
@@ -1070,7 +1133,7 @@ export function drawFarm(
   // Sample dense drum bursts; every important weapon cast still gets its own visual.
   for (const { event, born } of activeEffects) {
     // Low-effect mode keeps the telegraphs that must be dodged and drops the rest.
-    if (pose?.simple && event.kind !== 'slam' && event.kind !== 'surge') continue
+    if (compact && event.kind !== 'slam' && event.kind !== 'surge') continue
     if (event.kind === 'blast' && event.id % 3 !== 0) continue
     // A telegraph can be wider than the screen: keep the margin as wide as it is.
     if (!visibleAt(event.x, event.y, 48 + Y(event.radius ?? 15))) continue
@@ -1083,7 +1146,7 @@ export function drawFarm(
             ? 700
             : 900
     const progress = (now - born) / duration
-    if (progress < 1) groundEffect(ctx, event, progress, now, assets, forms)
+    if (progress < 1) groundEffect(ctx, event, progress, now, assets, forms, compact)
   }
   const hitIds = new Set<number>()
   for (const { event, born } of activeEffects)
@@ -1112,7 +1175,7 @@ export function drawFarm(
       Y(danger.y),
       Y(danger.radius) * progress,
       Y(danger.radius) * progress,
-      '#e2537850',
+      danger.sourceId !== undefined ? '#e5a54550' : '#e2537850',
     )
     ctx.fillStyle = '#b2375e'
     ctx.font = 'bold 20px system-ui'
@@ -1143,6 +1206,7 @@ export function drawFarm(
       moving.tick,
       hitIds.has(hitKey(crop.x, crop.y)),
       assets,
+      compact,
     )
   }
   for (const shot of state.shots) {
@@ -1172,7 +1236,7 @@ export function drawFarm(
     ctx.translate(X(arrow.x), Y(arrow.y))
     ctx.rotate(arrow.angle)
     // Whistle puffs: a few soft notes leaking out of the tail.
-    for (let i = 1; i <= 3; i++) {
+    for (let i = 1; i <= (compact ? 0 : 3); i++) {
       ctx.globalAlpha = fade * (0.3 - i * 0.07)
       ellipse(ctx, -9 - i * 6, 0, 4.4 - i * 0.9, 4.4 - i * 0.9, '#9ac6b4')
     }
@@ -1224,7 +1288,7 @@ export function drawFarm(
     const left = Math.max(0, trail.expires - moving.tick)
     const alpha = Math.min(1, left / 16)
     ctx.save()
-    ctx.globalAlpha = alpha * (0.35 + Math.sin(now / 220 + trail.id) * 0.15)
+    ctx.globalAlpha = alpha * (compact ? 0.4 : 0.35 + Math.sin(now / 220 + trail.id) * 0.15)
     ellipse(ctx, X(trail.x), Y(trail.y) + 6, 11, 4, '#9ac6b455')
     ctx.globalAlpha = alpha * 0.9
     ctx.drawImage(assets.notes[0], X(trail.x) - 13, Y(trail.y) - 15, 26, 26)
@@ -1236,7 +1300,7 @@ export function drawFarm(
     const left = Math.max(0, mine.due - moving.tick)
     const armed = 1 - Math.min(1, left / FPS)
     ctx.save()
-    ctx.globalAlpha = 0.45 + Math.sin(now / (110 - armed * 70) + mine.id) * 0.25
+    ctx.globalAlpha = compact ? 0.6 : 0.45 + Math.sin(now / (110 - armed * 70) + mine.id) * 0.25
     ellipse(ctx, X(mine.x), Y(mine.y) + 5, 9 + armed * 3, 4 + armed * 2, '#b795e070')
     ctx.globalAlpha = 0.9
     ctx.strokeStyle = '#8f6fc0'
@@ -1262,12 +1326,19 @@ export function drawFarm(
     const x = X(previous ? previous.x + (drop.x - previous.x) * alpha : drop.x)
     const y =
       Y(previous ? previous.y + (drop.y - previous.y) * alpha : drop.y) +
-      Math.sin(now / 230 + drop.id) * 1.8
+      (compact ? 0 : Math.sin(now / 230 + drop.id) * 1.8)
     if (drop.heal) {
       // Healing packs expire, so blink during the last three seconds.
       const expiring = drop.expires !== undefined && drop.expires - moving.tick < 3 * FPS
-      ctx.globalAlpha = expiring && Math.floor(now / 120) % 2 ? 0.4 : 1
+      ctx.globalAlpha = expiring && !compact && Math.floor(now / 120) % 2 ? 0.4 : 1
       ellipse(ctx, x, y, 9, 9, '#fff7ed')
+      if (expiring && compact) {
+        ctx.strokeStyle = '#c15d73'
+        ctx.lineWidth = 1.5
+        ctx.setLineDash([2, 2])
+        ctx.stroke()
+        ctx.setLineDash([])
+      }
       ctx.fillStyle = '#e8759e'
       ctx.font = 'bold 16px system-ui'
       ctx.textAlign = 'center'
@@ -1283,10 +1354,10 @@ export function drawFarm(
   }
   const orbit = orbitPositions(moving),
     terminalOrbit = forms.includes('orbit')
-  if (orbit.length && !pose?.simple) {
+  if (orbit.length) {
     ctx.save()
     ctx.strokeStyle = terminalOrbit ? '#c4a0d380' : '#b6a1ca40'
-    ctx.setLineDash([2, 5])
+    if (!compact) ctx.setLineDash([2, 5])
     ctx.lineWidth = 1
     ctx.beginPath()
     ctx.ellipse(
@@ -1301,19 +1372,31 @@ export function drawFarm(
     ctx.stroke()
     ctx.restore()
     for (const [x, y] of orbit) {
+      // These notes block shots at their real positions. Reduced motion can
+      // remove the artwork and trail, but must not hide the moving defence.
+      if (compact) {
+        ellipse(ctx, X(x), Y(y), 10, 10, '#fffaf0')
+        ctx.strokeStyle = terminalOrbit ? '#9c6eab' : '#8b78a2'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+        ctx.fillStyle = '#79628f'
+        ctx.font = '700 14px serif'
+        ctx.textAlign = 'center'
+        ctx.fillText('♪', X(x), Y(y) + 5)
+        continue
+      }
       const blade = effectArt(assets, 'orbit', terminalOrbit)
       if (blade) ctx.drawImage(blade, X(x) - 24, Y(y) - 24, 48, 48)
       else ctx.drawImage(assets.notes[terminalOrbit ? 1 : 0], X(x) - 24, Y(y) - 24, 48, 48)
     }
   }
   const deckLevel = state.gear.deck
-  if (deckLevel && !pose?.simple) {
+  if (deckLevel) {
     const terminalDeck = forms.includes('deck')
-    const blades = terminalDeck ? 4 : 2
-    const reach = 24 + deckLevel * 3
+    const { blades, reach } = farmDeckFeedback(moving, terminalDeck)
     ctx.save()
     ctx.strokeStyle = terminalDeck ? '#9db9c980' : '#9db9c940'
-    ctx.setLineDash([3, 6])
+    if (!compact) ctx.setLineDash([3, 6])
     ctx.lineWidth = 1
     ctx.beginPath()
     ctx.ellipse(
@@ -1327,14 +1410,11 @@ export function drawFarm(
     )
     ctx.stroke()
     ctx.restore()
-    for (let index = 0; index < blades; index++) {
-      const angle = moving.tick * 0.12 + (index * Math.PI * 2) / blades
-      const bx = X(moving.position[0] + (Math.cos(angle) * reach) / 0.84),
-        by = Y(moving.position[1] + Math.sin(angle) * reach)
+    for (const blade of blades) {
       ctx.save()
-      ctx.translate(bx, by)
-      ctx.rotate(angle)
-      const disc = effectArt(assets, 'deck', terminalDeck)
+      ctx.translate(X(blade.x), Y(blade.y))
+      if (!compact) ctx.rotate(blade.angle)
+      const disc = compact ? undefined : effectArt(assets, 'deck', terminalDeck)
       if (disc) ctx.drawImage(disc, -15, -15, 30, 30)
       else {
         ctx.fillStyle = terminalDeck ? '#cfe3ee' : '#e6eff5'
@@ -1348,16 +1428,26 @@ export function drawFarm(
       ctx.restore()
     }
   }
-  drawHero(ctx, moving, now, assets, pose?.character, heroScale(width, height), forms.length > 0)
+  drawHero(
+    ctx,
+    moving,
+    now,
+    assets,
+    pose?.character,
+    heroScale(width, height),
+    forms.length > 0,
+    compact,
+  )
   for (const { event, born } of activeEffects) {
+    if (compact && !ESSENTIAL_AIR_EFFECTS.has(event.kind)) continue
     if (!visibleAt(event.x, event.y)) continue
-    airEffect(ctx, event, (now - born) / 900)
+    airEffect(ctx, event, (now - born) / 900, compact)
   }
   ctx.restore()
   ctx.save()
   if (state.tick < state.surgeUntil) {
     ctx.strokeStyle = '#efd579'
-    ctx.lineWidth = 4 + Math.sin(now / 100)
+    ctx.lineWidth = compact ? 4 : 4 + Math.sin(now / 100)
     ctx.strokeRect(2, 2, width - 4, height - 4)
   }
   const recentHurt = activeEffects.find(
@@ -1365,7 +1455,7 @@ export function drawFarm(
   )
   if (recentHurt) {
     ctx.strokeStyle = `rgba(218,73,112,${(1 - (now - recentHurt.born) / 220) * 0.7})`
-    ctx.lineWidth = 12
+    ctx.lineWidth = compact ? 5 : 12
     ctx.strokeRect(0, 0, width, height)
   }
   for (const marker of farmOffscreenMarkers(
@@ -1376,8 +1466,9 @@ export function drawFarm(
   )) {
     ctx.save()
     ctx.translate(marker.x, marker.y)
+    ctx.save()
     ctx.rotate(marker.angle)
-    ctx.globalAlpha = 0.5 + Math.sin(now / 180) * 0.2
+    ctx.globalAlpha = compact ? 0.75 : 0.5 + Math.sin(now / 180) * 0.2
     ctx.fillStyle = '#cf456f'
     ctx.beginPath()
     ctx.moveTo(11, 0)
@@ -1385,10 +1476,12 @@ export function drawFarm(
     ctx.lineTo(-7, -7)
     ctx.closePath()
     ctx.fill()
+    ctx.restore()
     ctx.globalAlpha = 0.75
     ctx.font = '700 9px system-ui, sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText('巨兽', marker.x, marker.y + 20)
+    ctx.fillStyle = '#9a3654'
+    ctx.fillText('巨兽', 0, 20)
     ctx.restore()
   }
   const stick = pose?.joystick

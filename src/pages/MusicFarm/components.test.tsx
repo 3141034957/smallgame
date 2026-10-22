@@ -112,7 +112,9 @@ describe('farm screens render', () => {
     ) as Record<string, number>
     const build = renderToStaticMarkup(<BuildSummary gear={gear as never} />)
     expect(build).toContain('雷霆鼓组')
-    expect(build).toContain('Lv.5 ＋ Lv.5')
+    expect(build).toContain('鼓手咚咚')
+    expect(build).toContain('共鸣音箱')
+    expect(build).toContain('Lv.5')
     expect(
       renderToStaticMarkup(
         <RunTimeline
@@ -135,7 +137,7 @@ describe('farm screens render', () => {
     expect(long).toContain('本局复盘')
     expect(long).toContain('90')
   })
-  it('shows the run schools with their ladder and the combos they unlocked', () => {
+  it('shows evolution progress and the combos the run unlocked', () => {
     const gear = Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])) as Record<
       string,
       number
@@ -147,7 +149,8 @@ describe('farm screens render', () => {
     const build = renderToStaticMarkup(
       <BuildSummary gear={gear as never} state={{ gear: gear as never }} />,
     )
-    expect(build).toContain('farm-school-ladder')
+    expect(build).toContain('role="progressbar"')
+    expect(build).toContain('aria-valuenow="10"')
     expect(build).toContain('鼓组流')
     // Pinned to the layer span: "终极" alone would also match the evolved
     // badge on the same card.

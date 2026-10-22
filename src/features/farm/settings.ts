@@ -1,5 +1,5 @@
 import { accountStorage } from '@/utils/accountStorage'
-export type FarmSettings = { effects: boolean }
+export type FarmSettings = { effects: boolean; muted: boolean }
 export const FARM_SETTINGS_KEY = 'farm-settings-v1'
 
 // Visual effects are the first thing to drop on a slow phone. Gameplay rules
@@ -11,12 +11,17 @@ export function loadFarmSettings(): FarmSettings {
   } catch {
     stored = null
   }
-  const effects = (stored as { effects?: unknown } | null)?.effects
-  return { effects: effects !== false }
+  const value = stored as { effects?: unknown; muted?: unknown } | null
+  return { effects: value?.effects !== false, muted: value?.muted === true }
 }
 
-export function saveFarmSettings(next: FarmSettings): FarmSettings {
-  const settings = { effects: next.effects !== false }
+export function saveFarmSettings(next: Partial<FarmSettings>): FarmSettings {
+  // Each switch changes one preference without resetting the other.
+  const previous = loadFarmSettings()
+  const settings = {
+    effects: next.effects === undefined ? previous.effects : next.effects !== false,
+    muted: next.muted === undefined ? previous.muted : next.muted === true,
+  }
   try {
     accountStorage.setItem(FARM_SETTINGS_KEY, JSON.stringify(settings))
   } catch {

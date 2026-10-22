@@ -96,8 +96,9 @@ it('uses the same identities across upgrades, help, builds, career and share tex
     cleanup()
     render(<BuildSummary gear={gear} />)
     expect(screen.getByLabelText('本局乐队').textContent).toContain(character.name)
-    // Levels are the only extra line: the name above already says who is playing.
-    expect(screen.getByLabelText('本局乐队').textContent).toContain('Lv.1 ＋ Lv.0')
+    // A named pair makes the held member and the missing accessory explicit.
+    expect(screen.getByLabelText('本局乐队').textContent).toContain(`${character.name}Lv.1`)
+    expect(screen.getByLabelText('本局乐队').textContent).toContain('缺少')
     cleanup()
     render(
       <BadgeWall
@@ -123,5 +124,6 @@ it('presents the additional synthesizer as an instrument rather than another rob
   cleanup()
   render(<BuildSummary gear={gear} />)
   expect(screen.getByLabelText('本局乐队').textContent).toContain('辅助合成器')
-  expect(screen.getByLabelText('本局乐队').textContent).toContain('Lv.1 ＋ Lv.0')
+  expect(screen.getByLabelText('本局乐队').textContent).toContain('辅助合成器Lv.1')
+  expect(screen.getByLabelText('本局乐队').textContent).toContain('琶音器缺少')
 })

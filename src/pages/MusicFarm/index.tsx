@@ -202,12 +202,27 @@ export default function MusicFarm() {
   const [copied, setCopied] = useState(false)
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const settingsRef = useRef(settings)
+  const reducedMotion = useRef(false)
+  useEffect(() => {
+    const preference = window.matchMedia?.('(prefers-reduced-motion: reduce)')
+    if (!preference) return
+    const update = () => {
+      reducedMotion.current = preference.matches
+    }
+    update()
+    if (preference.addEventListener) {
+      preference.addEventListener('change', update)
+      return () => preference.removeEventListener('change', update)
+    }
+    preference.addListener?.(update)
+    return () => preference.removeListener?.(update)
+  }, [])
   const [quests, setQuests] = useState<FarmQuestLog>(() => loadFarmQuests(day))
   const [freshQuests, setFreshQuests] = useState<string[]>([])
   const todayQuests = farmQuests(day)
   const evolutionMarks = useRef<number[]>([])
   const runId = useRef('')
-  const [muted, setMuted] = useState(false)
+  const muted = settings.muted
   const [audioError, setAudioError] = useState(false)
   const [celebration, setCelebration] = useState('')
   const [notice, setNotice] = useState('')
@@ -265,13 +280,14 @@ export default function MusicFarm() {
     audio.current?.stop()
     audioSerial.current++
   }
-  const prepare = async (nextMuted = muted) => {
+  const prepare = async (nextMuted = settingsRef.current.muted) => {
     const serial = ++audioSerial.current
     if (!audio.current) audio.current = new FarmAudio()
+    audio.current.setMuted(nextMuted)
     const ok = await audio.current.prepare()
     if (serial !== audioSerial.current) return
     setAudioError(!ok)
-    audio.current.setMuted(nextMuted)
+    audio.current.setMuted(settingsRef.current.muted)
   }
   const dismissPanel = (fromHistory: boolean) => {
     dropDialogHistory(!fromHistory)
@@ -487,7 +503,10 @@ export default function MusicFarm() {
       setBadges(loadFarmAchievements())
       setCareer(loadFarmCareer())
       setQuests(loadFarmQuests(dayRef.current))
-      setSettings(loadFarmSettings())
+      const nextSettings = loadFarmSettings()
+      settingsRef.current = nextSettings
+      setSettings(nextSettings)
+      audio.current?.setMuted(nextSettings.muted)
       setBest((previous) => Math.max(previous, loadBestScore(farmBestKey(dayRef.current))))
     }
     const onStorage = (event: StorageEvent) => {
@@ -568,6 +587,7 @@ export default function MusicFarm() {
   }, [])
   useEffect(() => {
     const sound = new FarmAudio()
+    sound.setMuted(settingsRef.current.muted)
     audio.current = sound
     const element = canvas.current!,
       controlField = field.current!,
@@ -872,6 +892,7 @@ export default function MusicFarm() {
           character: heroSprite.current,
           joystick: stick.current ?? undefined,
           simple: !settingsRef.current.effects,
+          reducedMotion: reducedMotion.current,
           position: displayPosition.current,
           tick: state.tick + (elapsed * FPS) / 1000,
           previousLoot: lootPose.live,
@@ -1016,9 +1037,28 @@ export default function MusicFarm() {
     if (event.key !== 'Tab') return
     const buttons = Array.from(
       event.currentTarget.querySelectorAll<HTMLElement>(
-        'button:not(:disabled),input:not(:disabled),a[href]',
+        'button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[tabindex]',
       ),
-    )
+    ).filter((element) => {
+      if (
+        element.tabIndex < 0 ||
+        element.matches(':disabled') ||
+        element.closest('[hidden],[inert]')
+      )
+        return false
+      // Include scrollable tab panels, but skip inactive tabs and anything
+      // removed by a responsive rule. Layout sizes alone are not enough in
+      // embedded browsers (or DOM tests), so inspect ancestor styles.
+      for (
+        let current: HTMLElement | null = element;
+        current && current !== event.currentTarget;
+        current = current.parentElement
+      ) {
+        const style = getComputedStyle(current)
+        if (style.display === 'none' || style.visibility === 'hidden') return false
+      }
+      return true
+    })
     if (event.shiftKey && document.activeElement === buttons[0]) {
       event.preventDefault()
       buttons.at(-1)?.focus()
@@ -1119,9 +1159,11 @@ export default function MusicFarm() {
               aria-label={muted ? '开启声音' : '静音'}
               aria-pressed={muted}
               onClick={() => {
-                setMuted(!muted)
-                audio.current?.setMuted(!muted)
-                if (muted || audioError) void prepare(!muted)
+                const next = saveFarmSettings({ muted: !muted })
+                settingsRef.current = next
+                setSettings(next)
+                audio.current?.setMuted(next.muted)
+                if (!next.muted || audioError) void prepare(next.muted)
               }}
             >
               <span className={`farm-sound-toggle${muted ? ' is-muted' : ''}`}>
@@ -1155,7 +1197,9 @@ export default function MusicFarm() {
               )}
             </div>
             <div className="farm-status">
-              <div className={`farm-health ${view.hp <= 30 ? 'is-low' : ''}`}>
+              <div
+                className={`farm-health ${view.hp > 0 && view.hp / view.maxHp <= 0.3 ? 'is-low' : ''}`}
+              >
                 <span>♥</span>
                 <div
                   role="progressbar"
@@ -1477,7 +1521,7 @@ export default function MusicFarm() {
           className={`farm-backdrop${panel === 'shop' || panel === 'growth' ? ' is-fullscreen' : ''}`}
         >
           <section
-            className={`farm-dialog ${upgrade ? 'farm-upgrade-dialog' : panel === 'shop' || panel === 'growth' ? 'is-fullscreen' : panel === 'pause' ? 'farm-pause' : ''}`}
+            className={`farm-dialog ${upgrade ? 'farm-upgrade-dialog' : panel === 'shop' || panel === 'growth' ? 'is-fullscreen' : panel === 'pause' ? 'farm-pause' : panel === 'help' ? 'farm-help-dialog' : ''}`}
             ref={modal}
             role="dialog"
             aria-modal="true"
@@ -1511,7 +1555,7 @@ export default function MusicFarm() {
               />
             ) : (
               <>
-                {panel !== 'shop' && panel !== 'growth' && (
+                {panel !== 'shop' && panel !== 'growth' && panel !== 'help' && (
                   <button className="farm-close" aria-label="关闭弹窗" onClick={closePanel}>
                     ×
                   </button>

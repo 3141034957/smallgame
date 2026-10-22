@@ -15,10 +15,10 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('farm display settings', () => {
   it('keeps effects on by default and remembers turning them off', () => {
-    expect(loadFarmSettings()).toEqual({ effects: true })
-    expect(saveFarmSettings({ effects: false })).toEqual({ effects: false })
-    expect(loadFarmSettings()).toEqual({ effects: false })
-    expect(saveFarmSettings({ effects: true })).toEqual({ effects: true })
+    expect(loadFarmSettings()).toEqual({ effects: true, muted: false })
+    expect(saveFarmSettings({ effects: false })).toEqual({ effects: false, muted: false })
+    expect(loadFarmSettings()).toEqual({ effects: false, muted: false })
+    expect(saveFarmSettings({ effects: true })).toEqual({ effects: true, muted: false })
     expect(loadFarmSettings().effects).toBe(true)
   })
   it('treats corrupt or missing storage as the default', () => {
@@ -32,6 +32,18 @@ describe('farm display settings', () => {
         throw new Error('quota')
       },
     })
-    expect(saveFarmSettings({ effects: false })).toEqual({ effects: false })
+    expect(saveFarmSettings({ effects: false })).toEqual({ effects: false, muted: false })
+  })
+  it('keeps sound and effects choices independent across reloads', () => {
+    saveFarmSettings({ muted: true })
+    expect(saveFarmSettings({ effects: false })).toEqual({ effects: false, muted: true })
+    expect(loadFarmSettings()).toEqual({ effects: false, muted: true })
+    expect(saveFarmSettings({ muted: false })).toEqual({ effects: false, muted: false })
+  })
+  it('migrates an old effects-only setting and ignores invalid mute values', () => {
+    data.set(FARM_SETTINGS_KEY, JSON.stringify({ effects: false }))
+    expect(loadFarmSettings()).toEqual({ effects: false, muted: false })
+    data.set(FARM_SETTINGS_KEY, JSON.stringify({ muted: 'true' }))
+    expect(loadFarmSettings().muted).toBe(false)
   })
 })

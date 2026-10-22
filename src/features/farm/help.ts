@@ -17,7 +17,7 @@ import {
 export type { Combo, School }
 export type ComboState = ComboSource
 
-// The ladder the result screen draws under a school: I → V, where V is the
+// The ladder the upgrade cards draw under a school: I → V, where V is the
 // 终极 form. `tier` comes from the data layer (0–4).
 export const SCHOOL_ROMAN = ['I', 'II', 'III', 'IV', 'V']
 

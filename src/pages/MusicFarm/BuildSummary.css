@@ -1,0 +1,168 @@
+.farm-build.farm-build-summary {
+  background: #f3f5e9;
+  border-color: #dee5cb;
+  padding: 9px 10px;
+}
+
+.farm-build-summary .farm-build-heading {
+  margin-bottom: 6px;
+}
+
+.farm-build-summary .farm-build-heading small,
+.farm-build-summary .farm-build-heading span {
+  color: #6c7952;
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+.farm-build-summary .farm-build-recipes {
+  gap: 5px;
+}
+
+.farm-build-summary .farm-build-recipe {
+  position: relative;
+  display: block;
+  padding: 6px 8px;
+  border-color: #e0e6d1;
+  background: #fffef8;
+  overflow: hidden;
+}
+
+.farm-build-summary .farm-build-recipe.is-evolved {
+  border-color: #e5ce8e;
+  background: #fff9e9;
+}
+
+.farm-build-summary .farm-build-recipe.is-blocked {
+  border-color: #e4d6c8;
+}
+
+.farm-build-summary .farm-build-recipe-heading {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  line-height: 1.5;
+}
+
+.farm-build-summary .farm-build-recipe-heading > span:first-child {
+  font-size: 13px;
+}
+
+.farm-build-summary .farm-build-recipe-heading strong {
+  color: #56663e;
+  font-size: 11px;
+  min-width: 0;
+}
+
+.farm-build-summary .farm-build-recipe-heading .farm-school-layer {
+  margin-left: auto;
+  flex: none;
+  font-size: 9px;
+  font-weight: 800;
+  color: #697956;
+  font-variant-numeric: tabular-nums;
+}
+
+.farm-build-summary .is-evolved .farm-build-recipe-heading strong,
+.farm-build-summary .is-evolved .farm-school-layer {
+  color: #8b6924;
+}
+
+.farm-build-summary .is-blocked .farm-school-layer {
+  color: #986748;
+}
+
+.farm-build-summary .farm-build-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  margin: 3px 0 5px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #667151;
+}
+
+.farm-build-summary .farm-build-pair > div {
+  display: flex;
+  gap: 3px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.farm-build-summary .farm-build-pair dt {
+  min-width: 0;
+}
+
+.farm-build-summary .farm-build-pair dt span {
+  margin-right: 3px;
+}
+
+.farm-build-summary .farm-build-pair dd {
+  margin: 0 0 0 auto;
+  flex: none;
+  font-size: 9px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.farm-build-summary .farm-build-pair .is-missing {
+  color: #987957;
+}
+
+.farm-build-summary .farm-build-progress {
+  height: 3px;
+  background: #e9eddd;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.farm-build-summary .farm-build-progress i {
+  display: block;
+  height: 100%;
+  background: var(--school-color, #769655);
+  border-radius: inherit;
+}
+
+.farm-build-summary .is-evolved .farm-build-progress i {
+  background: #d2ac4b;
+}
+
+.farm-build-summary .is-blocked .farm-build-progress i {
+  background: #b59a7f;
+}
+
+.farm-build-summary .farm-build-drum {
+  margin-top: 4px;
+  color: #7a704d;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.farm-build-summary .farm-combos {
+  margin-top: 7px;
+  padding-top: 6px;
+  border-top-color: #d8dfc7;
+}
+
+.farm-build-summary .farm-combos > .farm-combos-title {
+  color: #6c7952;
+  letter-spacing: 0;
+}
+
+.farm-build-summary .farm-combos li {
+  padding: 5px 8px;
+}
+
+.farm-build-summary .farm-combos li.is-hint {
+  background: #f9faef;
+  border-color: #dce3c9;
+}
+
+.farm-build-summary .farm-combos li.is-hint strong {
+  color: #667151;
+}
+
+.farm-build-summary .farm-combos small {
+  color: #827356;
+}

@@ -189,7 +189,8 @@ it('opens the run already holding the instrument of the selected character', asy
   // No starter hand is dealt: the guitarist is on stage from the first frame.
   const build = screen.getByLabelText('本局乐队')
   expect(build.textContent).toContain('吉他手弦弦')
-  expect(build.textContent).toContain('Lv.1 ＋ Lv.0')
+  expect(build.textContent).toContain('吉他手弦弦Lv.1')
+  expect(build.textContent).toContain('节拍器缺少')
 })
 
 it('waits for a manual choice, and keeps waiting: a dry pool deals a hand, not a sole offer', async () => {

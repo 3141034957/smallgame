@@ -5,12 +5,15 @@
 - `src/App.tsx`：仅保留 `/` 与 `/farm` 两个游戏入口；其他旧地址回到首页。分享链接继续携带日期和挑战参数。
 - `src/pages/MusicFarm/index.tsx`：串联对局生命周期、动画循环、输入、音频与本地结算。可变的逐帧状态在 ref 中，界面状态在 React state 中。
 - `src/pages/MusicFarm/UpgradeChoices.tsx`、`FarmHelp.tsx`：升级选项与玩法说明，接收数据和回调，不修改存档或推进游戏。
+- `src/pages/MusicFarm/BuildSummary.tsx`、`src/features/farm/build.ts`：展示具名装备配对与进化进度，按双方剩余槽位过滤不可达组合提示，不参与抽卡或战斗。
 - `src/features/farm/upgradeGuidance.ts`：只读计算当前升级的配套关系，以及本次选择使哪些已接触流派失去进化条件；不参与抽卡、战斗或服务端回放。
 - `src/pages/MusicFarm/StartStage.tsx`：开场角色小舞台，复用现有角色素材，装饰随屏高收缩。
 - `src/features/farm/upgradeSelection.ts`：执行选择及后续单选项的连续自动升级，返回每次选择的日志；页面在发布画面前处理单选项，多选项继续等待玩家，服务端仍按原规则回放日志。
 - `src/pages/MusicFarm/FarmBoard.tsx`：生存榜读取、提交与重试。
 - `src/features/farm/runReporting.ts`：新对局开始后静默上报对局 ID，失败最多重试一次；服务端 `farm_run_starts` 按 ID 去重，后台用 `npm run stats:plays` 查询累计开局次数。
 - `src/pages/MusicFarm/render.ts`、`background.ts`：绘图和背景；不改变游戏规则。
+- `src/pages/MusicFarm/combatFeedback.ts`：从真实战斗状态提取生命比例、护盾/无敌反馈与环绕武器位置，用于完整和简化画面。
+- `src/features/farm/settings.ts`：保存特效和静音偏好，兼容旧存档；系统减少动态效果由主页面监听并单独传给画布。
 - `src/features/farm/`：战斗规则、控制器、本地角色钱包、成就、任务、生涯统计等独立模块。
 - `src/features/farm/permanent.mjs`：局外永久成长的数据与纯函数。成长是一条全局链而非多项多级树：`PERMANENT_CHAIN`（`PERMANENT_UPGRADES` 的别名）是 200 个 `max: 1` 的节点，`permanentNextStep` / `permanentIsUnlocked` 实现严格顺序解锁，`RECOVERY` 保存安全期与回血周期，`normalizePermanentLevels` 只认链上的 200 个 id（旧的多级存档键读回来为全 0，即强化数据直接清空，不做折算），`permanentStats` 汇总成战斗用的固定数值（`maxHp` / `damage` / `speed` / `attraction` / `xp` / `armor` / `regen` / `shieldSeconds`）。加成全为固定数值，链上没有百分比；`rules.mjs` 负责把它们接到伤害、受击、拾取、经验与步长上。
 - `src/features/farm/schools.mjs`：流派（乐器 + 专属芯片 + 进化形态）与跨流派组合技的数据层，只描述数据与纯函数判定；增益由 `rules.mjs` 在 `stepFarm` 里乘到既有数值上，并通过 `rules.mjs` 一并导出给界面，保证客户端与服务端回放共用同一份结果。鼓的余音通过 `drumEchoStats` / `markEcho` / `drainEcho` 独立结算，不加永久伤害、不吃暴击或局内倍率。鼓 Lv.1–5 的基础每跳伤害为 1 / 1 / 2 / 2 / 3，跳伤间隔为 1 / 0.75 / 0.75 / 0.5 / 0.5 秒；感染持续到死亡、不叠加。自动鼓点全图选最近的有效怪（跳过出生保护，已感染仍可选），在目标位置调用 `drumEcho()`；已感染怪死亡也继续扩散。`blastRadius()` 计算 `(7 + 鼓 × 2 + 音箱 × 2 + (有吉他 ? 3 : 0) + (进化 ? 12 : 0)) × 共振范围倍率`，音箱每级另加主动爆发半径 2。鼓 Lv.5 后只计余音最后一击，共享状态字段 `drumEchoKills` 每累计 100 个给最终每跳 +1；之前不追溯，新局归零。进化只把基础 3 翻倍为 6，计数不重置、击杀奖励不翻倍；这些规则与计数由客户端和服务端共享，规则版本为 `v14-sax-sustain`。
